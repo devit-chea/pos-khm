@@ -58,3 +58,18 @@ Thumbs.db
 # /public/product/**
 # /public/stock_count/**
 # /public/transfer/**
+
+# Backups
+*.bak
+*.orig
+*.swp
+
+# Runtime-generated exports and uploaded documents (folders kept via .gitkeep)
+/public/downloads/*
+/public/stock_count/*
+/public/documents/*/*
+/public/sale/documents/*
+/public/purchase/documents/*
+/public/transfer/documents/*
+/public/product/files/*
+!/public/**/.gitkeep
