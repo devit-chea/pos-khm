@@ -1,0 +1,60 @@
+# Dependencies
+/vendor/
+/node_modules/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+.phpunit.result.cache
+/auth.json
+*.pem
+*.key
+
+# Laravel generated
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/bootstrap/cache/*.php
+/storage/app/temp_file_*
+/storage/logs/*.log
+/storage/debugbar/*.json
+
+# Database dumps / local data
+*.sql
+*.sql.gz
+*.sqlite
+*.sqlite-journal
+/docker/mysql/init/*
+!/docker/mysql/init/.gitkeep
+
+# Tooling
+/.phpunit.cache
+/.fleet
+/.idea
+/.vscode
+/.zed
+/.nova
+/.claude/settings.local.json
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# User uploads (uncomment for real deployments; these folders also ship
+# with default/demo images, so they are tracked for now)
+# /public/images/**
+# /public/documents/**
+# /public/downloads/*
+# /public/logo/*
+# /public/sale/**
+# /public/purchase/**
+# /public/product/**
+# /public/stock_count/**
+# /public/transfer/**

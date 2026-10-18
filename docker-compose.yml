@@ -1,0 +1,51 @@
+services:
+  app:
+    build: .
+    container_name: salepro-app
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:80"
+    # Real environment variables take precedence over values in .env
+    environment:
+      APP_URL: http://localhost:8000
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: salepro
+      DB_USERNAME: salepro
+      DB_PASSWORD: salepro
+    volumes:
+      - .:/var/www/html
+      - vendor:/var/www/html/vendor   # keep the container's composer install, not the host's
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    container_name: salepro-db
+    command: --default-authentication-plugin=mysql_native_password --max_allowed_packet=256M
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: salepro
+      MYSQL_USER: salepro
+      MYSQL_PASSWORD: salepro
+    ports:
+      - "3308:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      # Any *.sql / *.sql.gz placed here is imported on the FIRST start (empty volume) only
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+# NOTE: no scheduler service on purpose — app/Console/Kernel.php schedules `reset:db`,
+# which drops every table twice a day (vendor demo reset).
+
+volumes:
+  db_data:
+  vendor:
