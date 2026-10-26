@@ -1,5 +1,23 @@
 @extends('backend.layout.main') @section('content')
 
+@push('css')
+    <style>
+        .sale-section {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            padding: 20px 20px 10px 20px;
+            margin-bottom: 20px;
+            background: #fff;
+        }
+        body.dark-mode .sale-section {
+            background: #283046;
+            border-color: #3b4253;
+            box-shadow: none;
+        }
+    </style>
+@endpush
+
 <x-error-message key="message" />
 <x-error-message key="not_permitted" />
 
@@ -15,8 +33,7 @@
                         <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
                         <form action="{{ route('purchase.import') }}" method="POST" enctype="multipart/form-data" id="purchase-form">
                             @csrf
-                        <div class="row">
-                            <div class="col-md-12">
+                            <div class="sale-section">
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="form-group">
@@ -40,7 +57,7 @@
                                     </div>
                                 </div>
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <div class="form-group">
                                             <label>{{__('db.Purchase Status')}}</label>
                                             <select name="status" class="form-control">
@@ -50,31 +67,49 @@
                                             </select>
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label>{{__('db.Currency')}} *</label>
+                                            <select name="currency_id" id="currency-id" class="form-control selectpicker">
+                                                @foreach($currency_list as $currency_data)
+                                                <option value="{{$currency_data->id}}" data-rate="{{$currency_data->exchange_rate}}" @if((int) $currency_data->id === (int) $general_setting->currency) selected @endif>{{$currency_data->code}}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label>{{__('db.Exchange Rate')}} *</label>
+                                            <input type="text" name="exchange_rate" id="exchange_rate" class="form-control" value="{{$currency->exchange_rate}}" required readonly />
+                                        </div>
+                                    </div>
+                                    <div class="col-md-12">
                                         <div class="form-group">
                                             <label>{{__('db.Attach Document')}}</label>
-                                            <i class="dripicons-question" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
+                                            <i class="ti ti-info-circle" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
                                             <input type="file" name="document" class="form-control" />
                                             @if($errors->has('extension'))
                                                 <span>
-                                                   <strong>{{ $errors->first('extension') }}</strong>
+                                                    <strong>{{ $errors->first('extension') }}</strong>
                                                 </span>
                                             @endif
                                         </div>
                                     </div>
                                 </div>
-                                <div class="row mt-3">
+                            </div>
+                            <div class="sale-section">
+                                <div class="row">
                                     <div class="col-md-6">
                                         <div class="form-group">
                                             <label>{{__('db.Upload CSV File')}} *</label>
                                             <input type="file" name="file" class="form-control" required />
-                                            <p>{{__('db.The correct column order is')}} (product_code, quantity, purchase_unit_code, cost, discount_per_unit, tax_name, profit_margin, profit_margin_type, price, imei_number) {{__('db.and you must follow this')}}. {{__('db.All columns are required')}}</p>
+                                            <p>{{__('db.The correct column order is')}} (product_code*, quantity*, purchase_unit_code*, cost*, discount_per_unit*, tax_name*, profit_margin*, profit_margin_type*, price*, imei_number) {{__('db.and you must follow this')}}.</p>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="form-group">
                                             <label></label><br>
-                                            <a href="../sample_file/sample_purchase_products.csv" class="btn btn-primary btn-block btn-lg"><i class="dripicons-download"></i> {{__('db.Download Sample File')}}</a>
+                                            <a href="../sample_file/sample_purchase_products.csv" class="btn btn-primary btn-block btn-lg"><i class="ti ti-download"></i> {{__('db.Download Sample File')}}</a>
                                         </div>
                                     </div>
                                 </div>
@@ -108,11 +143,13 @@
                                     <div class="col-md-2">
                                         <div class="form-group">
                                             <input type="hidden" name="grand_total" value="0" />
-                                            <input type="hidden" name="paid_amount" value="{{number_format(0, $general_setting->decimal, '.', '')}}" />
+                                            <input type="hidden" name="paid_amount" value="{{number_format(0, gen_setting()->decimal, '.', '')}}" />
                                             <input type="hidden" name="payment_status" value="1" />
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                            <div class="sale-section">
                                 <div class="row mt-3">
                                     <div class="col-md-4">
                                         <div class="form-group">
@@ -120,7 +157,7 @@
                                             <select class="form-control" name="order_tax_rate">
                                                 <option value="0">{{__('db.No Tax')}}</option>
                                                 @foreach($lims_tax_list as $tax)
-                                                <option value="{{$tax->rate}}">{{$tax->name}}</option>
+                                                    <option value="{{$tax->rate}}">{{$tax->name}}</option>
                                                 @endforeach
                                             </select>
                                         </div>
@@ -142,19 +179,20 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                            <div class="sale-section">
                                 <div class="row">
                                     <div class="col-md-12">
                                         <div class="form-group">
-                                            <label>{{__('db.Note')}}</label>
+                                            <label>{{__('db.note')}}</label>
                                             <textarea rows="5" class="form-control" name="note"></textarea>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="form-group">
-                                    <input type="submit" value="{{__('db.submit')}}" class="btn btn-primary" id="submit-button">
-                                </div>
                             </div>
-                        </div>
+                            <div class="form-group">
+                                <input type="submit" value="{{__('db.submit')}}" class="btn btn-primary" id="submit-button">
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -173,6 +211,11 @@
 
     $('.selectpicker').selectpicker({
         style: 'btn-link',
+    });
+
+    $('#currency-id').on('change', function() {
+        var rate = $(this).find(':selected').data('rate');
+        $('#exchange_rate').val(rate);
     });
 
     $('[data-toggle="tooltip"]').tooltip();

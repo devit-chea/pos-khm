@@ -27,6 +27,7 @@ use Clickatell\ClickatellException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Schema;
 
 class SettingController extends Controller
 {
@@ -38,72 +39,6 @@ class SettingController extends Controller
     public function __construct(SmsService $smsService)
     {
         $this->_smsService = $smsService;
-    }
-
-    public function emptyDatabase()
-    {
-        if (!env('USER_VERIFIED'))
-            return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
-
-        // Clear cached queries
-        $this->cacheForget('biller_list');
-        $this->cacheForget('brand_list');
-        $this->cacheForget('category_list');
-        $this->cacheForget('coupon_list');
-        $this->cacheForget('customer_list');
-        $this->cacheForget('customer_group_list');
-        $this->cacheForget('product_list');
-        $this->cacheForget('product_list_with_variant');
-        $this->cacheForget('warehouse_list');
-        $this->cacheForget('tax_list');
-        $this->cacheForget('currency');
-        $this->cacheForget('general_setting');
-        $this->cacheForget('pos_setting');
-        $this->cacheForget('user_role');
-        $this->cacheForget('permissions');
-        $this->cacheForget('role_has_permissions');
-        $this->cacheForget('role_has_permissions_list');
-
-        $tables = DB::select('SHOW TABLES');
-
-        if (!config('database.connections.saleprosaas_landlord'))
-            $database_name = env('DB_DATABASE');
-        else
-            $database_name = env('DB_PREFIX') . $this->getTenantId();
-
-        $str = 'Tables_in_' . $database_name;
-
-        // Disable FK checks
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-
-        foreach ($tables as $table) {
-            if (!in_array($table->$str, [
-                'accounts',
-                'currencies',
-                'ecommerce_settings',
-                'external_services',
-                'general_settings',
-                'hrm_settings',
-                'invoice_settings',
-                'languages',
-                'migrations',
-                'password_resets',
-                'permissions',
-                'pos_setting',
-                'reward_point_settings',
-                'roles',
-                'role_has_permissions',
-                'translations',
-                'users',
-            ])) {
-                DB::table($table->$str)->truncate();
-            }
-        }
-
-        // Re-enable FK checks
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
-
-        return redirect()->back()->with('message', __('db.Database cleared successfully'));
     }
 
     public function activityLog()
@@ -119,14 +54,14 @@ class SettingController extends Controller
 
         $activity_log_data = $query->get();
 
-        $general_setting = GeneralSetting::latest()->first();
+        $general_setting = cache()->get('general_setting');
 
         return view('backend.setting.activity_log', compact('activity_log_data','general_setting'));
     }
 
     public function generalSetting()
     {
-        $lims_general_setting_data = GeneralSetting::latest()->first();
+        $lims_general_setting_data = cache()->get('general_setting');
         $lims_account_list = Account::where('is_active', true)->get();
         $lims_currency_list = Currency::where('is_active',1)->get();
         $zones_array = array();
@@ -137,7 +72,10 @@ class SettingController extends Controller
             $zones_array[$key]['zone'] = $zone;
             $zones_array[$key]['diff_from_GMT'] = 'UTC/GMT ' . date('P', $timestamp);
         }
-        return view('backend.setting.general_setting', compact('lims_general_setting_data', 'lims_account_list', 'zones_array', 'lims_currency_list'));
+        $accountingMode = app(\App\Services\AccountingModeService::class);
+        $accountingConfig = \App\Models\AccountingConfig::find(1);
+        $canManageAccountingActivation = auth()->user()?->can('accounting-activation-manage') ?? false;
+        return view('backend.setting.general_setting', compact('lims_general_setting_data', 'lims_account_list', 'zones_array', 'lims_currency_list', 'accountingMode', 'accountingConfig', 'canManageAccountingActivation'));
     }
 
     public function appSetting()
@@ -162,12 +100,17 @@ class SettingController extends Controller
     public function appSettingDelete($id)
     {
         MobileToken::find($id)->update(['is_active' => false]);
-        return redirect()->back()->with('message', __('db.Token deleted successfully'));
+        return redirect()->back()->with('message', __('db.token_deleted_successfully'));
     }
 
     public function generalSettingStore(Request $request)
     {
-        if (!env('USER_VERIFIED'))
+        $role = \Spatie\Permission\Models\Role::find(auth()->user()->role_id);
+        if (!$role->hasPermissionTo('general_setting')) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        if (!config('app.user_verified'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
 
         $this->validate($request, [
@@ -176,6 +119,17 @@ class SettingController extends Controller
         ]);
 
         $data = $request->except('site_logo', 'dark_logo');
+
+        if (config('database.connections.saleprosaas_landlord')
+            && tenant('subscription_type') === 'profit_commission') {
+            $profile = \App\Models\landlord\TenantBillingProfile::where('tenant_id', tenant('id'))->firstOrFail();
+            $currencyCode = DB::table('currencies')->where('id', $data['currency'] ?? null)->value('code');
+            if ($currencyCode !== $profile->currency) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'currency' => 'This subscription requires the agreed billing currency: ' . $profile->currency,
+                ]);
+            }
+        }
 
         $general_setting = GeneralSetting::latest()->first();
         $general_setting->id = 1;
@@ -186,10 +140,16 @@ class SettingController extends Controller
         else
             $general_setting->is_rtl = false;
 
-        if (isset($data['is_zatca'])) {
+        $general_setting->is_india_gst_enabled = isset($data['is_india_gst_enabled']);
+
+        if (Schema::hasColumn('general_settings', 'zatca_mode')
+            && app(\App\Services\ZatcaIntegrationService::class)->moduleIsAvailable()) {
+            $general_setting->is_zatca = ($general_setting->zatca_mode ?? 'disabled') !== 'disabled';
+        } elseif (isset($data['is_zatca'])) {
             $general_setting->is_zatca = true;
-        } else
+        } else {
             $general_setting->is_zatca = false;
+        }
 
         $general_setting->company_name = $data['company_name'];
         $general_setting->vat_registration_number = $data['vat_registration_number'];
@@ -221,6 +181,15 @@ class SettingController extends Controller
             $general_setting->disable_forgot_password = true;
         else
             $general_setting->disable_forgot_password = false;
+
+        $general_setting->is_payment_approval_required = isset($data['is_payment_approval_required']);
+        if (isset($data['field_collection_payment_options'])) {
+            $general_setting->field_collection_payment_options = is_array($data['field_collection_payment_options'])
+                ? implode(',', $data['field_collection_payment_options'])
+                : (string) $data['field_collection_payment_options'];
+        } else {
+            $general_setting->field_collection_payment_options = '';
+        }
 
         if ($request->filled('maintenance_allowed_ips')) {
 
@@ -284,6 +253,8 @@ class SettingController extends Controller
 
         $general_setting->save();
         cache()->forget('general_setting');
+        cache()->forget('currency');
+        cache()->forget('currency_list');
 
         return redirect()->back()->with('message', __('db.Data updated successfully'));
     }
@@ -296,7 +267,16 @@ class SettingController extends Controller
 
     public function rewardPointSettingStore(Request $request)
     {
-        $data = $request->all();
+        $data = $request->validate([
+            'per_point_amount' => ['required', 'numeric', 'gt:0'],
+            'minimum_amount' => ['required', 'numeric', 'gte:0'],
+            'duration' => ['nullable', 'integer', 'gte:0'],
+            'type' => ['nullable', 'in:days,months,years'],
+            'redeem_amount_per_unit_rp' => ['nullable', 'numeric', 'gt:0'],
+            'min_order_total_for_redeem' => ['nullable', 'numeric', 'gte:0'],
+            'min_redeem_point' => ['nullable', 'integer', 'gte:0'],
+            'max_redeem_point' => ['nullable', 'integer', 'gte:0'],
+        ]);
 
         // Checkbox handling
         $data['is_active'] = isset($data['is_active']) ? true : false;
@@ -316,7 +296,7 @@ class SettingController extends Controller
 
     public function backup()
     {
-        if (!env('USER_VERIFIED'))
+        if (!config('app.user_verified'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
 
         // Database configuration
@@ -400,7 +380,7 @@ class SettingController extends Controller
 
     public function changeTheme($theme)
     {
-        $lims_general_setting_data = GeneralSetting::latest()->first();
+        $lims_general_setting_data = DB::table('general_settings')->latest()->first();
         $lims_general_setting_data->theme = $theme;
         $lims_general_setting_data->save();
     }
@@ -413,7 +393,7 @@ class SettingController extends Controller
 
     public function mailSettingStore(Request $request)
     {
-        if (!env('USER_VERIFIED'))
+        if (!config('app.user_verified'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
 
         $data = $request->all();
@@ -459,6 +439,7 @@ class SettingController extends Controller
         $twilio = [];
         $clickatell = [];
         $zircon = [];
+        $custom_http = [];
 
         foreach ($settings as $setting) {
             if ($setting->name == 'tonkra') {
@@ -495,6 +476,11 @@ class SettingController extends Controller
                 $zircon['active']  = $setting->active ?? '';
                 $zircon['details'] = json_decode($setting->details) ?? '';
             }
+            if ($setting->name == 'custom_http') {
+                $custom_http['sms_id'] = $setting->id ?? '';
+                $custom_http['active'] = $setting->active ?? '';
+                $custom_http['details'] = json_decode($setting->details) ?? '';
+            }
         }
 
         $tonkra['sms_id']       = $tonkra['sms_id'] ?? '';
@@ -529,12 +515,19 @@ class SettingController extends Controller
         $zircon['api_key']   = $zircon['details']->api_key ?? '';
         $zircon['sender_id'] = $zircon['details']->sender_id ?? '';
 
-        return view('backend.setting.sms_setting', compact('tonkra', 'twilio', 'clickatell', 'revesms', 'bdbulksms','zircon'));
+        $custom_http['sms_id'] = $custom_http['sms_id'] ?? '';
+        $custom_http['active'] = $custom_http['active'] ?? '';
+        $custom_http['method'] = $custom_http['details']->method ?? 'POST';
+        $custom_http['api_url'] = $custom_http['details']->api_url ?? '';
+        $custom_http['headers'] = $custom_http['details']->headers ?? '';
+        $custom_http['body_template'] = $custom_http['details']->body_template ?? '';
+
+        return view('backend.setting.sms_setting', compact('tonkra', 'twilio', 'clickatell', 'revesms', 'bdbulksms','zircon', 'custom_http'));
     }
 
     public function smsSettingStore(Request $request)
     {
-        if (!env('USER_VERIFIED'))
+        if (!config('app.user_verified'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
 
         $data = $request->all();
@@ -545,6 +538,7 @@ class SettingController extends Controller
         $bdbulksms = [];
         $twilio = [];
         $clickatell = [];
+        $custom_http = [];
         if ($data['gateway'] == 'zircon') {
             $zircon['user_id']   = $data['user_id'];
             $zircon['api_key']   = $data['api_key'];
@@ -581,6 +575,15 @@ class SettingController extends Controller
             $clickatell['api_key'] = $data['api_key'];
             $data['details'] = json_encode($clickatell);
         }
+        
+        if ($data['gateway'] == 'custom_http') {
+            $custom_http['method'] = $data['method'] ?? 'POST';
+            $custom_http['api_url'] = $data['api_url'] ?? '';
+            $custom_http['headers'] = $data['headers'] ?? '';
+            $custom_http['body_template'] = $data['body_template'] ?? '';
+            $data['details'] = json_encode($custom_http);
+        }
+        
         if (isset($data['active']) && $data['active'] == true) {
             ExternalService::where('type', 'sms')
                 ->where('active', true)
@@ -599,6 +602,31 @@ class SettingController extends Controller
         );
 
         return redirect()->back()->with('message', __('db.Data updated successfully'));
+    }
+
+    public function testCustomHttpSms(Request $request)
+    {
+        $data = $request->all();
+        
+        $smsData = [
+            'sms_provider_name' => 'custom_http',
+            'details' => json_encode([
+                'method' => $data['method'] ?? 'POST',
+                'api_url' => $data['api_url'] ?? '',
+                'headers' => $data['headers'] ?? '',
+                'body_template' => $data['body_template'] ?? '',
+            ]),
+            'message' => 'Test SMS from SalePro',
+            'numbers' => [$data['phone']],
+        ];
+
+        try {
+            $customHttpSms = new \App\SMSProviders\CustomHttpSms();
+            $response = $customHttpSms->send($smsData);
+            return response()->json(['success' => true, 'response' => $response]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()]);
+        }
     }
 
     public function createSms()
@@ -685,7 +713,7 @@ class SettingController extends Controller
                 ->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
         }
 
-        if (!env('USER_VERIFIED')) {
+        if (!config('app.user_verified')) {
             Session::flash('message', 'This feature is disabled for demo!');
             Session::flash('type', 'error');
             return redirect()->back();
@@ -781,7 +809,7 @@ class SettingController extends Controller
 
     public function posSettingStore(Request $request)
     {
-        if (!env('USER_VERIFIED'))
+        if (!config('app.user_verified'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
 
         $data = $request->all();

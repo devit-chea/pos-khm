@@ -30,12 +30,12 @@
                 </td>
                 <td>
                     <div class="input-group" style="max-width: unset">
-                        <input type="number" class="form-control qty" min="1" name="product_qty[]"
+                        <input type="number" class="form-control qty" min="0" name="product_qty[]"
                             value="{{ $qty_list[$key] ?? 1 }}" step="any" placeholder="Qty" aria-label="Quantity">
 
                         <div class="input-group-append">
-                            <select name="combo_unit_id[]" style="width: 112px;"
-                                class="btn btn-outline-secondary form-control combo_unit_id"
+                            <select name="combo_unit_id[]" style="width: 112px; border-top-left-radius: 0; border-bottom-left-radius: 0;"
+                                class="form-control combo_unit_id"
                                 onchange="calculate_price()">
                                 @foreach ($combo_unit as $row)
                                     <option value="{{ $row->id }}"

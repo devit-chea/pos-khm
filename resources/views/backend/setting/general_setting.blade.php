@@ -13,6 +13,32 @@
                     </div>
                     <div class="card-body">
                         <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
+                        @if($canManageAccountingActivation)
+                            <div class="alert {{ $accountingMode->state() === 'active' ? 'alert-success' : ($accountingMode->state() === 'needs_attention' ? 'alert-warning' : 'alert-info') }} d-flex justify-content-between align-items-center flex-wrap mb-4">
+                                <div>
+                                    <strong>{{ __('db.Double-Entry Accounting') }}</strong><br>
+                                    @if($accountingMode->state() === 'active')
+                                        <span>{{ __('db.Double-entry accounting is active.') }}</span>
+                                        @if($accountingConfig?->activated_at)
+                                            <small class="d-block">{{ __('db.Activated') }}: {{ $accountingConfig->activated_at->format('Y-m-d H:i') }} ({{ $accountingConfig->activation_mode }})</small>
+                                        @endif
+                                    @elseif($accountingMode->state() === 'needs_attention')
+                                        <span>{{ __('db.Accounting setup needs attention. Review the accounting health details before making changes.') }}</span>
+                                    @else
+                                        <span>{{ __('db.Set up double-entry accounting through a reviewed opening-balance cutover. This does not delete business data.') }}</span>
+                                    @endif
+                                </div>
+                                <div class="mt-2 mt-md-0">
+                                    @if($accountingMode->state() === 'active')
+                                        <a class="btn btn-sm btn-outline-success" href="{{ route('accounting.reconciliation.index') }}">{{ __('db.Open Accounting Health') }}</a>
+                                    @elseif($accountingMode->state() === 'needs_attention')
+                                        <a class="btn btn-sm btn-outline-warning" href="{{ route('accounting.reconciliation.index') }}">{{ __('db.Review Accounting Health') }}</a>
+                                    @else
+                                        <a class="btn btn-sm btn-primary" href="{{ route('accounting.activation.index') }}">{{ __('db.Set up double-entry accounting') }}</a>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
                         <form action="{{ route('setting.generalStore') }}" method="POST" enctype="multipart/form-data">
                             @csrf
                             <div class="row">
@@ -25,7 +51,7 @@
                                 <div class="col-md-4">
                                     <div class="form-group">
                                         <label>{{__('db.System Logo')}} * <x-info title="jpg, jpeg, png & gif" type="info" /></label>
-                                        <input type="file" name="site_logo" class="form-control" value="" accept="image/png, image/jpeg, image/gif"/>
+                                        <input type="file" id="site_logo" name="site_logo" class="form-control" value="" accept="image/png, image/jpeg, image/gif"/>
                                     </div>
                                     @if($errors->has('site_logo'))
                                    <span>
@@ -36,7 +62,7 @@
                                 <div class="col-md-4">
                                     <div class="form-group">
                                         <label>{{__('favicon')}} <x-info title="jpg, jpeg, png & gif" type="info" /></label>
-                                        <input type="file" name="favicon" class="form-control" value="" accept="image/png, image/jpeg, image/gif"/>
+                                        <input type="file" id="favicon" name="favicon" class="form-control" value="" accept="image/png, image/jpeg, image/gif"/>
                                     </div>
                                 </div>
                                 <div class="col-md-4 mt-4">
@@ -47,23 +73,36 @@
                                         <input type="checkbox" name="is_rtl" value="1" />
                                         @endif
                                         &nbsp;
-                                        <label>{{__('db.RTL Layout')}}</label>
+                                        <label>{{__('db.rtl_layout')}}</label>
                                     </div>
                                 </div>
-                                @if(config('database.connections.saleprosaas_landlord'))
-                                    <div class="col-md-4 mt-4">
-                                        <div class="form-group">
-                                            @if($lims_general_setting_data->is_zatca)
-                                            <input type="checkbox" name="is_zatca" value="1" checked>
-                                            @else
-                                            <input type="checkbox" name="is_zatca" value="1" />
-                                            @endif
-                                            &nbsp;
-                                            <label>{{__('db.ZATCA QrCode')}}</label>
-
-                                        </div>
+                                <div class="col-md-4 mt-4">
+                                    <div class="form-group">
+                                        @if($lims_general_setting_data->is_india_gst_enabled)
+                                        <input type="checkbox" name="is_india_gst_enabled" id="is_india_gst_enabled" value="1" checked>
+                                        @else
+                                        <input type="checkbox" name="is_india_gst_enabled" id="is_india_gst_enabled" value="1" />
+                                        @endif
+                                        &nbsp;
+                                        <label>Enable India GST</label>
                                     </div>
-                                @endif
+                                </div>
+                                <div class="col-md-4 mt-4">
+                                    <div class="form-group">
+                                        @if(\Illuminate\Support\Facades\Route::has('zatca.ksa.settings'))
+                                        <label class="d-block">{{__('db.ZATCA QrCode')}}</label>
+                                        <a href="{{ route('zatca.ksa.settings') }}" class="btn btn-sm btn-outline-primary">Manage Phase 1 / Phase 2</a>
+                                        @elseif($lims_general_setting_data->is_zatca)
+                                        <input type="checkbox" name="is_zatca" value="1" checked>
+                                        @else
+                                        <input type="checkbox" name="is_zatca" value="1" />
+                                        @endif
+                                        @unless(\Illuminate\Support\Facades\Route::has('zatca.ksa.settings'))
+                                        &nbsp;
+                                        <label>{{__('db.ZATCA QrCode')}}</label>
+                                        @endunless
+                                    </div>
+                                </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
                                         <label>{{__('db.Company Name')}}</label>
@@ -138,7 +177,7 @@
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>{{__('db.Currency')}} *</label>
+                                        <label>{{__('db.Currency')}} * <x-info title="You can add new currencies from the settings > currency. Exchange rate for default currency must be 1" /></label>
                                         <select name="currency" class="form-control" required>
                                             @foreach($lims_currency_list as $key => $currency)
                                                 @if($lims_general_setting_data->currency == $currency->id)
@@ -364,6 +403,32 @@
                                         <label>{{__('db.Disable password reset')}}</label>
                                     </div>
                                 </div>
+                                <div class="col-md-4 mt-4">
+                                    <div class="form-group mt-2">
+                                        @if($lims_general_setting_data->is_payment_approval_required)
+                                        <input type="checkbox" name="is_payment_approval_required" value="1" checked>
+                                        @else
+                                        <input type="checkbox" name="is_payment_approval_required" value="1" />
+                                        @endif
+                                        &nbsp;
+                                        <label>{{__('db.Require Approval for Staff-Collected Customer Payments')}}</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mt-4">
+                                    <div class="form-group">
+                                        <label>{{__('db.Field Collection Payment Options')}}</label>
+                                        <select name="field_collection_payment_options[]" class="form-control selectpicker" multiple data-live-search="true">
+                                            @php
+                                                $pos_setting = \App\Models\PosSetting::latest()->first();
+                                                $available_options = $pos_setting ? explode(',', $pos_setting->payment_options) : [];
+                                                $selected_options = explode(',', $lims_general_setting_data->field_collection_payment_options ?? 'cash,cheque');
+                                            @endphp
+                                            @foreach($available_options as $option)
+                                                <option value="{{$option}}" {{ in_array($option, $selected_options) ? 'selected' : '' }}>{{ucfirst($option)}}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </div>
 
                                 <div class="col-md-4 mt-4">
                                     <div class="form-group mt-2">
@@ -491,6 +556,14 @@
     $("ul#setting").addClass("show");
     $("ul#setting #general-setting-menu").addClass("active");
 
+    $('#is_india_gst_enabled').on('change', function () {
+        if (!$(this).is(':checked')) {
+            if (typeof SaleProToast !== 'undefined') {
+                SaleProToast.warning("Warning: Disabling India GST will disable access to all India GST functionality. If you have historical India GST transactions, you will not be able to modify or return them until you re-enable it. Historical data will not be deleted.");
+            }
+        }
+    });
+
     $("select[name=invoice_format]").on("change", function (argument) {
         if($(this).val() == 'standard') {
             $("#state").addClass('d-none');
@@ -579,28 +652,37 @@
 </script>
 
 <script>
-    document.getElementById('site_logo').addEventListener('change', function () {
-        const file = this.files[0];
-        const errorEl = document.getElementById('logo_error');
-        errorEl.textContent = '';
+    const siteLogoEl = document.getElementById('site_logo');
+    if (siteLogoEl) {
+        siteLogoEl.addEventListener('change', function () {
+            const file = this.files[0];
+            let errorEl = document.getElementById('logo_error');
+            if (!errorEl) {
+                errorEl = document.createElement('strong');
+                errorEl.id = 'logo_error';
+                errorEl.className = 'text-danger d-block mt-1';
+                this.parentNode.appendChild(errorEl);
+            }
+            errorEl.textContent = '';
 
-        if (!file) return;
+            if (!file) return;
 
-        // Allowed types
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-        const maxSize = 5 * 1024 * 1024; // 5 MB
+            // Allowed types
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+            const maxSize = 5 * 1024 * 1024; // 5 MB
 
-        if (!allowedTypes.includes(file.type)) {
-            errorEl.textContent = 'Only JPG, PNG, or GIF images are allowed.';
-            this.value = '';
-            return;
-        }
+            if (!allowedTypes.includes(file.type)) {
+                errorEl.textContent = 'Only JPG, PNG, or GIF images are allowed.';
+                this.value = '';
+                return;
+            }
 
-        if (file.size > maxSize) {
-            errorEl.textContent = 'File size must be less than 5 MB.';
-            this.value = '';
-            return;
-        }
-    });
+            if (file.size > maxSize) {
+                errorEl.textContent = 'File size must be less than 5 MB.';
+                this.value = '';
+                return;
+            }
+        });
+    }
 </script>
 @endpush

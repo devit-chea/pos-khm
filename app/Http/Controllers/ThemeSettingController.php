@@ -134,7 +134,7 @@ class ThemeSettingController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        if (!env('USER_VERIFIED')) {
+        if (!config('app.user_verified')) {
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
         }
 
@@ -169,7 +169,7 @@ class ThemeSettingController extends Controller
 
     public function update(Request $request, ThemeSetting $themeSetting): RedirectResponse
     {
-        if (!env('USER_VERIFIED')) {
+        if (!config('app.user_verified')) {
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
         }
 
@@ -200,7 +200,7 @@ class ThemeSettingController extends Controller
 
     public function destroy(ThemeSetting $themeSetting): RedirectResponse
     {
-        if (!env('USER_VERIFIED')) {
+        if (!config('app.user_verified')) {
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
         }
 
@@ -221,7 +221,7 @@ class ThemeSettingController extends Controller
 
     public function updateActiveFor(Request $request, ThemeSetting $themeSetting): JsonResponse
     {
-        if (!env('USER_VERIFIED')) {
+        if (!config('app.user_verified')) {
             return response()->json([
                 'success' => false,
                 'debug_bar' => env('APP_DEBUG', false) ? true : false,

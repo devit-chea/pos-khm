@@ -1,4 +1,8 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
 
 <x-success-message key="message" />
@@ -50,6 +54,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 
     <script type="text/javascript">
 
@@ -79,7 +84,7 @@
                 buttons: [
                     {
                         extend: 'pdf',
-                        text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                        text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                         exportOptions: {
                             columns: ':visible:Not(.not-exported)',
                             rows: ':visible'
@@ -93,7 +98,7 @@
                     },
                     {
                         extend: 'excel',
-                        text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                        text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                         exportOptions: {
                             columns: ':visible:Not(.not-exported)',
                             rows: ':visible'
@@ -107,7 +112,7 @@
                     },
                     {
                         extend: 'csv',
-                        text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                        text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                         exportOptions: {
                             columns: ':visible:Not(.not-exported)',
                             rows: ':visible'
@@ -121,7 +126,7 @@
                     },
                     {
                         extend: 'print',
-                        text: '<i title="print" class="fa fa-print"></i>',
+                        text: '<i title="print" class="ti ti-printer"></i>',
                         exportOptions: {
                             columns: ':visible:not(.not-exported)',
                             rows: ':visible',
@@ -161,7 +166,7 @@
                 },
                 method: 'GET',
                 beforeSend: function () {
-                    $('#report-table').html('<div class="text-center"><i class="fa fa-spin fa-spinner"></i> Loading...</div>');
+                    $('#report-table').html('<div class="text-center"><i class="ti ti-spin fa-spinner"></i> Loading...</div>');
                 },
                 success: function (response) {
                     $('#report-table').html(response);
@@ -185,24 +190,24 @@
         function datatable_sum(dt_selector, is_calling_first) {
             if (dt_selector.rows( '.selected' ).any() && is_calling_first) {
                 var rows = dt_selector.rows( '.selected' ).indexes();
-                $( dt_selector.column( 6 ).footer() ).html(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum().toFixed(2));
-                $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed(2));
-                $( dt_selector.column( 8 ).footer() ).html(dt_selector.cells( rows, 8, { page: 'current' } ).data().sum().toFixed(2));
-                $( dt_selector.column( 9 ).footer() ).html(dt_selector.cells( rows, 9, { page: 'current' } ).data().sum().toFixed(2));
-                $( dt_selector.column( 10 ).footer() ).html(dt_selector.cells( rows, 10, { page: 'current' } ).data().sum().toFixed(2));
-                $( dt_selector.column( 11 ).footer() ).html(dt_selector.cells( rows, 11, { page: 'current' } ).data().sum().toFixed(2));
-                $( dt_selector.column( 12 ).footer() ).html(dt_selector.cells( rows, 12, { page: 'current' } ).data().sum().toFixed(2));
-                $( dt_selector.column( 13 ).footer() ).html(dt_selector.cells( rows, 13, { page: 'current' } ).data().sum().toFixed(2));
+                $( dt_selector.column( 6 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 7 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 8 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 8, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 9 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 9, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 10 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 10, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 11 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 11, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 12 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 12, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 13 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 13, { page: 'current' } ).data().sum()));
             }
             else {
-                $( dt_selector.column( 6 ).footer() ).html(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum().toFixed(2));
-                $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed(2));
-                $( dt_selector.column( 8 ).footer() ).html(dt_selector.cells( rows, 8, { page: 'current' } ).data().sum().toFixed(2));
-                $( dt_selector.column( 9 ).footer() ).html(dt_selector.cells( rows, 9, { page: 'current' } ).data().sum().toFixed(2));
-                $( dt_selector.column( 10 ).footer() ).html(dt_selector.cells( rows, 10, { page: 'current' } ).data().sum().toFixed(2));
-                $( dt_selector.column( 11 ).footer() ).html(dt_selector.cells( rows, 11, { page: 'current' } ).data().sum().toFixed(2));
-                $( dt_selector.column( 12 ).footer() ).html(dt_selector.cells( rows, 12, { page: 'current' } ).data().sum().toFixed(2));
-                $( dt_selector.column( 13 ).footer() ).html(dt_selector.cells( rows, 13, { page: 'current' } ).data().sum().toFixed(2));
+                $( dt_selector.column( 6 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 7 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 8 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 8, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 9 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 9, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 10 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 10, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 11 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 11, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 12 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 12, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 13 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 13, { page: 'current' } ).data().sum()));
             }
         }
 

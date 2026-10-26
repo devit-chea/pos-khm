@@ -7,8 +7,8 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <link rel="icon" type="image/png" href="{{ url('logo', $general_setting->site_logo) }}" />
-    <title>{{ $general_setting->site_title }}</title>
+    <link rel="icon" type="image/png" href="{{ url('logo', gen_setting()->site_logo) }}" />
+    <title>{{ gen_setting()->site_title }}</title>
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="all,follow">
@@ -78,8 +78,8 @@
 
         @media print {
             * {
-                font-size: 10px !important;
-                line-height: 20px;
+                font-size: 11px !important;
+                line-height: 14px;
             }
 
             table {
@@ -89,19 +89,23 @@
 
             td,
             th {
-                padding: 5px 0;
+                padding: 2px 0;
+            }
+
+            /* Target secondary information specifically */
+            small, .metadata {
+                font-size: 9px !important;
+                line-height: 11px !important;
+                display: block; /* Forces a tight stack */
             }
 
             .hidden-print {
                 display: none !important;
             }
 
-            /*tbody::after {
-                content: ''; display: block;
-                page-break-after: always;
-                page-break-inside: avoid;
-                page-break-before: avoid;
-            }*/
+            @page {
+                margin: 0.2cm 0.2cm; /* Reduce giant top/bottom margins */
+            }
         }
     </style>
 </head>
@@ -116,10 +120,10 @@
         <div class="hidden-print">
             <table>
                 <tr>
-                    <td><a href="{{ $url }}" class="btn btn-info"><i class="fa fa-arrow-left"></i>
+                    <td><a href="{{ $url }}" class="btn btn-info"><i class="ti ti-arrow-left"></i>
                             {{ __('db.Back') }}</a> </td>
-                    <td><button onclick="window.print();" class="btn btn-primary"><i class="dripicons-print"></i>
-                            {{ __('db.Print') }}</button></td>
+                    <td><button onclick="window.print();" class="btn btn-primary"><i class="ti ti-printer"></i>
+                            {{ __('db.print') }}</button></td>
                 </tr>
             </table>
             <br>
@@ -129,18 +133,20 @@
 
         <div id="receipt-data" style="margin-right:15%">
             <div class="centered">
-                @if ($general_setting->site_logo || $invoice_settings->company_logo)
-                    <img src="{{ $invoice_settings->company_logo ? url('invoices', $invoice_settings->company_logo) : url('logo', $general_setting->site_logo) }}"
-                        height="{{ $invoice_settings->logo_height ?? auto }}"
-                        width="{{ $invoice_settings->logo_width ?? auto }}" style="margin:5px 0;">
+                @if (gen_setting()->site_logo || $invoice_settings->company_logo)
+                    <img src="{{ $invoice_settings->company_logo ? url('invoices', $invoice_settings->company_logo) : url('logo', gen_setting()->site_logo) }}"
+                        height="{{ $invoice_settings->logo_height ?? 'auto' }}"
+                        width="{{ $invoice_settings->logo_width ?? 'auto' }}" style="margin:5px 0;">
                 @endif
-                @if (isset($show->show_warehouse_info) && $show->show_warehouse_info == 1)
+                @if (!empty($zatcaInvoice))
+                    @include('backend.setting.invoice_setting.zatca_seller')
+                @elseif (isset($show->show_warehouse_info) && $show->show_warehouse_info == 1)
                     <!--<h2>{{ $lims_biller_data->company_name }}</h2>-->
 
                     <p>{{ __('db.Address') }}: {{ $lims_warehouse_data->address }}
                         <br>{{ __('db.Phone Number') }}: {{ $lims_warehouse_data->phone }}
-                        @if ($general_setting->vat_registration_number && isset($show->show_vat_registration_number) && $show->show_vat_registration_number == 1)
-                            <br>{{ __('db.VAT Number') }}: {{ $general_setting->vat_registration_number }}
+                        @if (gen_setting()->vat_registration_number && isset($show->show_vat_registration_number) && $show->show_vat_registration_number == 1)
+                            <br>{{ __('db.VAT Number') }}: {{ gen_setting()->vat_registration_number }}
                         @endif
                     </p>
                 @endif
@@ -155,8 +161,15 @@
                 @if (isset($show->show_ref_number) && $show->show_ref_number == 1)
                     {{ __('db.reference') }}: {{ $lims_sale_data->reference_no }}<br>
                 @endif
-                @if (isset($show->show_customer_name) && $show->show_customer_name == 1)
-                    {{ __('db.customer') }}: {{ $lims_customer_data->name }}
+                @if (!empty($zatcaInvoice))
+                    @include('backend.setting.invoice_setting.zatca_buyer')
+                @elseif (isset($show->show_customer_name) && $show->show_customer_name == 1)
+                    {{ __('db.customer') }}: {{ $lims_customer_data->name }}<br>
+
+                @if(isset($lims_customer_data->tax_no))
+                {{__('Tax Number')}}: {{ $lims_customer_data->tax_no }}<br>
+                @endif
+
                 @endif
 
                 {{-- biller info --}}
@@ -165,7 +178,7 @@
                 @endif
                 {{-- end biller info --}}
                 @if ($lims_sale_data->table_id)
-                    <br>{{ __('db.Table') }}: {{ $lims_sale_data->table->name }}
+                    <br>{{ __('db.table') }}: {{ $lims_sale_data->table->name }}
                     <br>{{ __('db.Queue') }}: {{ $lims_sale_data->queue }}
                 @endif
                 <?php
@@ -183,107 +196,76 @@
             <table class="table-data" style="width:100%;max-width:180px;margin: 0 0">
                 <tbody>
 
-                    <?php $total_product_tax = 0; ?>
                     @if (isset($show->show_description) && $show->show_description == 1)
-                        @foreach ($lims_product_sale_data as $key => $product_sale_data)
-                            <?php
-                            $lims_product_data = \App\Models\Product::find($product_sale_data->product_id);
-                            if ($product_sale_data->variant_id) {
-                                $variant_data = \App\Models\Variant::find($product_sale_data->variant_id);
-                                $product_name = $lims_product_data->name . ' [' . $variant_data->name . ']';
-                            } elseif ($product_sale_data->product_batch_id) {
-                                $product_batch_data = \App\Models\ProductBatch::select('batch_no')->find($product_sale_data->product_batch_id);
-                                $product_name = $lims_product_data->name . ' [' . __('db.Batch No') . ':' . $product_batch_data->batch_no . ']';
-                            } else {
-                                $product_name = $lims_product_data->name;
-                            }
-
-                            if ($product_sale_data->imei_number && !str_contains($product_sale_data->imei_number, 'null')) {
-                                $product_name .= '<br>' . trans('IMEI or Serial Numbers') . ': <span style="text-transform: none;">' . $product_sale_data->imei_number . '</span>';
-                            }
-                            // Warranty
-                            if (isset($product_sale_data->warranty_duration)) {
-                                $product_name .= '<br>' . "<span style='font-weight: bold;'>Warranty</span>: " . $product_sale_data->warranty_duration;
-                                $product_name .= '<br>' . "<span style='font-weight: bold;'>Expire At</span>: " . $product_sale_data->warranty_end;
-                            }
-                            // Guarantee
-                            if (isset($product_sale_data->guarantee_duration)) {
-                                $product_name .= '<br>' . "<span style='font-weight: bold;'>Guarantee</span>: " . $product_sale_data->guarantee_duration;
-                                $product_name .= '<br>' . "<span style='font-weight: bold;'>Expire At</span>: " . $product_sale_data->guarantee_end;
-                            }
-
-                            $topping_names = [];
-                            $topping_prices = [];
-                            $topping_price_sum = 0;
-
-                            if ($product_sale_data->topping_id) {
-                                $decoded_topping_id = is_string($product_sale_data->topping_id) ? json_decode($product_sale_data->topping_id, true) : $product_sale_data->topping_id;
-                                //dd(json_decode($product_sale_data->topping_id));
-                                if (is_array($decoded_topping_id)) {
-                                    foreach ($decoded_topping_id as $topping) {
-                                        $topping_names[] = $topping['name']; // Extract name
-                                        $topping_prices[] = $topping['price']; // Extract price
-                                        $topping_price_sum += $topping['price']; // Sum up prices
-                                    }
-                                }
-                            }
-
-                            $net_price_with_toppings = $product_sale_data->net_unit_price + $topping_price_sum;
-                            $subtotal = $product_sale_data->total + $topping_price_sum;
-                            ?>
+                        @foreach ($line_items as $key => $item)
                             <tr>
                                 <td colspan="2" style="width:60%">
-                                    {!! $product_name !!}
-
-                                    @if (!empty($topping_names))
-                                        <br><small>({{ implode(', ', $topping_names) }})</small>
+                                    {!! $item->product_name !!}
+                                    @if (!empty($item->variant_name))
+                                        <br><span class="metadata">{{ $item->variant_name }}</span>
                                     @endif
 
-                                    @foreach ($product_custom_fields as $index => $fieldName)
-                                        <?php $field_name = str_replace(' ', '_', strtolower($fieldName)); ?>
-                                        @if ($lims_product_data->$field_name)
-                                            @if (!$index)
-                                                <br>{{ $fieldName . ': ' . $lims_product_data->$field_name }}
+                                    @if ($item->imei_number)
+                                        <br><span class="metadata">{{ trans('IMEI') }}: {{ $item->imei_number }}</span>
+                                    @endif
+
+                                    @php
+                                        $warranty_info = [];
+                                        if ($item->warranty_duration) {
+                                            $warranty_info[] = 'Warranty: ' . $item->warranty_duration . ' (Exp: ' . $item->warranty_end . ')';
+                                        }
+                                        if ($item->guarantee_duration) {
+                                            $warranty_info[] = 'Guarantee: ' . $item->guarantee_duration . ' (Exp: ' . $item->guarantee_end . ')';
+                                        }
+                                    @endphp
+                                    @if (!empty($warranty_info))
+                                        <br><span class="metadata">{{ implode(' | ', $warranty_info) }}</span>
+                                    @endif
+
+                                    @if (!empty($item->topping_names))
+                                        <br><small>({{ implode(', ', $item->topping_names) }})</small>
+                                    @endif
+
+                                    @php $cfIndex = 0; @endphp
+                                    @foreach ($item->custom_fields as $fieldName => $fieldValue)
+                                        @if ($fieldValue)
+                                            @if (!$cfIndex)
+                                                <br>{{ $fieldName . ': ' . $fieldValue }}
                                             @else
-                                                {{ '/' . $fieldName . ': ' . $lims_product_data->$field_name }}
+                                                {{ '/' . $fieldName . ': ' . $fieldValue }}
                                             @endif
+                                            @php $cfIndex++; @endphp
                                         @endif
                                     @endforeach
-                                    <br>{{ $product_sale_data->qty }} x
-                                    {{ number_format((float) ($product_sale_data->total / $product_sale_data->qty), $general_setting->decimal, '.', ',') }}
+                                    <br>{{ $item->qty }} x
+                                    {{ number_format((float) ($item->total / $item->qty), gen_setting()->decimal, '.', ',') }}
 
-                                    @if (!empty($topping_prices))
-                                        <small>+
-                                            {{ implode(' + ', array_map(fn($price) => number_format($price, $general_setting->decimal, '.', ','), $topping_prices)) }}</small>
-                                    @endif
-
-                                    @if ($product_sale_data->tax_rate)
-                                        <?php $total_product_tax += $product_sale_data->tax; ?>
-                                        [{{ __('db.Tax') }} ({{ $product_sale_data->tax_rate }}%):
-                                        {{ $product_sale_data->tax }}]
+                                    @if ($item->tax_rate)
+                                        [{{ __('db.Tax') }} ({{ $item->tax_rate }}%):
+                                        {{ $item->tax }}]
                                     @endif
                                 </td>
                                 <td style="vertical-align:bottom;width:40%">
-                                    {{format_currency($subtotal, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
+                                    {{format_currency($item->subtotal, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
                                 </td>
                             </tr>
                         @endforeach
                     @endif
                     <!-- <tfoot> -->
                     <tr>
-                        <th colspan="2" style="text-align:left;width:60%">{{ __('db.Total') }}</th>
+                        <th colspan="2" style="text-align:left;width:60%">{{ __('db.Total Before Tax') }}</th>
                         <th style="width:40%">
-                            {{format_currency($lims_sale_data->total_price, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
+                            {{ format_currency($lims_sale_data->total_price - ($lims_sale_data->total_tax + $lims_sale_data->order_tax), $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
                         </th>
                     </tr>
-                    @if ($general_setting->invoice_format == 'gst' && $general_setting->state == 1)
+                    @if (gen_setting()->invoice_format == 'gst' && gen_setting()->state == 1)
                         <tr>
                             <td colspan="2" style="width:60%">IGST</td>
                             <td style="width:40%">
                                 {{format_currency($total_product_tax, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
                             </td>
                         </tr>
-                    @elseif($general_setting->invoice_format == 'gst' && $general_setting->state == 2)
+                    @elseif(gen_setting()->invoice_format == 'gst' && gen_setting()->state == 2)
                         <tr>
                             <td colspan="2" style="width:60%">SGST</td>
                             <td style="width:40%">
@@ -298,12 +280,11 @@
                                 {{format_currency($total_product_tax_amount, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
                             </td>
                         </tr>
-                    @endif
-                    @if ($lims_sale_data->order_tax)
+                    @else
                         <tr>
-                            <th colspan="2" style="text-align:left;width:60%">{{ __('db.Order Tax') }}</th>
+                            <th colspan="2" style="text-align:left;width:60%">{{ __('db.Tax') }}</th>
                             <th style="width:40%">
-                                {{format_currency($lims_sale_data->order_tax, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
+                                {{ format_currency($lims_sale_data->total_tax + $lims_sale_data->order_tax, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
                             </th>
                         </tr>
                     @endif
@@ -332,7 +313,7 @@
                         </tr>
                     @endif
                     <tr>
-                        <th colspan="2" style="text-align:left;width:60%">{{ __('db.grand total') }}</th>
+                        <th colspan="2" style="text-align:left;width:60%">{{ !empty($return_summary['has_returns']) ? __('db.Original Total') : __('db.grand total') }}</th>
                         <th style="width:40%">
                             {{format_currency($lims_sale_data->grand_total, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
                         </th>
@@ -346,15 +327,33 @@
                         </th>
                     </tr>
                     @endforeach
-                    @if ($lims_sale_data->grand_total - $lims_sale_data->paid_amount > 0)
+                    @if (!empty($return_summary['has_returns']))
+                        @foreach($return_summary['returns'] as $ret)
+                            <tr>
+                                <th colspan="2" style="text-align:left;width:60%;font-size:10px;color:#a94442;">
+                                    {{ __('db.Return') }}: {{ $ret['reference_no'] }}
+                                </th>
+                                <th style="width:40%;color:#a94442;">
+                                    - {{ format_currency($ret['returned_amount'], $lims_sale_data->currency->symbol ?? '$') }}
+                                </th>
+                            </tr>
+                        @endforeach
                         <tr>
-                            <th colspan="2" style="text-align:left;width:60%">{{ __('db.Due') }}</th>
-                            <th style="width:40%">
-                                {{format_currency($lims_sale_data->grand_total - $lims_sale_data->paid_amount, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
+                            <th colspan="2" style="text-align:left;width:60%;font-weight:bold;">{{ __('db.Net Total') }}</th>
+                            <th style="width:40%;font-weight:bold;">
+                                {{format_currency($return_summary['net_grand_total'], $lims_sale_data->currency->symbol ?? '$') }}
                             </th>
                         </tr>
                     @endif
-                    @if ($totalDue && isset($show->hide_total_due))
+                    @if (($return_summary['remaining_due'] ?? ($lims_sale_data->grand_total - $lims_sale_data->paid_amount)) > 0)
+                        <tr>
+                            <th colspan="2" style="text-align:left;width:60%">{{ __('db.Due') }}</th>
+                            <th style="width:40%">
+                                {{format_currency($return_summary['remaining_due'] ?? ($lims_sale_data->grand_total - $lims_sale_data->paid_amount), $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
+                            </th>
+                        </tr>
+                    @endif
+                    @if ($totalDue && isset($show->hide_total_due) && $lims_customer_data->type != 'walkin')
                         @if (!$show->hide_total_due)
                         <tr>
                             <th colspan="2" style="text-align:left">{{ __('db.Previous Due') }}</th>
@@ -372,7 +371,7 @@
                     @endif
                     <tr>
                         @if (isset($show->show_in_word) && $show->show_in_word == 1)
-                            @if ($general_setting->currency_position == 'prefix')
+                            @if (gen_setting()->currency_position == 'prefix')
                                 <th class="centered" colspan="3">{{ __('db.In Words') }}:
                                     <span>{{ $currency_code }}</span>
                                     <span>{{ str_replace('-', ' ', $numberInWords) }}</span>
@@ -387,29 +386,17 @@
                     </tr>
 
                     <tr>
-                        @php
-                        $lims_installment_plan_data = DB::table('installment_plans')->where([
-                            ['reference_type', 'sale'],
-                            ['reference_id', $lims_sale_data->id]
-                        ])->first();
-                    @endphp
-                    @if($lims_installment_plan_data)
-                    @php
-                        $inst_all   = DB::table('installments')->where('installment_plan_id', $lims_installment_plan_data->id)->get();
-                        $inst_total = $inst_all->count();
-                        $inst_paid  = $inst_all->where('status', 'completed')->count();
-                        $inst_next  = $inst_all->where('status', 'pending')->sortBy('payment_date')->first();
-                    @endphp
+                    @if($installment_info)
                     <tr>
                         <td colspan="3" style="border: 1px dotted #ddd; padding: 5px;">
                             <p style="text-align: center; margin: 0; font-weight: bold; border-bottom: 1px dotted #ddd;">INSTALMENT SALE</p>
-                            <p style="margin: 2px 0;">Plan: {{$lims_installment_plan_data->name}}</p>
-                            <p style="margin: 2px 0;">Duration: {{$lims_installment_plan_data->months}} Mo</p>
-                            <p style="margin: 2px 0;">Add. Amt: {{format_currency($lims_installment_plan_data->additional_amount, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$')}}</p>
-                            <p style="margin: 2px 0;">Down Pay: {{format_currency($lims_installment_plan_data->down_payment, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$')}}</p>
-                            <p style="margin: 2px 0; font-weight: bold;">Paid: {{$inst_paid}}/{{$inst_total}} Instalments</p>
-                            @if($inst_next)
-                            <p style="margin: 2px 0;">Next Due: {{\Carbon\Carbon::parse($inst_next->payment_date)->format('d M Y')}}</p>
+                            <p style="margin: 2px 0;">Plan: {{$installment_info->plan->name}}</p>
+                            <p style="margin: 2px 0;">Duration: {{$installment_info->plan->months}} Mo</p>
+                            <p style="margin: 2px 0;">Add. Amt: {{format_currency($installment_info->plan->additional_amount, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$')}}</p>
+                            <p style="margin: 2px 0;">Down Pay: {{format_currency($installment_info->plan->down_payment, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$')}}</p>
+                            <p style="margin: 2px 0; font-weight: bold;">Paid: {{$installment_info->paid}}/{{$installment_info->total}} Instalments</p>
+                            @if($installment_info->next)
+                            <p style="margin: 2px 0;">Next Due: {{\Carbon\Carbon::parse($installment_info->next->payment_date)->format('d M Y')}}</p>
                             @endif
                         </td>
                     </tr>
@@ -435,7 +422,7 @@
                                 @if ($invoice_settings->footer_text)
                                 {!! $invoice_settings->footer_text !!}
                                 @else
-                                <strong>{{ __('db.Thank you for shopping with us!') }}</strong>
+                                <strong>{{ __('db.thank_you_for_shopping') }}</strong>
                                 @endif                            
                             @endif
                         </td>
@@ -451,8 +438,8 @@
 
                     <tr>
                         <td class="centered" colspan="3">
-                            @if (isset($show->show_qr_code) && $show->show_qr_code == 1)
-                                <?php echo '<img style="margin:10px auto;width:30px" src="data:image/png;base64,' . DNS2D::getBarcodePNG($qrText, 'QRCODE') . '" alt="QRcode"   />'; ?>
+                            @if (!empty($zatcaInvoice) || (isset($show->show_qr_code) && $show->show_qr_code == 1))
+                                <img style="margin:10px auto;{{ !empty($zatcaInvoice) ? 'max-width:100%;height:auto' : 'width:30px' }}" src="data:image/png;base64,{{ DNS2D::getBarcodePNG($qrText, 'QRCODE') }}" alt="QRcode">
                             @endif
                         </td>
                     </tr>

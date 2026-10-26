@@ -20,7 +20,7 @@
                                                 <div class="form-group">
                                                     <div class="input-group">
                                                         <span class="input-group-addon">
-                                                            <i class="fa fa-search"></i>
+                                                            <i class="ti ti-search"></i>
                                                         </span>
                                                         <input type="text" name="search_product" class="form-control" id="search_product_for_label" placeholder="{{ __('db.lang_v1 enter_product_name_to_print_labels') }}" autofocus>
                                                     </div>
@@ -55,7 +55,7 @@
                                 </div>
                                 <div class="row">
                                     <div class="col-md-12">
-                                        <label><strong>Paper Size *</strong></label>
+                                        <label>Paper Size *</label>
 						                <select name="barcode_setting" class="form-control">
 						                    @foreach($barcode_settings as $key => $value)
 						                        <option value="{{ $key }}" {{ !empty($default) && $default->id == $key ? 'selected' : '' }}>{{ $value }}</option>
@@ -123,7 +123,7 @@ $(document).ready(function() {
     });
 
     $('button#labels_preview').click(function() {
-        alert('hello');
+        SaleProToast.show('hello');
         if ($('form#preview_setting_form table#product_table tbody tr').length > 0) {
             var url = base_path + '/labels/preview?' + $('form#preview_setting_form').serialize();
 
@@ -140,7 +140,7 @@ $(document).ready(function() {
             //             $('div#preview_box').html(result.html);
             //             __currency_convert_recursively($('div#preview_box'));
             //         } else {
-            //             toastr.error(result.msg);
+            //             SaleProToast.error(result.msg);
             //         }
             //     },
             // });

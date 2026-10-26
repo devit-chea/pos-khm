@@ -14,9 +14,15 @@ use App\Helpers\DateHelper;
 use Auth;
 use DB;
 
+use App\Services\AccountingService;
+
 class IncomeController extends Controller
 {
     use StaffAccess;
+
+    public function __construct(public AccountingService $accountingService)
+    {
+    }
 
     public function index(Request $request)
     {
@@ -50,7 +56,7 @@ class IncomeController extends Controller
             $income_category_list = DB::table('income_categories')->where('is_active', true)->get();
 
             $lims_warehouse_list = Warehouse::select('name', 'id')->where('is_active', true)->get();
-            $lims_account_list = Account::where('is_active', true)->get();
+            $lims_account_list = app(\App\Services\PaymentAccountService::class)->validOperationalAccounts();
             return view('backend.income.index', compact('lims_account_list', 'lims_warehouse_list', 'income_category_list', 'all_permission', 'starting_date', 'ending_date', 'warehouse_id','income_category_id'));
         }
         else
@@ -154,13 +160,13 @@ class IncomeController extends Controller
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">';
                 if(in_array("incomes-edit", $request['all_permission'])) {
                     $nestedData['options'] .= '<li>
-                        <button type="button" data-id="'.$income->id.'" class="open-Editincome_categoryDialog btn btn-link" data-toggle="modal" data-target="#editModal"><i class="dripicons-document-edit"></i>'.__('db.edit').'</button>
+                        <button type="button" data-id="'.$income->id.'" class="open-Editincome_categoryDialog btn btn-link" data-toggle="modal" data-target="#editModal"><i class="ti ti-edit"></i>'.__('db.edit').'</button>
                         </li>';
                 }
                 if(in_array("incomes-delete", $request['all_permission']))
                     $nestedData['options'] .= '<form action="' . route("incomes.destroy", $income->id) . '" method="POST">'.csrf_field().'' . method_field("DELETE") . '
                             <li>
-                              <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> '.__("db.delete").'</button>
+                              <button type="submit" class="btn btn-link" data-confirm-message="' . __('db.Are you sure want to delete?') . '"><i class="ti ti-trash"></i> '.__("db.delete").'</button>
                             </li></form>
                         </ul>
                     </div>';
@@ -183,6 +189,9 @@ class IncomeController extends Controller
 
     public function store(Request $request)
     {
+        try {
+        DB::beginTransaction();
+
         $data = $request->all();
         if (isset($data['created_at'])) {
             $data['created_at'] = normalize_to_sql_datetime($data['created_at']);
@@ -198,8 +207,24 @@ class IncomeController extends Controller
         ])->first();
         if($cash_register_data)
             $data['cash_register_id'] = $cash_register_data->id;
-        Income::create($data);
+        $income = Income::create($data);
+
+        $accountingResult = $this->accountingService->recordIncome($income);
+        if (!$accountingResult->isSuccess()) {
+            \Log::error('Income Accounting failed: ' . $accountingResult->getMessage());
+            throw new \RuntimeException($accountingResult->getMessage() ?: 'Income accounting posting failed.');
+        } elseif ($accountingResult->isPosted()) {
+            $income->update(['accounting_status' => 'posted']);
+        }
+
+        DB::commit();
         return redirect('incomes')->with('message', __('db.Data inserted successfully'));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Income creation failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Income creation failed: ' . $e->getMessage());
+        }
     }
 
     public function show(string $id)
@@ -221,6 +246,9 @@ class IncomeController extends Controller
 
     public function update(Request $request, $id)
     {
+        try {
+        DB::beginTransaction();
+
         $data = $request->all();
         $lims_income_data = Income::find($data['income_id']);
         if (isset($data['created_at'])) {
@@ -228,24 +256,70 @@ class IncomeController extends Controller
         } else {
             $data['created_at'] = date('Y-m-d H:i:s');
         }
-        $lims_income_data->update($data);
+        $income = Income::find($data['income_id']);
+        $reversal = $this->accountingService->reverseTransaction(get_class($income), $income->id);
+        if (!$reversal->isSuccess()) {
+            throw new \RuntimeException($reversal->getMessage() ?: 'Income accounting reversal failed.');
+        }
+
+        $income->update($data);
+
+        $accountingResult = $this->accountingService->recordIncome($income);
+        if (!$accountingResult->isSuccess()) {
+            \Log::error('Income Accounting failed on update: ' . $accountingResult->getMessage());
+            throw new \RuntimeException($accountingResult->getMessage() ?: 'Income accounting posting failed.');
+        } elseif ($accountingResult->isPosted()) {
+            $income->update(['accounting_status' => 'posted']);
+        }
+
+        DB::commit();
         return redirect('incomes')->with('message', __('db.Data updated successfully'));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Income update failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Income update failed: ' . $e->getMessage());
+        }
     }
 
     public function deleteBySelection(Request $request)
     {
-        $income_id = $request['incomeIdArray'];
-        foreach ($income_id as $id) {
-            $lims_income_data = Income::find($id);
-            $lims_income_data->delete();
+        try {
+            DB::beginTransaction();
+            $income_id = $request['incomeIdArray'];
+            foreach ($income_id as $id) {
+                $income = Income::find($id);
+                $reversal = $this->accountingService->reverseTransaction(get_class($income), $income->id);
+                if (!$reversal->isSuccess()) {
+                    throw new \RuntimeException($reversal->getMessage() ?: 'Income accounting reversal failed.');
+                }
+                $income->delete();
+            }
+            DB::commit();
+            return 'income deleted successfully!';
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Income bulk deletion failed: ' . $e->getMessage());
+            return 'Income bulk deletion failed: ' . $e->getMessage();
         }
-        return 'income deleted successfully!';
     }
 
     public function destroy(string $id)
     {
-        $lims_income_data = Income::find($id);
-        $lims_income_data->delete();
-        return redirect('incomes')->with('not_permitted', __('db.Data deleted successfully'));
+        try {
+            DB::beginTransaction();
+            $income = Income::find($id);
+            $reversal = $this->accountingService->reverseTransaction(get_class($income), $income->id);
+            if (!$reversal->isSuccess()) {
+                throw new \RuntimeException($reversal->getMessage() ?: 'Income accounting reversal failed.');
+            }
+            $income->delete();
+            DB::commit();
+            return redirect('incomes')->with('not_permitted', __('db.Data deleted successfully'));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Income deletion failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Income deletion failed: ' . $e->getMessage());
+        }
     }
 }

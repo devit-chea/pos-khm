@@ -1,11 +1,15 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
     <x-success-message key="message" />
     <x-error-message key="not_permitted" />
 
     <section>
         <div class="container-fluid">
             <button class="btn btn-info" data-toggle="modal" data-target="#create-modal">
-                <i class="dripicons-plus"></i> {{ __('db.Add Courier') }}
+                <i class="ti ti-plus"></i> {{ __('db.Add Courier') }}
             </button>
         </div>
         <div class="table-responsive">
@@ -40,7 +44,7 @@
                                             <button type="button"
                                                 onclick="editCourier({{ $courier->makeVisible(['api_key', 'secret_key', 'client_id', 'client_secret', 'username', 'password', 'base_url', 'api_token'])->toJson() }})"
                                                 class="btn btn-link">
-                                                <i class="dripicons-document-edit"></i> {{ __('db.edit') }}
+                                                <i class="ti ti-edit"></i> {{ __('db.edit') }}
                                             </button>
                                         </li>
                                         <form action="{{ route('couriers.destroy', $courier->id) }}" method="POST">
@@ -48,8 +52,8 @@
                                             @method('DELETE')
                                             <li>
                                                 <button type="submit" class="btn btn-link"
-                                                    onclick="return confirmDelete()">
-                                                    <i class="dripicons-trash"></i> {{ __('db.delete') }}
+                                                    data-confirm-message="{{ __('db.Are you sure want to delete?') }}">
+                                                    <i class="ti ti-trash"></i> {{ __('db.delete') }}
                                                 </button>
                                             </li>
                                         </form>
@@ -78,7 +82,7 @@
                 <div class="modal-header">
                     <h5 class="modal-title">{{ __('db.Add Courier') }}</h5>
                     <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                        <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                        <span aria-hidden="true"><i class="ti ti-x"></i></span>
                     </button>
                 </div>
                 <div class="modal-body">
@@ -93,9 +97,9 @@
                                 <input type="text" name="name" class="form-control" required>
                             </div>
                             <div class="col-md-6 form-group">
-                                <label>{{ __('db.Courier Type') }} *</label>
+                                <label>{{ __('db.courier_type') }} *</label>
                                 <select name="type" id="courier_type" class="form-control" required>
-                                    <option value="">-- {{ __('db.Select Type') }} --</option>
+                                    <option value="">-- {{ __('db.select_type') }} --</option>
                                     <option value="steadfast">Steadfast</option>
                                     <option value="pathao">Pathao</option>
                                     <option value="redx">Redx</option>
@@ -115,17 +119,17 @@
                             {{-- STEADFAST --}}
                             <div class="col-md-12 courier-fields" id="steadfast_fields" style="display: none;">
                                 <hr>
-                                <h6 class="text-primary mb-3">🚚 {{ __('db.Steadfast API Settings') }}</h6>
+                                <h6 class="text-primary mb-3">🚚 {{ __('db.steadfast_api_settings') }}</h6>
                                 <div class="row">
                                     <div class="col-md-6 form-group">
                                         <label>{{ __('db.API Key') }} *</label>
                                         <input type="text" name="api_key" class="form-control"
-                                            placeholder="{{ __('db.Steadfast API Key') }}">
+                                            placeholder="{{ __('db.steadfast_api_key') }}">
                                     </div>
                                     <div class="col-md-6 form-group">
                                         <label>{{ __('db.Secret Key') }} *</label>
                                         <input type="text" name="secret_key" class="form-control"
-                                            placeholder="{{ __('db.Steadfast Secret Key') }}">
+                                            placeholder="{{ __('db.steadfast_secret_key') }}">
                                     </div>
                                 </div>
                             </div>
@@ -133,27 +137,27 @@
                             {{-- PATHAO --}}
                             <div class="col-md-12 courier-fields" id="pathao_fields" style="display: none;">
                                 <hr>
-                                <h6 class="text-primary mb-3">🛵 {{ __('db.Pathao API Settings') }}</h6>
+                                <h6 class="text-primary mb-3">🛵 {{ __('db.pathao_api_settings') }}</h6>
                                 <div class="row">
                                     <div class="col-md-12 form-group">
-                                        <label>{{ __('db.Base URL') }} *</label>
+                                        <label>{{ __('db.base_url') }} *</label>
                                         <input type="text" name="base_url" class="form-control"
-                                            placeholder="{{ __('db.e.g. https://courier-api-sandbox.pathao.com') }}">
+                                            placeholder="{{ __('db.courier_api_url_example') }}">
                                         <small class="text-muted">
-                                            {{ __('db.Sandbox') }}: <code>https://courier-api-sandbox.pathao.com</code> |
-                                            {{ __('db.Production') }}: <code>https://api-hermes.pathao.com</code>
+                                            {{ __('db.sandbox') }}: <code>https://courier-api-sandbox.pathao.com</code> |
+                                            {{ __('db.production') }}: <code>https://api-hermes.pathao.com</code>
                                         </small>
                                     </div>
                                     <div class="col-md-6 form-group">
-                                        <label>{{ __('db.Client ID') }} *</label>
+                                        <label>{{ __('db.client_id') }} *</label>
                                         <input type="text" name="client_id" class="form-control">
                                     </div>
                                     <div class="col-md-6 form-group">
-                                        <label>{{ __('db.Client Secret') }} *</label>
+                                        <label>{{ __('db.client_secret') }} *</label>
                                         <input type="text" name="client_secret" class="form-control">
                                     </div>
                                     <div class="col-md-6 form-group">
-                                        <label>{{ __('db.Username') }} *</label>
+                                        <label>{{ __('db.username') }} *</label>
                                         <input type="text" name="pathao_username" class="form-control">
                                     </div>
                                     <div class="col-md-6 form-group">
@@ -166,12 +170,12 @@
                             {{-- REDX --}}
                             <div class="col-md-12 courier-fields" id="redx_fields" style="display: none;">
                                 <hr>
-                                <h6 class="text-primary mb-3">📦 {{ __('db.Redx API Settings') }}</h6>
+                                <h6 class="text-primary mb-3">📦 {{ __('db.redx_api_settings') }}</h6>
                                 <div class="row">
                                     <div class="col-md-12 form-group">
-                                        <label>{{ __('db.API Token') }} *</label>
+                                        <label>{{ __('db.api_token') }} *</label>
                                         <input type="text" name="api_token" class="form-control"
-                                            placeholder="{{ __('db.Redx API Token') }}">
+                                            placeholder="{{ __('db.redx_api_token') }}">
                                     </div>
                                 </div>
                             </div>
@@ -179,10 +183,10 @@
                             {{-- PAPERFLY --}}
                             <div class="col-md-12 courier-fields" id="paperfly_fields" style="display: none;">
                                 <hr>
-                                <h6 class="text-primary mb-3">✈️ {{ __('db.Paperfly API Settings') }}</h6>
+                                <h6 class="text-primary mb-3">✈️ {{ __('db.paperfly_api_settings') }}</h6>
                                 <div class="row">
                                     <div class="col-md-6 form-group">
-                                        <label>{{ __('db.Username') }} *</label>
+                                        <label>{{ __('db.username') }} *</label>
                                         <input type="text" name="paperfly_username" class="form-control">
                                     </div>
                                     <div class="col-md-6 form-group">
@@ -210,7 +214,7 @@
                 <div class="modal-header">
                     <h5 class="modal-title">{{ __('db.Update Courier') }}</h5>
                     <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                        <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                        <span aria-hidden="true"><i class="ti ti-x"></i></span>
                     </button>
                 </div>
                 <div class="modal-body">
@@ -226,9 +230,9 @@
                                 <input type="text" name="name" id="edit_name" class="form-control" required>
                             </div>
                             <div class="col-md-6 form-group">
-                                <label>{{ __('db.Courier Type') }} *</label>
+                                <label>{{ __('db.courier_type') }} *</label>
                                 <select name="type" id="edit_courier_type" class="form-control" required>
-                                    <option value="">-- {{ __('db.Select Type') }} --</option>
+                                    <option value="">-- {{ __('db.select_type') }} --</option>
                                     <option value="steadfast">Steadfast</option>
                                     <option value="pathao">Pathao</option>
                                     {{-- <option value="redx">Redx</option>
@@ -248,7 +252,7 @@
                             {{-- STEADFAST --}}
                             <div class="col-md-12 edit-courier-fields" id="edit_steadfast_fields" style="display: none;">
                                 <hr>
-                                <h6 class="text-primary mb-3">🚚 {{ __('db.Steadfast API Settings') }}</h6>
+                                <h6 class="text-primary mb-3">🚚 {{ __('db.steadfast_api_settings') }}</h6>
                                 <div class="row">
                                     <div class="col-md-6 form-group">
                                         <label>{{ __('db.API Key') }}</label>
@@ -265,28 +269,28 @@
                             {{-- PATHAO --}}
                             <div class="col-md-12 edit-courier-fields" id="edit_pathao_fields" style="display: none;">
                                 <hr>
-                                <h6 class="text-primary mb-3">🛵 {{ __('db.Pathao API Settings') }}</h6>
+                                <h6 class="text-primary mb-3">🛵 {{ __('db.pathao_api_settings') }}</h6>
                                 <div class="row">
                                     <div class="col-md-12 form-group">
-                                        <label>{{ __('db.Base URL') }}</label>
+                                        <label>{{ __('db.base_url') }}</label>
                                         <input type="text" name="base_url" id="edit_base_url" class="form-control"
-                                            placeholder="{{ __('db.e.g. https://courier-api-sandbox.pathao.com') }}">
+                                            placeholder="{{ __('db.courier_api_url_example') }}">
                                         <small class="text-muted">
-                                            {{ __('db.Sandbox') }}: <code>https://courier-api-sandbox.pathao.com</code> |
-                                            {{ __('db.Production') }}: <code>https://api-hermes.pathao.com</code>
+                                            {{ __('db.sandbox') }}: <code>https://courier-api-sandbox.pathao.com</code> |
+                                            {{ __('db.production') }}: <code>https://api-hermes.pathao.com</code>
                                         </small>
                                     </div>
                                     <div class="col-md-6 form-group">
-                                        <label>{{ __('db.Client ID') }}</label>
+                                        <label>{{ __('db.client_id') }}</label>
                                         <input type="text" name="client_id" id="edit_client_id" class="form-control">
                                     </div>
                                     <div class="col-md-6 form-group">
-                                        <label>{{ __('db.Client Secret') }}</label>
+                                        <label>{{ __('db.client_secret') }}</label>
                                         <input type="text" name="client_secret" id="edit_client_secret"
                                             class="form-control">
                                     </div>
                                     <div class="col-md-6 form-group">
-                                        <label>{{ __('db.Username') }}</label>
+                                        <label>{{ __('db.username') }}</label>
                                         <input type="text" name="pathao_username" id="edit_username"
                                             class="form-control">
                                     </div>
@@ -301,10 +305,10 @@
                             {{-- REDX --}}
                             <div class="col-md-12 edit-courier-fields" id="edit_redx_fields" style="display: none;">
                                 <hr>
-                                <h6 class="text-primary mb-3">📦 {{ __('db.Redx API Settings') }}</h6>
+                                <h6 class="text-primary mb-3">📦 {{ __('db.redx_api_settings') }}</h6>
                                 <div class="row">
                                     <div class="col-md-12 form-group">
-                                        <label>{{ __('db.API Token') }}</label>
+                                        <label>{{ __('db.api_token') }}</label>
                                         <input type="text" name="api_token" id="edit_api_token" class="form-control">
                                     </div>
                                 </div>
@@ -313,10 +317,10 @@
                             {{-- PAPERFLY --}}
                             <div class="col-md-12 edit-courier-fields" id="edit_paperfly_fields" style="display: none;">
                                 <hr>
-                                <h6 class="text-primary mb-3">✈️ {{ __('db.Paperfly API Settings') }}</h6>
+                                <h6 class="text-primary mb-3">✈️ {{ __('db.paperfly_api_settings') }}</h6>
                                 <div class="row">
                                     <div class="col-md-6 form-group">
-                                        <label>{{ __('db.Username') }}</label>
+                                        <label>{{ __('db.username') }}</label>
                                         <input type="text" name="paperfly_username" id="edit_pf_username"
                                             class="form-control">
                                     </div>
@@ -341,6 +345,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
     <script type="text/javascript">
         $("ul#sale").siblings('a').attr('aria-expanded', 'true');
         $("ul#sale").addClass("show");
@@ -409,7 +414,7 @@
         }
 
         function confirmDelete() {
-            return confirm("{{ __('db.Are you sure want to delete?') }}");
+            return true;
         }
 
         var courier_id = [];
@@ -425,8 +430,8 @@
                 "info": '<small>{{ __('db.Showing') }} _START_ - _END_ (_TOTAL_)</small>',
                 "search": '{{ __('db.Search') }}',
                 'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
                 }
             },
             'columnDefs': [{
@@ -459,7 +464,7 @@
             dom: '<"row"lfB>rtip',
             buttons: [{
                     extend: 'pdf',
-                    text: '<i title="{{ __('db.export to pdf') }}" class="fa fa-file-pdf-o"></i>',
+                    text: '<i title="{{ __('db.export_pdf') }}" class="ti ti-file-type-pdf"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -467,7 +472,7 @@
                 },
                 {
                     extend: 'excel',
-                    text: '<i title="{{ __('db.export to excel') }}" class="dripicons-document-new"></i>',
+                    text: '<i title="{{ __('db.export_excel') }}" class="ti ti-file-type-xls"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -475,7 +480,7 @@
                 },
                 {
                     extend: 'csv',
-                    text: '<i title="{{ __('db.export to csv') }}" class="fa fa-file-text-o"></i>',
+                    text: '<i title="{{ __('db.export_csv') }}" class="ti ti-file-type-csv"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -483,14 +488,14 @@
                 },
                 {
                     extend: 'print',
-                    text: '<i title="{{ __('db.print') }}" class="fa fa-print"></i>',
+                    text: '<i title="{{ __('db.print') }}" class="ti ti-printer"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
                     }
                 },
                 {
-                    text: '<i title="{{ __('db.delete') }}" class="dripicons-cross"></i>',
+                    text: '<i title="{{ __('db.delete') }}" class="ti ti-x"></i>',
                     className: 'buttons-delete',
                     action: function(e, dt, node, config) {
                         if (user_verified == '1') {
@@ -498,8 +503,7 @@
                             $(':checkbox:checked').each(function(i) {
                                 if (i) courier_id[i - 1] = $(this).closest('tr').data('id');
                             });
-                            if (courier_id.length && confirm(
-                                "{{ __('db.Are you sure want to delete?') }}")) {
+                            if (courier_id.length) { SaleProConfirm.open({ message: "{{ __('db.delete_confirmation') }}" }).then(function(confirmed) { if (confirmed) {
                                 $.ajax({
                                     type: 'POST',
                                     url: 'couriers/deletebyselection',
@@ -508,7 +512,7 @@
                                         _token: '{{ csrf_token() }}'
                                     },
                                     success: function(data) {
-                                        alert(data);
+                                        SaleProToast.show(data);
                                         location.reload();
                                     }
                                 });
@@ -516,17 +520,19 @@
                                     page: 'current',
                                     selected: true
                                 }).remove().draw(false);
+                            }
+                            });
                             } else if (!courier_id.length) {
-                                alert('{{ __('db.No courier is selected!') }}');
+                                SaleProToast.show('{{ __('db.no_courier_selected');}}');
                             }
                         } else {
-                            alert('{{ __('db.This feature is disable for demo!') }}');
+                            SaleProToast.show('{{ __('db.This feature is disable for demo!');}}');
                         }
                     }
                 },
                 {
                     extend: 'colvis',
-                    text: '<i title="{{ __('db.column visibility') }}" class="fa fa-eye"></i>',
+                    text: '<i title="{{ __('db.column_visibility') }}" class="ti ti-eye"></i>',
                     columns: ':gt(0)'
                 },
             ]

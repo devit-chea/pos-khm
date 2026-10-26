@@ -70,17 +70,21 @@
                             @endif
                             <td class="text-center">{{ number_format($installment->amount, 2) }}</td>
                             <td class="text-center">
-                                @if ($installment->status === 'pending')
+                                @if ($installment->status === 'pending' && !$saleFullyPaid)
                                     <button 
                                         class="btn btn-sm btn-primary add-payment-btn" 
                                         data-id="{{ $installment->id }}" 
                                         data-amount="{{ $installment->amount }}"
                                         data-date="{{ $installment->payment_date }}">
-                                        <i class="fa fa-plus"></i> Add Payment
+                                        <i class="ti ti-plus"></i> Add Payment
                                     </button>
+                                @elseif ($saleFullyPaid)
+                                    <span class="badge bg-success py-2 px-3">
+                                        <i class="ti ti-check"></i> Sale Fully Paid
+                                    </span>
                                 @else
                                     <button class="btn btn-sm btn-secondary" disabled>
-                                        <i class="fa fa-check"></i> Paid
+                                        <i class="ti ti-check"></i> Paid
                                     </button>
                                 @endif
                             </td>
@@ -101,7 +105,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="addPaymentLabel"><i class="fa fa-plus-circle me-2"></i> Add Payment</h5>
+                <h5 class="modal-title" id="addPaymentLabel"><i class="ti ti-plus-circle me-2"></i> Add Payment</h5>
                 <button type="button" class="btn-close btn-close-white button-close-x" data-bs-dismiss="modal" aria-label="Close">X</button>
             </div>
 
@@ -189,10 +193,10 @@
 
                     <div class="mt-4 text-end">
                         <button type="button" class="btn btn-secondary button-close-cancel" data-bs-dismiss="modal">
-                            <i class="fa fa-times me-1"></i> Cancel
+                            <i class="ti ti-times me-1"></i> Cancel
                         </button>
                         <button type="submit" class="btn btn-primary">
-                            <i class="fa fa-check me-1"></i> Submit Payment
+                            <i class="ti ti-check me-1"></i> Submit Payment
                         </button>
                     </div>
                 </form>

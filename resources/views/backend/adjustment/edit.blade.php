@@ -42,7 +42,7 @@
                                 <div class="col-md-12">
                                     <label>{{__('db.Select Product')}}</label>
                                     <div class="search-box input-group">
-                                        <button type="button" class="btn btn-secondary btn-lg"><i class="fa fa-barcode"></i></button>
+                                        <button type="button" class="btn btn-secondary btn-lg"><i class="ti ti-barcode"></i></button>
                                         <input type="text" name="product_code_name" id="lims_productcodeSearch" placeholder="{{__('db.Please type product code and select')}}" class="form-control" />
                                     </div>
                                 </div>
@@ -61,7 +61,7 @@
                                                     <th>{{__('db.Adjustment Quantity')}}</th>
                                                     <th>{{__('db.Adjust Quantity')}}</th>
                                                     <th>{{__('db.action')}}</th>
-                                                    <th><i class="dripicons-trash"></i></th>
+                                                    <th><i class="ti ti-trash"></i></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -109,7 +109,7 @@
                                             <tfoot class="tfoot active">
                                                 <th colspan="5">{{__('db.Total')}}</th>
                                                 <th id="total-qty" colspan="2">0</th>
-                                                <th><i class="dripicons-trash"></i></th>
+                                                <th><i class="ti ti-trash"></i></th>
                                             </tfoot>
                                         </table>
                                     </div>
@@ -126,7 +126,7 @@
                             <div class="row">
                                 <div class="col-md-12">
                                     <div class="form-group">
-                                        <label>{{__('db.Note')}}</label>
+                                        <label>{{__('db.note')}}</label>
                                         <textarea rows="5" class="form-control" name="note">{{$lims_adjustment_data->note}}</textarea>
                                     </div>
                                 </div>
@@ -180,35 +180,53 @@ for(rowindex  =0; rowindex <= rownumber; rowindex++){
 
 	    if(!warehouse_id){
 	        $('#lims_productcodeSearch').val(temp_data.substring(0, temp_data.length - 1));
-	        alert('Please select Warehouse!');
+	        SaleProToast.show('Please select Warehouse!');
 	    }
 	});
 
-	var id = $('#warehouse_id').val();
-    $.get('../getproduct/' + id, function(data) {
-        lims_product_array = [];
-        product_code = data[0];
-        product_name = data[1];
-        product_qty = data[2];
-        unit_cost = data[3];
-        $.each(product_code, function(index) {
-            if(exist_code.includes(product_code[index])) {
-                pos = exist_code.indexOf(product_code[index]);
-                product_qty[index] = product_qty[index] + exist_qty[pos];
-            }
-            lims_product_array.push(product_code[index] + ' (' + product_name[index] + ')'+ '|' + unit_cost[index] + '|' + product_qty[index]);
-        });
-    });
+// 	var id = $('#warehouse_id').val();
+//     $.get('../getproduct/' + id, function(data) {
+//         lims_product_array = [];
+//         product_code = data[0];
+//         product_name = data[1];
+//         product_qty = data[2];
+//         unit_cost = data[3];
+//         $.each(product_code, function(index) {
+//             if(exist_code.includes(product_code[index])) {
+//                 pos = exist_code.indexOf(product_code[index]);
+//                 product_qty[index] = product_qty[index] + exist_qty[pos];
+//             }
+//             lims_product_array.push(product_code[index] + ' (' + product_name[index] + ')'+ '|' + unit_cost[index] + '|' + product_qty[index]);
+//         });
+//     });
+
+	<?php $productArray = []; ?>
+    var lims_product_code = [
+        @foreach($lims_product_list_without_variant as $product)
+            <?php
+                $productArray[] = htmlspecialchars($product->code) . '|' . preg_replace('/[\n\r]/', "<br>", htmlspecialchars($product->name));
+            ?>
+        @endforeach
+        @foreach($lims_product_list_with_variant as $product)
+            <?php
+                $productArray[] = htmlspecialchars($product->item_code) . '|' . preg_replace('/[\n\r]/', "<br>", htmlspecialchars($product->name));
+            ?>
+        @endforeach
+
+        <?php
+            echo  '"'.implode('","', $productArray).'"';
+        ?>
+    ];
 
 	var lims_productcodeSearch = $('#lims_productcodeSearch');
 
 	lims_productcodeSearch.autocomplete({
-	    source: function(request, response) {
-	        var matcher = new RegExp(".?" + $.ui.autocomplete.escapeRegex(request.term), "i");
-	        response($.grep(lims_product_array, function(item) {
-	            return matcher.test(item);
-	        }));
-	    },
+        source: function(request, response) {
+            var matcher = new RegExp(".?" + $.ui.autocomplete.escapeRegex(request.term), "i");
+            response($.grep(lims_product_code, function(item) {
+                return matcher.test(item);
+            }));
+        },
         response: function(event, ui) {
             if (ui.content.length == 1) {
                 var data = ui.content[0].value;
@@ -216,25 +234,25 @@ for(rowindex  =0; rowindex <= rownumber; rowindex++){
                 productSearch(data);
             };
         },
-	    select: function(event, ui) {
-	        var data = ui.item.value;
+        select: function(event, ui) {
+            var data = ui.item.value;
             productSearch(data);
-	    }
-	});
+        }
+    });
 
-	$('select[name="warehouse_id"]').on('change', function() {
-	    var id = $('#warehouse_id').val();
-	    $.get('../getproduct/' + id, function(data) {
-	        lims_product_array = [];
-	        product_code = data[0];
-	        product_name = data[1];
-	        product_qty = data[2];
-	        unit_cost = data[3];
-            $.each(product_code, function(index) {
-                lims_product_array.push(product_code[index] + ' (' + product_name[index] + ')' + '|' + unit_cost[index] + '|' + product_qty[index]);
-            });
-	    });
-	});
+// 	$('select[name="warehouse_id"]').on('change', function() {
+// 	    var id = $('#warehouse_id').val();
+// 	    $.get('../getproduct/' + id, function(data) {
+// 	        lims_product_array = [];
+// 	        product_code = data[0];
+// 	        product_name = data[1];
+// 	        product_qty = data[2];
+// 	        unit_cost = data[3];
+//             $.each(product_code, function(index) {
+//                 lims_product_array.push(product_code[index] + ' (' + product_name[index] + ')' + '|' + unit_cost[index] + '|' + product_qty[index]);
+//             });
+// 	    });
+// 	});
 
 	$("#myTable").on('input', '.qty', function() {
 	    rowindex = $(this).closest('tr').index();
@@ -269,27 +287,27 @@ for(rowindex  =0; rowindex <= rownumber; rowindex++){
     $('#adjustment-form').on('submit',function(e){
         var rownumber = $('table.order-list tbody tr:last').index();
         if (rownumber < 0) {
-            alert("Please insert product to order table!")
-            e.preventDefault();
+            SaleProToast.show("Please insert product to order table!");e.preventDefault();
         }
     });
 
     function productSearch(data){
-        $.ajax({
+		$.ajax({
             type: 'GET',
             url: '../lims_product_search',
             data: {
                 data: data
             },
             success: function(data) {
+            	console.log(data);
                 var flag = 1;
                 $(".product-code").each(function(i) {
                     if ($(this).val() == data[1]) {
                         rowindex = i;
-                        var qty = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val()) + 1;
-                        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val(qty);
-                        checkQuantity(qty);
-                        flag = 0;
+	                    var qty = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val()) + 1;
+	                    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val(qty);
+	                    checkQuantity(qty);
+	                    flag = 0;
                     }
                 });
                 $("input[name='product_code_name']").val('');
@@ -298,32 +316,28 @@ for(rowindex  =0; rowindex <= rownumber; rowindex++){
                     var cols = '';
                     cols += '<td>' + data[0] + '</td>';
                     cols += '<td>' + data[1] + '</td>';
-                    cols += '<td>' + data[4] + '<input type="hidden" name="unit_cost[]" value="'+data[4]+'" /></td>';
-                    cols += '<td>' + data[5] + '<input type="hidden" name="available_quantity" value="'+data[5]+'" /></td>';
-                    cols += '<td>0</td>';
-                    cols += '<td><input type="number" class="form-control qty" name="qty[]" value="1" required step="any"/></td>';
+                    cols += '<td>' + data[2] + '<input type="hidden" name="unit_cost[]" value="'+data[2]+'" /></td>';
+                    cols += '<td><input type="number" class="form-control qty" name="qty[]" value="1" required step="any" /></td>';
                     cols += '<td class="action"><select name="action[]" class="form-control act-val"><option value="-">{{__("db.Subtraction")}}</option><option value="+">{{__("db.Addition")}}</option></select></td>';
                     cols += '<td><button type="button" class="ibtnDel btn btn-md btn-danger">{{__("db.delete")}}</button></td>';
                     cols += '<input type="hidden" class="product-code" name="product_code[]" value="' + data[1] + '"/>';
-                    cols += '<input type="hidden" class="product-id" name="product_id[]" value="' + data[2] + '"/>';
-                    cols += '<input type="hidden" name="product_variant_id[]" value="' + data[3] + '"/>';
+                    cols += '<input type="hidden" class="product-id" name="product_id[]" value="' + data[9] + '"/>';
 
                     newRow.append(cols);
                     $("table.order-list tbody").append(newRow);
-                    $('.selectpicker').selectpicker('refresh');
                     rowindex = newRow.index();
                     calculateTotal();
                 }
             }
         });
-    }
+	}
 
 	function checkQuantity(qty) {
 	    var row_product_code = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(2)').text();
         var action = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.act-val').val();
 	    var pos = product_code.indexOf(row_product_code);
 	    if ( (qty > parseFloat(product_qty[pos])) && (action == '-') ) {
-	        alert('Quantity exceeds stock quantity!');
+	        SaleProToast.show('Quantity exceeds stock quantity!');
             var row_qty = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val();
             row_qty = row_qty.substring(0, row_qty.length - 1);
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val(row_qty);

@@ -25,11 +25,11 @@
             <table role="presentation" style="width:602px;border-collapse:collapse;border:1px solid #cccccc;border-spacing:0;text-align:left;">
               <tr>
                 <td align="center" style="padding:40px 0 30px 0;background:#CCC;">
-                  @if($general_setting->site_logo)
-                  <a href="{{url('/')}}"><img src="{{url('logo', $general_setting->site_logo)}}" width="200" style="height:auto;display:block;"></a>
+                  @if(gen_setting()->site_logo)
+                  <a href="{{url('/')}}"><img src="{{url('logo', gen_setting()->site_logo)}}" width="200" style="height:auto;display:block;"></a>
                   @else
                   <a href="{{url('/')}}">
-                    <h1 class="d-inline">{{$general_setting->site_title}}</h1>
+                    <h1 class="d-inline">{{gen_setting()->site_title}}</h1>
                   </a>
                   @endif
                 </td>
@@ -76,7 +76,7 @@
                                         <td style="border: 1px solid #ccc; padding: 5px">N/A</td>
                                     @endif
                                     <td style="border: 1px solid #ccc; padding: 5px">{{$sale_data['qty'][$key].' '.$sale_data['unit'][$key]}}</td>
-                                    <td style="border: 1px solid #ccc; padding: 5px">{{number_format((float)($sale_data['total'][$key] / $sale_data['qty'][$key]), $general_setting->decimal, '.', '')}}</td>
+                                    <td style="border: 1px solid #ccc; padding: 5px">{{number_format((float)($sale_data['total'][$key] / $sale_data['qty'][$key]), gen_setting()->decimal, '.', '')}}</td>
                                     <td style="border: 1px solid #ccc; padding: 5px">{{$sale_data['total'][$key]}}</td>
                                 </tr>
                                 @endforeach
@@ -117,7 +117,7 @@
                                 </tr>
                                 <tr>
                                     <td colspan="5" style="border: 1px solid #ccc; padding: 5px"><strong>Due</strong></td>
-                                    <td style="border: 1px solid #ccc; padding: 5px">{{number_format((float)($sale_data['grand_total'] - $sale_data['paid_amount']), $general_setting->decimal, '.', '')}}</td>
+                                    <td style="border: 1px solid #ccc; padding: 5px">{{number_format((float)($sale_data['grand_total'] - $sale_data['paid_amount']), gen_setting()->decimal, '.', '')}}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -134,7 +134,7 @@
                 <tr>
                   <td style="padding:0;width:50%;" align="center">
                     <p style="margin:0;font-size:14px;line-height:16px;font-family:Arial,sans-serif;color:#ffffff;">
-                      &copy; {{$general_setting->site_title}} {{date('Y')}}<br/>
+                      &copy; {{gen_setting()->site_title}} {{date('Y')}}<br/>
                     </p>
                   </td>
                 </tr>

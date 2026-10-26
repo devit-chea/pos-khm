@@ -1,6 +1,10 @@
 <?php
 
+namespace Database\Seeders;
+
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class DatabaseSeeder extends Seeder
 {
@@ -11,16 +15,11 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
-        $this->call(Database\Seeders\Tenant\TenantDatabaseSeeder::class);
+        $this->call(Tenant\TenantDatabaseSeeder::class);
 
         if (Schema::hasTable('general_settings')) {
             $general_setting = DB::table('general_settings')->select('modules')->first();
 
-
-            if (in_array('restaurant', explode(',', $general_setting->modules))) {
-                $this->call(\Modules\Restaurant\Database\Seeders\RestaurantDatabaseSeeder::class);
-                $this->call(\Modules\Restaurant\Database\Seeders\RestaurantProductSeeder::class);
-            }
         }
     }
 }

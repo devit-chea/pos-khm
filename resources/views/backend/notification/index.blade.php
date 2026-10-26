@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <x-success-message key="message" />
 <x-error-message key="not_permitted" />
@@ -27,14 +31,16 @@
                 @foreach($lims_notification_all as $key=>$notification)
                 <?php 
                     $data = json_decode($notification->data);
-                    $from_user = \DB::table('users')->select('name')->where('id', $data->sender_id)->first();
-                    $to_user = \DB::table('users')->select('name')->where('id', $data->receiver_id)->first();
+                    $sender_id = $data->sender_id ?? null;
+                    $receiver_id = $data->receiver_id ?? null;
+                    $from_user = $sender_id ? \DB::table('users')->select('name')->where('id', $sender_id)->first() : null;
+                    $to_user = $receiver_id ? \DB::table('users')->select('name')->where('id', $receiver_id)->first() : null;
                 ?>
                 <tr data-id="{{$notification->id}}">
                     <td>{{$key}}</td>
-                    <td>{{ date($general_setting->date_format, strtotime($notification->created_at)) }}</td>
-                    <td>{{$from_user->name}}</td>
-                    <td>{{$to_user->name}}</td>
+                    <td>{{ date(gen_setting()->date_format, strtotime($notification->created_at)) }}</td>
+                    <td>{{$from_user->name ?? 'System'}}</td>
+                    <td>{{$to_user->name ?? 'N/A'}}</td>
                     @if($data->document_name)
                     <td><a target="_blank" href="{{url('documents/notification', $data->document_name)}}">Open</a>
                     </td>
@@ -43,7 +49,7 @@
                     @endif
                     <td>{{$data->message}}</td>
                     @if(isset($data->reminder_date))
-                    <td>{{ date($general_setting->date_format, strtotime($data->reminder_date)) }}</td>
+                    <td>{{ date(gen_setting()->date_format, strtotime($data->reminder_date)) }}</td>
                     @else
                     <td>N/A</td>
                     @endif
@@ -62,6 +68,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $("ul#setting").siblings('a').attr('aria-expanded','true');
@@ -69,7 +76,7 @@
     $("ul#setting #notification-list-menu").addClass("active");
 
     var brand_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
     $.ajaxSetup({
         headers: {
@@ -93,8 +100,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -123,7 +130,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -132,7 +139,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -140,7 +147,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -148,7 +155,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -157,7 +164,7 @@
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],

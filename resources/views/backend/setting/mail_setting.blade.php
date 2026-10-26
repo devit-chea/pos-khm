@@ -38,7 +38,7 @@
                                 <input type="text" name="from_name" class="form-control" value="@if($mail_setting_data){{$mail_setting_data->from_name}}@endif" required />
                             </div>
                             <div class="col-md-4 form-group">
-                                <label>{{__('db.UserName')}} *</label>
+                                <label>{{__('db.username')}} *</label>
                                 <input type="text" name="username" class="form-control" value="@if($mail_setting_data){{$mail_setting_data->username}}@endif" required />
                             </div>
                             <div class="col-md-4 form-group">

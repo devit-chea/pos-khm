@@ -1,166 +1,62 @@
 <!DOCTYPE html>
-<html dir="@if (Config::get('app.locale') == 'ar' || $general_setting->is_rtl) {{ 'rtl' }} @endif">
+<html dir="@if (Config::get('app.locale') == 'ar' || gen_setting()->is_rtl) {{ 'rtl' }} @endif">
 
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    @if (!config('database.connections.saleprosaas_landlord'))
-        <link rel="icon" type="image/png"
-            href="{{ url('logo', $general_setting->favicon ?? $general_setting->site_logo) }}" />
-        <title>{{ $general_setting->site_title }}</title>
-        <meta name="description" content="">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="robots" content="all,follow">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
-        <!-- Bootstrap CSS-->
-        <link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap.min.css'); ?>" type="text/css">
-        <link rel="preload" href="<?php echo asset('vendor/bootstrap-toggle/css/bootstrap-toggle.min.css'); ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('vendor/bootstrap-toggle/css/bootstrap-toggle.min.css'); ?>" rel="stylesheet">
-        </noscript>
-        <link rel="preload" href="<?php echo asset('vendor/bootstrap/css/bootstrap-datepicker.min.css'); ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    @php
+        $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+    @endphp
+    <link rel="icon" type="image/png"
+        href="{{ url('logo', gen_setting()->favicon ?? gen_setting()->site_logo) }}" />
+    <title>{{ gen_setting()->site_title }}</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="all,follow">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <!-- Bootstrap CSS-->
+    <link rel="stylesheet" href="{{ asset($asset_prefix . 'vendor/bootstrap/css/bootstrap.min.css') }}" type="text/css">
 
-        <link rel="preload" href="<?php echo asset('vendor/bootstrap/css/awesome-bootstrap-checkbox.css'); ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('vendor/bootstrap/css/awesome-bootstrap-checkbox.css'); ?>" rel="stylesheet">
-        </noscript>
-        <link rel="preload" href="<?php echo asset('vendor/bootstrap/css/bootstrap-select.min.css'); ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('vendor/bootstrap/css/bootstrap-select.min.css'); ?>" rel="stylesheet">
-        </noscript>
-        <!-- Font Awesome CSS-->
-        <link rel="preload" href="<?php echo asset('vendor/font-awesome/css/font-awesome.min.css'); ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('vendor/font-awesome/css/font-awesome.min.css'); ?>" rel="stylesheet">
-        </noscript>
-        <!-- Drip icon font-->
-        <link rel="preload" href="<?php echo asset('vendor/dripicons/webfont.css'); ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('vendor/dripicons/webfont.css'); ?>" rel="stylesheet">
-        </noscript>
+    <link rel="preload" href="{{ asset($asset_prefix . 'vendor/bootstrap/css/bootstrap-datepicker.min.css') }}" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript>
+        <link href="{{ asset($asset_prefix . 'vendor/bootstrap/css/bootstrap-datepicker.min.css') }}" rel="stylesheet">
+    </noscript>
 
-        @if (Route::current()->getName() != '/')
-            <!-- date range stylesheet-->
-            <link rel="preload" href="<?php echo asset('vendor/daterange/css/daterangepicker.min.css'); ?>" as="style"
-                onload="this.onload=null;this.rel='stylesheet'">
-            <noscript>
-                <link href="<?php echo asset('vendor/daterange/css/daterangepicker.min.css'); ?>" rel="stylesheet">
-            </noscript>
-            <!-- table sorter stylesheet-->
-            <link rel="preload" href="<?php echo asset('vendor/datatable/dataTables.bootstrap4.min.css'); ?>" as="style"
-                onload="this.onload=null;this.rel='stylesheet'">
-            <noscript>
-                <link href="<?php echo asset('vendor/datatable/dataTables.bootstrap4.min.css'); ?>" rel="stylesheet">
-            </noscript>
-            <link rel="preload" href="https://cdn.datatables.net/fixedheader/3.1.6/css/fixedHeader.bootstrap.min.css"
-                as="style" onload="this.onload=null;this.rel='stylesheet'">
-            <noscript>
-                <link href="https://cdn.datatables.net/fixedheader/3.1.6/css/fixedHeader.bootstrap.min.css"
-                    rel="stylesheet">
-            </noscript>
-            <link rel="preload" href="https://cdn.datatables.net/responsive/2.2.3/css/responsive.bootstrap.min.css"
-                as="style" onload="this.onload=null;this.rel='stylesheet'">
-            <noscript>
-                <link href="https://cdn.datatables.net/responsive/2.2.3/css/responsive.bootstrap.min.css"
-                    rel="stylesheet">
-            </noscript>
-        @endif
+    <link rel="preload" href="{{ asset($asset_prefix . 'vendor/bootstrap/css/bootstrap-select.min.css') }}" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript>
+        <link href="{{ asset($asset_prefix . 'vendor/bootstrap/css/bootstrap-select.min.css') }}" rel="stylesheet">
+    </noscript>
+    <!-- Icons CSS-->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
 
-        <link rel="stylesheet" href="<?php echo asset('css/style.default.css'); ?>" id="theme-stylesheet" type="text/css">
-        <link rel="stylesheet" href="<?php echo asset('css/dropzone.css'); ?>">
-        <!-- Custom stylesheet - for your changes-->
-        <link rel="stylesheet" href="<?php echo asset('css/custom-' . $general_setting->theme); ?>" type="text/css" id="custom-style">
-
-        @if (Config::get('app.locale') == 'ar' || $general_setting->is_rtl)
-            <!-- RTL css -->
-            <link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap-rtl.min.css'); ?>" type="text/css">
-            <link rel="stylesheet" href="<?php echo asset('css/custom-rtl.css'); ?>" type="text/css" id="custom-style">
-        @endif
-    @else
-        <link rel="icon" type="image/png"
-            href="{{ url('logo', $general_setting->favicon ?? $general_setting->site_logo) }}" />
-        <title>{{ $general_setting->site_title }}</title>
-        <meta name="description" content="">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="robots" content="all,follow">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
-        <!-- Bootstrap CSS-->
-        <link rel="stylesheet" href="<?php echo asset('../../vendor/bootstrap/css/bootstrap.min.css'); ?>" type="text/css">
-        <link rel="preload" href="<?php echo asset('../../vendor/bootstrap-toggle/css/bootstrap-toggle.min.css'); ?>" as="style"
+    @if (optional(Route::current())->getName() != '/')
+        <link rel="preload" href="{{ asset($asset_prefix . 'vendor/bootstrap/css/awesome-bootstrap-checkbox.css') }}" as="style" onload="this.onload=null;this.rel='stylesheet'">
+        <noscript>
+            <link href="{{ asset($asset_prefix . 'vendor/bootstrap/css/awesome-bootstrap-checkbox.css') }}" rel="stylesheet">
+        </noscript>
+        <!-- date range stylesheet-->
+        <link rel="preload" href="{{ asset($asset_prefix . 'vendor/daterange/css/daterangepicker.min.css') }}" as="style"
             onload="this.onload=null;this.rel='stylesheet'">
         <noscript>
-            <link href="<?php echo asset('../../vendor/bootstrap-toggle/css/bootstrap-toggle.min.css'); ?>" rel="stylesheet">
+            <link href="{{ asset($asset_prefix . 'vendor/daterange/css/daterangepicker.min.css') }}" rel="stylesheet">
         </noscript>
-        <link rel="preload" href="<?php echo asset('../../vendor/bootstrap/css/bootstrap-datepicker.min.css'); ?>" as="style"
-            onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('../../vendor/bootstrap/css/bootstrap-datepicker.min.css'); ?>" rel="stylesheet">
-        </noscript>
-        <link rel="preload" href="<?php echo asset('../../vendor/bootstrap/css/awesome-bootstrap-checkbox.css'); ?>" as="style"
-            onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('../../vendor/bootstrap/css/awesome-bootstrap-checkbox.css'); ?>" rel="stylesheet">
-        </noscript>
-        <link rel="preload" href="<?php echo asset('../../vendor/bootstrap/css/bootstrap-select.min.css'); ?>" as="style"
-            onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('../../vendor/bootstrap/css/bootstrap-select.min.css'); ?>" rel="stylesheet">
-        </noscript>
-        <!-- Font Awesome CSS-->
-        <link rel="preload" href="<?php echo asset('../../vendor/font-awesome/css/font-awesome.min.css'); ?>" as="style"
-            onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('../../vendor/font-awesome/css/font-awesome.min.css'); ?>" rel="stylesheet">
-        </noscript>
-        <!-- Drip icon font-->
-        <link rel="preload" href="<?php echo asset('../../vendor/dripicons/webfont.css'); ?>" as="style"
-            onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('../../vendor/dripicons/webfont.css'); ?>" rel="stylesheet">
-        </noscript>
-
-        @if (Route::current()->getName() != '/')
-            <!-- date range stylesheet-->
-            <link rel="preload" href="<?php echo asset('../../vendor/daterange/css/daterangepicker.min.css'); ?>" as="style"
-                onload="this.onload=null;this.rel='stylesheet'">
-            <noscript>
-                <link href="<?php echo asset('../../vendor/daterange/css/daterangepicker.min.css'); ?>" rel="stylesheet">
-            </noscript>
-            <!-- table sorter stylesheet-->
-            <link rel="preload" href="<?php echo asset('../../vendor/datatable/dataTables.bootstrap4.min.css'); ?>" as="style"
-                onload="this.onload=null;this.rel='stylesheet'">
-            <noscript>
-                <link href="<?php echo asset('../../vendor/datatable/dataTables.bootstrap4.min.css'); ?>" rel="stylesheet">
-            </noscript>
-            <link rel="preload" href="https://cdn.datatables.net/fixedheader/3.1.6/css/fixedHeader.bootstrap.min.css"
-                as="style" onload="this.onload=null;this.rel='stylesheet'">
-            <noscript>
-                <link href="https://cdn.datatables.net/fixedheader/3.1.6/css/fixedHeader.bootstrap.min.css"
-                    rel="stylesheet">
-            </noscript>
-            <link rel="preload" href="https://cdn.datatables.net/responsive/2.2.3/css/responsive.bootstrap.min.css"
-                as="style" onload="this.onload=null;this.rel='stylesheet'">
-            <noscript>
-                <link href="https://cdn.datatables.net/responsive/2.2.3/css/responsive.bootstrap.min.css"
-                    rel="stylesheet">
-            </noscript>
-        @endif
-
-        <link rel="stylesheet" href="<?php echo asset('../../css/style.default.css'); ?>" id="theme-stylesheet" type="text/css">
-        <link rel="stylesheet" href="<?php echo asset('../../css/dropzone.css'); ?>">
-        <!-- Custom stylesheet - for your changes-->
-        <link rel="stylesheet" href="<?php echo asset('../../css/custom-' . $general_setting->theme); ?>" type="text/css" id="custom-style">
-
-        @if (Config::get('app.locale') == 'ar' || $general_setting->is_rtl)
-            <!-- RTL css -->
-            <link rel="stylesheet" href="<?php echo asset('../../vendor/bootstrap/css/bootstrap-rtl.min.css'); ?>" type="text/css">
-            <link rel="stylesheet" href="<?php echo asset('../../css/custom-rtl.css'); ?>" type="text/css" id="custom-style">
-        @endif
     @endif
 
+    <link rel="stylesheet" href="{{ asset($asset_prefix . 'css/style.default.css') }}" id="theme-stylesheet" type="text/css">
+    
+
+
+    @if (Config::get('app.locale') == 'ar' || gen_setting()->is_rtl)
+        <!-- RTL css -->
+        <link rel="stylesheet" href="{{ asset($asset_prefix . 'vendor/bootstrap/css/bootstrap-rtl.min.css') }}" type="text/css">
+        <link rel="stylesheet" href="{{ asset($asset_prefix . 'css/custom-rtl.css') }}" type="text/css" id="custom-style">
+    @endif
+
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://cdn.datatables.net" crossorigin>
     <!-- Google fonts -->
-    @if ($general_setting->font_css)
-        {!! $general_setting->font_css !!}
+    @if (gen_setting()->font_css)
+        {!! gen_setting()->font_css !!}
     @else
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -170,20 +66,25 @@
 
     @stack('css')
 
+    @php
+        // The shared backend UI theme is a light/dark string. Child views must not be able
+        // to break the layout if they happen to use a local variable named $theme.
+        $backendUiTheme = is_string($theme ?? null) ? $theme : 'light';
+    @endphp
+
     <!-- Custom CSS from general settings -->
-    {!! $general_setting->custom_css !!}
+    {!! gen_setting()->custom_css !!}
 </head>
 
-<body class="@if ($theme == 'dark') dark-mode dripicons-brightness-low @endif  @if (Route::current()->getName() == 'sale.pos') pos-page @endif" onload="myFunction()">
-    <div id="loader"></div>
+<body class="@if ($backendUiTheme === 'dark') dark-mode @endif  @if (optional(Route::current())->getName() == 'sale.pos') pos-page @endif">
     <!-- Side Navbar -->
     <nav class="side-navbar shrink d-print-none">
         <span class="brand-big">
             <a href="{{ url('/dashboard') }}">
-                @if ($general_setting->site_logo)
-                    <img src="{{ url('logo', $general_setting->site_logo) }}" width="115">
+                @if (gen_setting()->site_logo)
+                    <img src="{{ url('logo', gen_setting()->site_logo) }}" width="115">
                 @else
-                    <h1 class="d-inline">{{ $general_setting->site_title }}</h1>
+                    <h1 class="d-inline">{{ gen_setting()->site_title }}</h1>
                 @endif
             </a>
         </span>
@@ -192,16 +93,19 @@
 
     <div class="page">
         <!-- navbar-->
-        @if (Route::current()->getName() != 'sale.pos')
+        @if (optional(Route::current())->getName() != 'sale.pos')
             <header class="container-fluid">
                 <nav class="navbar">
-                    <a id="toggle-btn" class="menu-btn"><i class="fa fa-bars"> </i></a>
+                    <a id="toggle-btn" class="menu-btn"><i class="ti ti-menu-deep"> </i></a>
 
                     <ul class="nav-menu list-unstyled d-flex flex-md-row align-items-md-center">
+                        @php
+                            $role_has_permissions_list = $role_has_permissions_list ?? collect();
+                        @endphp
                         <div class="dropdown d-none d-lg-block">
 
                             <a class="btn-pos btn-sm" type="button" data-toggle="dropdown" aria-expanded="false">
-                                <i class="dripicons-plus"></i>
+                                <i class="ti ti-plus"></i>
                             </a>
                             <ul class="dropdown-menu">
                                 <?php
@@ -304,7 +208,7 @@
                             </ul>
                         </div>
                         <?php
-                        $empty_database_permission_active = $role_has_permissions_list->where('name', 'empty_database')->first();
+                        $business_reset_permission_active = $role_has_permissions_list->where('name', 'business_reset')->first();
 
                         $sale_add_permission_active = $role_has_permissions_list->where('name', 'sales-add')->first();
 
@@ -317,113 +221,39 @@
                         ?>
                         @if ($sale_add_permission_active)
                             <li class="nav-item"><a class="btn-pos btn-sm" href="{{ route('sale.pos') }}"><i
-                                        class="dripicons-shopping-bag"></i><span> POS</span></a></li>
+                                        class="ti ti-shopping-bag"></i><span> POS</span></a></li>
                         @endif
-                        <li class="nav-item d-none d-lg-block"><a id="switch-theme" data-toggle="tooltip"
-                                title="{{ __('Switch Theme') }}"><i class="dripicons-brightness-max"></i></a></li>
+
                         @if (config('database.connections.saleprosaas_landlord'))
+                            @if (tenant('subscription_type') === 'profit_commission' && (int) optional(\Auth::user())->role_id === 1)
+                                <li class="nav-item"><a href="{{ route('subscription.billing') }}">{{ __('Subscription Billing') }}</a></li>
+                            @else
                             <li class="nav-item"><a target="_blank"
                                     href="{{ 'https://' . env('CENTRAL_DOMAIN') . '/contact-for-renewal?id=' . $subdomain }}"
                                     data-toggle="tooltip" title="{{ __('Renew Subscription') }}"><i
-                                        class="dripicons-clockwise"></i></a></li>
+                                        class="ti ti-clockwise"></i></a></li>
+                            @endif
                         @endif
                         <li class="nav-item d-none d-lg-block"><a id="btnFullscreen" data-toggle="tooltip"
-                                title="{{ __('Full Screen') }}"><i class="dripicons-expand"></i></a></li>
-                        @if (\Auth::user()->role_id <= 2)
+                                title="{{ __('Full Screen') }}"><i class="ti ti-arrows-maximize"></i></a></li>
+                        @if (optional(\Auth::user())->role_id <= 2)
                             <li class="nav-item d-none d-lg-block"><a href="{{ route('cashRegister.index') }}" data-toggle="tooltip"
-                                    title="{{ __('Cash Register List') }}"><i class="dripicons-archive"></i></a></li>
+                                    title="{{ __('Cash Register List') }}"><i class="ti ti-archive"></i></a></li>
                         @endif
-                        @php
-                            $total_notifications =
-                                $alert_product +
-                                $dso_alert_product_no +
-                                Auth::user()->unreadNotifications()
-                                ->whereDate('data->reminder_date', now()->toDateString())->count();
-                        @endphp
 
-                        <li class="nav-item" id="notification-icon">
-
-                            <a rel="nofollow" data-toggle="tooltip" title="{{ __('Notifications') }}"
-                                class="nav-link dropdown-item">
-                                <i class="dripicons-bell"></i>
-
-                                @if ($product_qty_alert_active && $total_notifications > 0)
-                                    <span
-                                        class="badge badge-danger notification-number">{{ $total_notifications + $expire_alert_products }}</span>
-                                @elseif ($total_notifications > 0)
-                                    <span class="badge badge-danger notification-number">{{$total_notifications}}</span>
-                                @endif
-                            </a>
-
-                            <ul class="right-sidebar">
-
-                                {{-- No notifications --}}
-                                @if ($total_notifications == 0)
-                                    <li class="notifications text-center">
-                                        <span class="text-muted">No notifications available</span>
-                                    </li>
-                                @else
-                                    {{-- Quantity Alert --}}
-                                    @if ($alert_product > 0)
-                                        <li class="notifications">
-                                            <a href="{{ route('report.qtyAlert') }}" class="btn btn-link">
-                                                {{ $alert_product }} product exceeds alert quantity
-                                            </a>
-                                        </li>
-                                    @endif
-
-                                    {{-- DSO Alert --}}
-                                    @if ($dso_alert_product_no > 0)
-                                        <li class="notifications">
-                                            <a href="{{ route('report.dailySaleObjective') }}" class="btn btn-link">
-                                                {{ $dso_alert_product_no }} product could not fulfill daily sale
-                                                objective
-                                            </a>
-                                        </li>
-                                    @endif
-
-                                    {{-- Expire Alert --}}
-                                    @if ($expire_alert_products > 0)
-                                        <li class="notifications">
-                                            <a href="{{ route('report.productExpiry') }}" class="btn btn-link">
-                                                {{ $expire_alert_products }} product will expire within
-                                                {{ $product_qty_alert_active->expiry_alert_days ?? 0 }} days
-                                            </a>
-                                        </li>
-                                    @endif
-
-                                    {{-- Reminder Notifications --}}
-                                    @foreach (Auth::user()->unreadNotifications->where('data.reminder_date', date('Y-m-d')) as $notification)
-                                        <li class="notifications">
-                                            @if ($notification->data['document_name'])
-                                                <a target="_blank"
-                                                    href="{{ url('documents/notification', $notification->data['document_name']) }}"
-                                                    class="btn btn-link">
-                                                    {{ $notification->data['message'] }}
-                                                </a>
-                                            @else
-                                                <a href="#"
-                                                    class="btn btn-link">{{ $notification->data['message'] }}</a>
-                                            @endif
-                                        </li>
-                                    @endforeach
-
-                                @endif
-
-                            </ul>
-                        </li>
+                        @include('backend.layout.partials.notification_menu')
                         <li class="nav-item">
                             <a rel="nofollow" title="{{ __('db.language') }}" data-toggle="tooltip"
-                                class="nav-link dropdown-item"><i class="dripicons-web"></i></a>
+                                class="nav-link dropdown-item"><i class="ti ti-world"></i></a>
                             <ul class="right-sidebar">
-                                @foreach ($languages as $language)
+                                @foreach ($languages ?? [] as $language)
                                     <li>
                                         <a href="{{ url('language_switch/' . $language->id) }}"
                                             class="btn btn-link">{{ $language->name }}</a>
                                     </li>
                                 @endforeach
 
-                                @if (!env('USER_VERIFIED'))
+                                @if (!config('app.user_verified'))
                                     @if ($language_setting_active)
                                         <li id="languages"
                                             style="background-color: #f0f0f0; padding: 10px; border-radius: 5px;">
@@ -436,42 +266,39 @@
                         </li>
                         <li class="nav-item">
                             <a rel="nofollow" data-toggle="tooltip" class="nav-link dropdown-item"><i
-                                    class="dripicons-user"></i> <span>{{ ucfirst(Auth::user()->name) }}</span> <i
-                                    class="fa fa-angle-down"></i>
+                                    class="ti ti-user"></i> <span>{{ ucfirst(optional(Auth::user())->name) }}</span> <i
+                                    class="ti ti-angle-down"></i>
                             </a>
                             <ul class="right-sidebar">
                                 <li>
-                                    <a href="{{ route('user.profile', ['id' => Auth::id()]) }}"><i
-                                            class="dripicons-user"></i> {{ __('db.profile') }}</a>
+                                    <a href="{{ route('user.profile', ['id' => Auth::id() ?: 1]) }}"><i
+                                            class="ti ti-user"></i> {{ __('db.profile') }}</a>
                                 </li>
                                 @if ($general_setting_permission_active)
                                     <li>
-                                        <a href="{{ route('setting.general') }}"><i class="dripicons-gear"></i>
+                                        <a href="{{ route('setting.general') }}"><i class="ti ti-settings"></i>
                                             {{ __('db.settings') }}</a>
                                     </li>
                                 @endif
                                 <li>
                                     <a href="{{ url('my-transactions/' . date('Y') . '/' . date('m')) }}"><i
-                                            class="dripicons-swap"></i> {{ __('db.My Transaction') }}</a>
+                                            class="ti ti-calendar-dollar"></i> {{ __('db.My Transaction') }}</a>
                                 </li>
-                                @if (Auth::user()->role_id != 5)
+                                @if (optional(Auth::user())->role_id != 5)
                                     <li>
                                         <a href="{{ url('holidays/my-holiday/' . date('Y') . '/' . date('m')) }}"><i
-                                                class="dripicons-vibrate"></i> {{ __('db.My Holiday') }}</a>
+                                                class="ti ti-luggage"></i> {{ __('db.My Holiday') }}</a>
                                     </li>
                                 @endif
-                                @if ($empty_database_permission_active)
-                                    <li>
-                                        <a onclick="return confirm('Are you sure want to delete? If you do this all of your data will be lost.')"
-                                            href="{{ route('setting.emptyDatabase') }}"><i
-                                                class="dripicons-stack"></i> {{ __('db.Empty Database') }}</a>
-                                    </li>
+                                @if ($business_reset_permission_active)
+
+                                    <li><a href="{{ route('setting.freshBusinessReset') }}"><i class="ti ti-alert-triangle"></i> {{ __('db.fresh_reset_title') }}</a></li>
                                 @endif
                                 <li>
                                     <a href="{{ route('logout') }}"
                                         onclick="event.preventDefault();
                                         document.getElementById('logout-form').submit();"><i
-                                            class="dripicons-power"></i>
+                                            class="ti ti-power"></i>
                                         {{ __('db.logout') }}
                                     </a>
                                     <form id="logout-form" action="{{ route('logout') }}" method="POST"
@@ -487,7 +314,7 @@
         @endif
 
 
-        <div style="display:none" id="content" class="animate-bottom">
+        <div id="content" class="animate-bottom">
             @yield('content')
         </div>
 
@@ -495,1327 +322,95 @@
             <div class="container-fluid">
                 <div class="row">
                     <div class="col-sm-12">
-                        <p>&copy; {{ $general_setting->site_title }} | {{ __('Developed') }} {{ __('By') }}
-                            <span class="external">{{ $general_setting->developed_by }}</span> | V
+                        <p>&copy; {{ gen_setting()->site_title }} | {{ __('Developed') }} {{ __('By') }}
+                            <span class="external">{{ gen_setting()->developed_by }}</span> | V
                             {{ env('VERSION') }}</p>
                     </div>
                 </div>
+                @if (config('app.user_verified') != true)
+                <a href="https://wa.me/8801924756759" target="_blank">
+                    <div class="contact-button" style="display: flex;justify-content: center;align-items: center;background-color: #9fe870;border-radius: 50%;bottom: 20px;height: 70px;right: 20px;width: 70px;font-size: 30px;color: #f5f6f7;text-align: center;line-height: 64px;position: fixed;z-index: 999;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" fill="#101010" class="bi bi-whatsapp" viewBox="0 0 16 16">
+                            <path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.9 7.9 0 0 0 13.6 2.326zM7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.73.73 0 0 0-.529.247c-.182.198-.691.677-.691 1.654s.71 1.916.81 2.049c.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232"></path>
+                        </svg>
+                    </div>
+                    <span style="background-color: #9fe870;border-radius: 15px;bottom: 10px;height: 18px;right: 5px;width: 100px;font-size: 12px;font-weight:600;color: #111;text-align: center;line-height: 1.5;position: fixed;z-index: 999;">Have Questions?</span>
+                </a>
+                @endif
             </div>
         </footer>
 
-        <!-- notification modal -->
-        <div id="notification-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
-            aria-hidden="true" class="modal fade text-left">
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title">{{ __('Send Notification') }}</h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="italic">
-                            <small>{{ __('The field labels marked with are required input fields') }}.</small></p>
-                        <form route = 'notifications.store' method = 'post' files = 'true'>
-                        <div class="row">
-                            <?php
-                            $lims_user_list = DB::table('users')
-                                ->where([['is_active', true], ['id', '!=', \Auth::user()->id]])
-                                ->get();
-                            ?>
-                            <div class="col-md-4 form-group">
-                                <input type="hidden" name="sender_id" value="{{ \Auth::id() }}">
-                                <label>{{ __('User') }} *</label>
-                                <select name="receiver_id" class="selectpicker form-control" required
-                                    data-live-search="true" data-live-search-style="begins" title="Select user...">
-                                    @foreach ($lims_user_list as $user)
-                                        <option value="{{ $user->id }}">
-                                            {{ $user->name . ' (' . $user->email . ')' }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-4 form-group">
-                                <label>{{ __('Reminder Date') }}</label>
-                                <input type="text" name="reminder_date" class="form-control date"
-                                    value="{{ date('d-m-Y') }}">
-                            </div>
-                            <div class="col-md-4 form-group">
-                                <label>{{ __('Attach Document') }}</label>
-                                <input type="file" name="document" class="form-control">
-                            </div>
-                            <div class="col-md-12 form-group">
-                                <label>{{ __('Message') }} *</label>
-                                <textarea rows="5" name="message" class="form-control" required></textarea>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary ">{{ __('submit') }}</button>
-                        </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- end notification modal -->
+        @include('backend.layout.modals.notification')
 
-        <!-- Category Modal -->
-        <div id="category-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
-            aria-hidden="true" class="modal fade text-left">
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-                    <form action="{{ route('category.store') }}" method="post" enctype="multipart/form-data" id="category-form">
-                    @csrf
-                    <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title">{{ __('Add Category') }}</h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="italic">
-                            <small>{{ __('The field labels marked with are required input fields') }}.</small></p>
-                        <div class="row">
-                            <div class="col-md-6 form-group">
-                                <label>{{ __('name') }} *</label>
-                                <input type="text" name="name" class="form-control" required placeholder="{{ __('db.Type category name') }}">
-                                <x-validation-error fieldName="name" />
-                            </div>
-                            <div class="col-md-6 form-group">
-                                <label>{{ __('Image') }}</label>
-                                <input type="file" name="image" class="form-control">
-                                <x-validation-error fieldName="image" />
-                            </div>
-                            <div class="col-md-6 form-group">
-                                <label>{{ __('Parent Category') }}</label>
-                                <select name="parent_id" class="form-control selectpicker" id="parent">
-                                    <option value="">No {{ __('parent') }}</option>
-                                    @foreach ($categories_list as $category)
-                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
-                                    @endforeach
-                                </select>
-                                <x-validation-error fieldName="parent_id" />
-                            </div>
-                            @if (\Schema::hasColumn('categories', 'woocommerce_category_id'))
-                                <div class="col-md-6 form-group mt-4">
-                                    <input class="mt-3" name="is_sync_disable" type="checkbox"
-                                        id="is_sync_disable" value="1">&nbsp;
-                                    {{ __('Disable Woocommerce Sync') }}
-                                    <x-validation-error fieldName="is_sync_disable" />
-                                </div>
-                            @endif
+        @include('backend.layout.modals.category')
 
-                            @if (in_array('ecommerce', explode(',', $general_setting->modules)))
-                                <div class="col-md-12 mt-3">
-                                    <h6><strong>{{ __('For Website') }}</strong></h6>
-                                    <hr>
-                                </div>
+        @include('backend.layout.modals.expense')
+        @include('backend.layout.modals.income')
 
-                                <div class="col-md-6 form-group">
-                                    <label>{{ __('Icon') }}</label>
-                                    <input type="file" name="icon" class="form-control">
-                                </div>
-                                <div class="col-md-6 form-group">
-                                    <input class="mt-5" type="checkbox" name="featured" id="featured"
-                                        value="1"> <label>{{ __('List on category dropdown') }}</label>
-                                </div>
-                            @endif
-                        </div>
+        @include('backend.layout.modals.sale_return')
 
-                        @if (in_array('ecommerce', explode(',', $general_setting->modules)))
-                            <div class="row">
-                                <div class="col-md-12 mt-3">
-                                    <h6><strong>{{ __('For SEO') }}</strong></h6>
-                                    <hr>
-                                </div>
-                                <div class="col-md-12 form-group">
-                                    <label>{{ __('Meta Title') }}</label>
-                                    <input type="text" name="page_title" class="form-control" placeholder="{{ __('db.Meta Title') }}">
-                                </div>
-                                <div class="col-md-12 form-group">
-                                    <label>{{ __('Meta Description') }}</label>
-                                    <input type="text" name="short_description" class="form-control" placeholder="{{ __('db.Meta Description') }}">
-                                </div>
-                            </div>
-                        @endif
+        @include('backend.layout.modals.sale_exchange')
 
-                        <div class="form-group">
-                            <input type="hidden" class="category-ajax-check" name="ajax" value="0">
-                            <button type="submit"
-                                class="btn btn-primary category-submit-btn">{{ __('submit') }}</button>
-                        </div>
-                    </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-        <!-- Category Modal -->
+        @include('backend.layout.modals.purchase_return')
 
-        <!-- expense modal -->
-        <div id="expense-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
-            aria-hidden="true" class="modal fade text-left">
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title">{{ __('Add Expense') }}</h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="italic">
-                            <small>{{ __('The field labels marked with are required input fields') }}.</small></p>
-                        <form action="{{ route('expenses.store') }}" method="post" enctype="multipart/form-data">
-                            @csrf
-                        <?php
-                        $lims_expense_category_list = DB::table('expense_categories')->where('is_active', true)->get();
-                        if (Auth::user()->role_id > 2) {
-                            $lims_warehouse_list = DB::table('warehouses')
-                                ->where([['is_active', true], ['id', Auth::user()->warehouse_id]])
-                                ->get();
-                        } else {
-                            $lims_warehouse_list = DB::table('warehouses')->where('is_active', true)->get();
-                        }
-                        $lims_account_list = \App\Models\Account::where('is_active', true)->get();
-                        ?>
-                        <div class="row">
-                            <div class="col-md-6 form-group">
-                                <label>{{ __('Date') }}</label>
-                                <input type="text" name="created_at" class="form-control date"
-                                    placeholder="{{ __('db.Choose date') }}"
-                                    value="{{ date($general_setting->date_format, strtotime('now')) }}" />
-                            </div>
-                            <div class="col-md-6 form-group">
-                                <label>{{ __('Expense Category') }} *</label>
-                                <select name="expense_category_id"
-                                    class="selectpicker form-control"
-                                    required
-                                    data-live-search="true"
-                                    title="Select Expense Category...">
-                                    @foreach ($lims_expense_category_list as $expense_category)
-                                        <option value="{{ $expense_category->id }}">{{ $expense_category->name }} ({{ $expense_category->code }})</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-6 form-group">
-                                <label>{{ __('Warehouse') }} *</label>
-                                <select name="warehouse_id" class="selectpicker form-control" required
-                                    data-live-search="true" data-live-search-style="begins"
-                                    title="Select Warehouse...">
-                                    @foreach ($lims_warehouse_list as $warehouse)
-                                        <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-6 form-group">
-                                <label>{{ __('Amount') }} *</label>
-                                <input type="number" name="amount" step="any" required class="form-control">
-                            </div>
-                            <div class="col-md-12" id="employee-fields" style="display:none; width:100%">
-                                <div class="row">
-                                    <div class="col-md-6 form-group">
-                                        <label>{{ __('db.select Employee') }}</label>
-                                        <select id="expense-employee" name="employee_id"
-                                            class="selectpicker form-control" data-live-search="true"
-                                            title="Select Employee...">
-                                            @foreach (\App\Models\Employee::where('is_active', 1)->get() as $emp)
-                                                <option value="{{ $emp->id }}">{{ $emp->name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
+        @include('backend.layout.modals.account')
 
-                                    <div class="col-md-6 form-group">
-                                        <label>{{ __('db.Select Type') }} *</label>
-                                        <select id="expense-type" name="expense_type"
-                                            class="selectpicker form-control" disabled>
-                                            <option value="">{{ __('db.Select Type') }}</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6 form-group">
-                                <label> {{ __('Account') }}</label>
-                                <select class="form-control selectpicker" name="account_id">
-                                    @foreach ($lims_account_list as $account)
-                                        @if ($account->is_default)
-                                            <option selected value="{{ $account->id }}">{{ $account->name }}
-                                                [{{ $account->account_no }}]</option>
-                                        @else
-                                            <option value="{{ $account->id }}">{{ $account->name }}
-                                                [{{ $account->account_no }}]</option>
-                                        @endif
-                                    @endforeach
-                                </select>
-                            </div>
+        @if(app(\App\Services\AccountingModeService::class)->isLegacy())
+            @include('backend.layout.modals.account_statement')
+        @endif
 
+        @include('backend.layout.modals.warehouse')
 
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label>{{ __('db.Attach Document') }}</label>
-                                    <i class="dripicons-question" data-toggle="tooltip"
-                                        title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
-                                    <input type="file" name="document" class="form-control" />
-                                    @if ($errors->has('extension'))
-                                        <span>
-                                            <strong>{{ $errors->first('extension') }}</strong>
-                                        </span>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
+        @include('backend.layout.modals.user')
 
-                        <div class="form-group">
-                            <label>{{ __('Note') }}</label>
-                            <textarea name="note" rows="3" class="form-control"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary">{{ __('submit') }}</button>
-                        </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- end expense modal -->
-        <!-- income modal start -->
-        <div id="income-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true"
-            class="modal fade text-left">
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title">{{ __('Add Income') }}</h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="italic">
-                            <small>{{ __('The field labels marked with are required input fields') }}.</small></p>
-                        <form action="{{ route('incomes.store') }}" method="post">
-                            @csrf
-                        <?php
-                        $lims_income_category_list = DB::table('income_categories')->where('is_active', true)->get();
-                        if (Auth::user()->role_id > 2) {
-                            $lims_warehouse_list = DB::table('warehouses')
-                                ->where([['is_active', true], ['id', Auth::user()->warehouse_id]])
-                                ->get();
-                        } else {
-                            $lims_warehouse_list = DB::table('warehouses')->where('is_active', true)->get();
-                        }
-                        $lims_account_list = \App\Models\Account::where('is_active', true)->get();
-                        ?>
-                        <div class="row">
-                            <div class="col-md-6 form-group">
-                                <label>{{ __('Date') }}</label>
-                                <input type="text" name="created_at" class="form-control date"
-                                    placeholder="{{ __('db.Choose date') }}"
-                                    value="{{ date($general_setting->date_format, strtotime('now')) }}" />
-                            </div>
-                            <div class="col-md-6 form-group">
-                                <label>{{ __('Income Category') }} *</label>
-                                <select name="income_category_id" class="selectpicker form-control" required
-                                    data-live-search="true" data-live-search-style="begins"
-                                    title="Select Income Category...">
-                                    @foreach ($lims_income_category_list as $income_category)
-                                        <option value="{{ $income_category->id }}">
-                                            {{ $income_category->name . ' (' . $income_category->code . ')' }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-6 form-group">
-                                <label>{{ __('Warehouse') }} *</label>
-                                <select name="warehouse_id" class="selectpicker form-control" required
-                                    data-live-search="true" data-live-search-style="begins"
-                                    title="Select Warehouse...">
-                                    @foreach ($lims_warehouse_list as $warehouse)
-                                        <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-6 form-group">
-                                <label>{{ __('Amount') }} *</label>
-                                <input type="number" name="amount" step="any" required class="form-control">
-                            </div>
-                            <div class="col-md-6 form-group">
-                                <label> {{ __('Account') }}</label>
-                                <select class="form-control selectpicker" name="account_id">
-                                    @foreach ($lims_account_list as $account)
-                                        @if ($account->is_default)
-                                            <option selected value="{{ $account->id }}">{{ $account->name }}
-                                                [{{ $account->account_no }}]</option>
-                                        @else
-                                            <option value="{{ $account->id }}">{{ $account->name }}
-                                                [{{ $account->account_no }}]</option>
-                                        @endif
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>{{ __('Note') }}</label>
-                            <textarea name="note" rows="3" class="form-control"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary">{{ __('submit') }}</button>
-                        </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- income modal end -->
+        @include('backend.layout.modals.biller')
 
-        <!-- sale return modal -->
-        <div id="add-sale-return" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
-            aria-hidden="true" class="modal fade text-left">
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-                    <form action="{{ route('return-sale.create') }}" method="get">
-                    <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title">Add Sale Return</h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="italic">
-                            <small>{{ __('The field labels marked with are required input fields') }}.</small></p>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label>{{ __('Sale Reference') }} *</label>
-                                    <input type="text" name="reference_no" class="form-control">
-                                </div>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-primary">{{ __('db.submit') }}</button>
-                    </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-        <!-- end sale return modal -->
+        @include('backend.layout.modals.customer')
 
-        <!-- Sale Exchange Modal -->
-        <div id="add-exchange" tabindex="-1" role="dialog" aria-hidden="true" class="modal fade text-left">
+        @include('backend.layout.modals.customer_group')
 
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-
-                    <form action="{{ route('exchange.create') }}" method="get">
-
-                        <!-- Header -->
-                        <div class="modal-header">
-                            <h5 class="modal-title">{{ __('db.Add Sale Exchange') }}</h5>
-                            <button type="button" data-dismiss="modal" class="close">
-                                <span><i class="dripicons-cross"></i></span>
-                            </button>
-                        </div>
-
-                        <!-- Body -->
-                        <div class="modal-body">
-
-                            <!-- Instruction for user -->
-                            <p class="text-muted">
-                                <small>
-                                    You can enter a Sale Reference to exchange a specific sale. <br>
-                                    Or continue without it to open a blank Exchange page.
-                                </small>
-                            </p>
-
-                            <!-- Optional Reference Input -->
-                            <div class="form-group">
-                                <label>{{ __('db.Sale Reference') }} ({{ __('db.Optional') }})</label>
-                                <input type="text" name="reference_no" class="form-control"
-                                    placeholder="Example: SALE-1234">
-                            </div>
-
-                        </div>
-
-                        <!-- Footer -->
-                        <div class="modal-footer">
-
-                            <!-- Submit with reference (if provided) -->
-                            <button type="submit" class="btn btn-primary">
-                                {{ __('db.Continue to Exchange') }}
-                            </button>
-
-                            <!-- Direct access without reference -->
-                            <a href="{{ route('exchange.create') }}" class="btn btn-outline-secondary">
-                                {{ __('db.Continue Without Reference') }}
-                            </a>
-
-                        </div>
-
-                    </form>
-
-                </div>
-            </div>
-        </div>
-        <!-- end sale exchange modal -->
-
-        <!-- purchase return modal -->
-        <div id="add-purchase-return" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
-            aria-hidden="true" class="modal fade text-left">
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-                    <form action="{{ route('return-purchase.create') }}" method="get">
-                    <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title">Add Purchase Return</h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="italic">
-                            <small>{{ __('The field labels marked with are required input fields') }}.</small></p>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label>{{ __('Purchase Reference') }} *</label>
-                                    <input type="text" name="reference_no" class="form-control">
-                                </div>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-primary">{{ __('db.submit') }}</button>
-                    </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-        <!-- end purchase return modal -->
-
-        <!-- account modal -->
-        <div id="account-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
-            aria-hidden="true" class="modal fade text-left">
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title">{{ __('Add Account') }}</h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="italic">
-                            <small>{{ __('The field labels marked with are required input fields') }}.</small></p>
-                        <form action="{{ route('accounts.store') }}" method="post">
-                            @csrf
-                        <div class="form-group">
-                            <label>{{ __('Account No') }} *</label>
-                            <input type="text" name="account_no" required class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label>{{ __('name') }} *</label>
-                            <input type="text" name="name" required class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label>{{ __('Initial Balance') }}</label>
-                            <input type="number" name="initial_balance" step="any" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label>{{ __('Note') }}</label>
-                            <textarea name="note" rows="3" class="form-control"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary">{{ __('submit') }}</button>
-                        </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- end account modal -->
-
-        <!-- account statement modal -->
-        <div id="account-statement-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
-            aria-hidden="true" class="modal fade text-left">
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title">{{ __('Account Statement') }}</h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="italic">
-                            <small>{{ __('The field labels marked with are required input fields') }}.</small></p>
-                        <form action="{{ route('accounts.statement') }}" method="post">
-                        @csrf
-                        <div class="row">
-                            <div class="col-md-6 form-group">
-                                <label> {{ __('Account') }}</label>
-                                <select class="form-control selectpicker" name="account_id">
-                                    @foreach ($lims_account_list as $account)
-                                        <option value="{{ $account->id }}">{{ $account->name }}
-                                            [{{ $account->account_no }}]</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-6 form-group">
-                                <label> {{ __('Type') }}</label>
-                                <select class="form-control selectpicker" name="type">
-                                    <option value="0">{{ __('All') }}</option>
-                                    <option value="1">{{ __('Debit') }}</option>
-                                    <option value="2">{{ __('Credit') }}</option>
-                                </select>
-                            </div>
-                            <div class="col-md-12 form-group">
-                                <label>{{ __('Choose Your Date') }}</label>
-                                <div class="input-group">
-                                    <input type="text" class="daterangepicker-field form-control"
-                                        required />
-                                    <input type="hidden" name="start_date" />
-                                    <input type="hidden" name="end_date" />
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary">{{ __('submit') }}</button>
-                        </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- end account statement modal -->
-
-        <!-- warehouse modal -->
-        <div id="warehouse-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
-            aria-hidden="true" class="modal fade text-left">
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title">{{ __('Warehouse Report') }}</h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="italic">
-                            <small>{{ __('The field labels marked with are required input fields') }}.</small></p>
-                        <form action="{{ route('report.warehouse') }}" method="post">
-                            @csrf
-
-                        <div class="form-group">
-                            <label>{{ __('Warehouse') }} *</label>
-                            <select name="warehouse_id" class="selectpicker form-control" required
-                                data-live-search="true" id="warehouse-id" data-live-search-style="begins"
-                                title="Select warehouse...">
-                                @foreach ($lims_warehouse_list as $warehouse)
-                                    <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <input type="hidden" name="start_date" value="{{ date('Y-m') . '-' . '01' }}" />
-                        <input type="hidden" name="end_date" value="{{ date('Y-m-d') }}" />
-
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary">{{ __('submit') }}</button>
-                        </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- end warehouse modal -->
-
-        <!-- user modal -->
-        <div id="user-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true"
-            class="modal fade text-left">
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title">{{ __('User Report') }}</h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="italic">
-                            <small>{{ __('The field labels marked with are required input fields') }}.</small></p>
-                        <form action="{{ route('report.user') }}" method="post">
-                            @csrf
-                        <?php
-                        $lims_user_list = DB::table('users')->where('is_active', true)->get();
-                        ?>
-                        <div class="form-group">
-                            <label>{{ __('User') }} *</label>
-                            <select name="user_id" class="selectpicker form-control" required data-live-search="true"
-                                id="user-id" data-live-search-style="begins" title="Select user...">
-                                @foreach ($lims_user_list as $user)
-                                    <option value="{{ $user->id }}">
-                                        {{ $user->name . ' (' . $user->phone . ')' }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <input type="hidden" name="start_date" value="{{ date('Y-m') . '-' . '01' }}" />
-                        <input type="hidden" name="end_date" value="{{ date('Y-m-d') }}" />
-
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary">{{ __('submit') }}</button>
-                        </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- end user modal -->
-
-        <!-- biller modal -->
-        <div id="biller-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true"
-            class="modal fade text-left">
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title">{{ __('Biller Report') }}</h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="italic">
-                            <small>{{ __('The field labels marked with are required input fields') }}.</small></p>
-                        <form action="{{ route('report.biller') }}" method="post">
-                            @csrf
-                        <?php
-                        $lims_biller_list = DB::table('billers')->where('is_active', true)->get();
-                        ?>
-                        <div class="form-group">
-                            <label>{{ __('Biller') }} *</label>
-                            <select name="biller_id" class="selectpicker form-control" required
-                                data-live-search="true" id="user-id" data-live-search-style="begins"
-                                title="Select biller...">
-                                @foreach ($lims_biller_list as $biller)
-                                    <option value="{{ $biller->id }}">
-                                        {{ $biller->name . ' (' . $biller->phone_number . ')' }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <input type="hidden" name="start_date" value="{{ date('Y-m') . '-' . '01' }}" />
-                        <input type="hidden" name="end_date" value="{{ date('Y-m-d') }}" />
-
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary">{{ __('submit') }}</button>
-                        </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- end biller modal -->
-
-        <!-- customer modal -->
-        <div id="customer-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
-            aria-hidden="true" class="modal fade text-left">
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title">{{ __('Customer Report') }}</h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="italic">
-                            <small>{{ __('The field labels marked with are required input fields') }}.</small></p>
-                        <form action="{{ route('report.customer') }}" method="post">
-                            @csrf
-                        <?php
-                        $lims_customer_list = DB::table('customers')->where('is_active', true)->get();
-                        ?>
-                        <div class="form-group">
-                            <label>{{ __('customer') }} *</label>
-                            <select name="customer_id" class="selectpicker form-control" required
-                                data-live-search="true" id="customer-id" data-live-search-style="begins"
-                                title="Select customer...">
-                                @foreach ($lims_customer_list as $customer)
-                                    <option value="{{ $customer->id }}">
-                                        {{ $customer->name . ' (' . $customer->phone_number . ')' }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <input type="hidden" name="start_date" value="{{ date('Y-m') . '-' . '01' }}" />
-                        <input type="hidden" name="end_date" value="{{ date('Y-m-d') }}" />
-
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary">{{ __('submit') }}</button>
-                        </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- end customer modal -->
-
-        <!-- customer group modal -->
-        <div id="customer-group-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
-            aria-hidden="true" class="modal fade text-left">
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title">{{ __('Customer Group Report') }}</h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="italic">
-                            <small>{{ __('The field labels marked with are required input fields') }}.</small></p>
-                        <form action="{{ route('report.customer_group') }}" method="post">
-                            @csrf
-                        <?php
-                        $lims_customer_group_list = DB::table('customer_groups')->where('is_active', true)->get();
-                        ?>
-                        <div class="form-group">
-                            <label>{{ __('Customer Group') }} *</label>
-                            <select name="customer_group_id" class="selectpicker form-control" required
-                                data-live-search="true" id="customer-group-id" data-live-search-style="begins"
-                                title="Select customer group...">
-                                @foreach ($lims_customer_group_list as $customer_group)
-                                    <option value="{{ $customer_group->id }}">{{ $customer_group->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <input type="hidden" name="start_date" value="{{ date('Y-m') . '-' . '01' }}" />
-                        <input type="hidden" name="end_date" value="{{ date('Y-m-d') }}" />
-
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary">{{ __('submit') }}</button>
-                        </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- end customer group modal -->
-
-        <!-- supplier modal -->
-        <div id="supplier-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
-            aria-hidden="true" class="modal fade text-left">
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title">{{ __('Supplier Report') }}</h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="italic">
-                            <small>{{ __('The field labels marked with are required input fields') }}.</small></p>
-                        <form action="{{ route('report.supplier') }}" method="post">
-                            @csrf
-                        <?php
-                        $lims_supplier_list = DB::table('suppliers')->where('is_active', true)->get();
-                        ?>
-                        <div class="form-group">
-                            <label>{{ __('Supplier') }} *</label>
-                            <select name="supplier_id" class="selectpicker form-control" required
-                                data-live-search="true" id="supplier-id" data-live-search-style="begins"
-                                title="Select Supplier...">
-                                @foreach ($lims_supplier_list as $supplier)
-                                    <option value="{{ $supplier->id }}">
-                                        {{ $supplier->name . ' (' . $supplier->phone_number . ')' }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <input type="hidden" name="start_date" value="{{ date('Y-m') . '-' . '01' }}" />
-                        <input type="hidden" name="end_date" value="{{ date('Y-m-d') }}" />
-
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary">{{ __('submit') }}</button>
-                        </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- end supplier modal -->
+        @include('backend.layout.modals.supplier')
     </div>
-    @if (!config('database.connections.saleprosaas_landlord'))
-        <script type="text/javascript" src="<?php echo asset('vendor/jquery/jquery.min.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('vendor/jquery/jquery-ui.min.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('vendor/jquery/bootstrap-datepicker.min.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('vendor/popper.js/umd/popper.min.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('vendor/bootstrap/js/bootstrap.min.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('vendor/bootstrap-toggle/js/bootstrap-toggle.min.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('vendor/bootstrap/js/bootstrap-select.min.js'); ?>"></script>
-        @if (Route::current()->getName() == 'sale.pos')
-            <script type="text/javascript" src="<?php echo asset('vendor/keyboard/js/jquery.keyboard.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('vendor/keyboard/js/jquery.keyboard.extension-autocomplete.js'); ?>"></script>
-        @endif
 
-        <script type="text/javascript" src="<?php echo asset('vendor/jquery.cookie/jquery.cookie.js'); ?>"></script>
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/jquery/jquery.min.js') }}"></script>
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/jquery/jquery-ui.min.js') }}"></script>
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/jquery/bootstrap-datepicker.min.js') }}"></script>
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/popper.js/umd/popper.min.js') }}"></script>
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/bootstrap/js/bootstrap.min.js') }}"></script>
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/bootstrap/js/bootstrap-select.min.js') }}"></script>
 
-        <script type="text/javascript" src="<?php echo asset('vendor/jquery-validation/jquery.validate.min.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('js/front.js'); ?>"></script>
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/jquery.cookie/jquery.cookie.js') }}"></script>
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/jquery-validation/jquery.validate.min.js') }}"></script>
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'js/front.js') }}"></script>
 
-        @if (Route::current()->getName() != '/')
-            <script type="text/javascript" src="<?php echo asset('vendor/daterange/js/moment.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('vendor/daterange/js/knockout-3.4.2.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('vendor/daterange/js/daterangepicker.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('vendor/tinymce/js/tinymce/tinymce.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('js/dropzone.js'); ?>"></script>
+    @if (optional(Route::current())->getName() != '/')
+        <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/daterange/js/moment.min.js') }}"></script>
+        <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/daterange/js/knockout-3.4.2.js') }}"></script>
+        <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/daterange/js/daterangepicker.min.js') }}"></script>
+        <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/tinymce/js/tinymce/tinymce.min.js') }}"></script>
 
-            <!-- table sorter js-->
-            @if (Config::get('app.locale') == 'ar')
-                <script type="text/javascript" src="<?php echo asset('vendor/datatable/pdfmake_arabic.min.js'); ?>"></script>
-                <script type="text/javascript" src="<?php echo asset('vendor/datatable/vfs_fonts_arabic.js'); ?>"></script>
-            @else
-                <script type="text/javascript" src="<?php echo asset('vendor/datatable/pdfmake.min.js'); ?>"></script>
-                <script type="text/javascript" src="<?php echo asset('vendor/datatable/vfs_fonts.js'); ?>"></script>
-            @endif
-            <script type="text/javascript" src="<?php echo asset('vendor/datatable/jquery.dataTables.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('vendor/datatable/dataTables.bootstrap4.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('vendor/datatable/dataTables.buttons.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('vendor/datatable/jszip.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('vendor/datatable/buttons.bootstrap4.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('vendor/datatable/buttons.colVis.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('vendor/datatable/buttons.html5.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('vendor/datatable/buttons.printnew.js'); ?>"></script>
-
-            <script type="text/javascript" src="<?php echo asset('vendor/datatable/sum().js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('vendor/datatable/dataTables.checkboxes.min.js'); ?>"></script>
-            <script type="text/javascript" src="https://cdn.datatables.net/fixedheader/3.1.6/js/dataTables.fixedHeader.min.js">
-            </script>
-            <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.3/js/dataTables.responsive.min.js">
-            </script>
-            <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.3/js/responsive.bootstrap.min.js">
-            </script>
-        @endif
-    @else
-        <script type="text/javascript" src="<?php echo asset('../../vendor/jquery/jquery.min.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('../../vendor/jquery/jquery-ui.min.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('../../vendor/jquery/bootstrap-datepicker.min.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('../../vendor/popper.js/umd/popper.min.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('../../vendor/bootstrap/js/bootstrap.min.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('../../vendor/bootstrap-toggle/js/bootstrap-toggle.min.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('../../vendor/bootstrap/js/bootstrap-select.min.js'); ?>"></script>
-
-        <script type="text/javascript" src="<?php echo asset('../../js/grasp_mobile_progress_circle-1.0.0.min.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('../../vendor/jquery.cookie/jquery.cookie.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('../../vendor/jquery-validation/jquery.validate.min.js'); ?>"></script>
-        <script type="text/javascript" src="<?php echo asset('../../js/front.js'); ?>"></script>
-
-        @if (Route::current()->getName() != '/')
-            <script type="text/javascript" src="<?php echo asset('../../vendor/daterange/js/moment.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('../../vendor/daterange/js/knockout-3.4.2.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('../../vendor/daterange/js/daterangepicker.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('../../vendor/tinymce/js/tinymce/tinymce.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('../../js/dropzone.js'); ?>"></script>
-
-            <!-- table sorter js-->
-            @if (Config::get('app.locale') == 'ar')
-                <script type="text/javascript" src="<?php echo asset('../../vendor/datatable/pdfmake_arabic.min.js'); ?>"></script>
-                <script type="text/javascript" src="<?php echo asset('../../vendor/datatable/vfs_fonts_arabic.js'); ?>"></script>
-            @else
-                <script type="text/javascript" src="<?php echo asset('../../vendor/datatable/pdfmake.min.js'); ?>"></script>
-                <script type="text/javascript" src="<?php echo asset('../../vendor/datatable/vfs_fonts.js'); ?>"></script>
-            @endif
-            <script type="text/javascript" src="<?php echo asset('../../vendor/datatable/jquery.dataTables.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('../../vendor/datatable/dataTables.bootstrap4.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('../../vendor/datatable/dataTables.buttons.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('../../vendor/datatable/jszip.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('../../vendor/datatable/buttons.bootstrap4.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('../../vendor/datatable/buttons.colVis.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('../../vendor/datatable/buttons.html5.min.js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('../../vendor/datatable/buttons.printnew.js'); ?>"></script>
-
-            <script type="text/javascript" src="<?php echo asset('../../vendor/datatable/sum().js'); ?>"></script>
-            <script type="text/javascript" src="<?php echo asset('../../vendor/datatable/dataTables.checkboxes.min.js'); ?>"></script>
-            <script type="text/javascript" src="https://cdn.datatables.net/fixedheader/3.1.6/js/dataTables.fixedHeader.min.js">
-            </script>
-            <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.3/js/dataTables.responsive.min.js">
-            </script>
-            <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.3/js/responsive.bootstrap.min.js">
-            </script>
-
-            <script type="text/javascript" src="{{ asset('js/barcode-qrcode-scanner_plugin.js') }}"></script>
-
-        @endif
     @endif
 
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-
-            const menu = document.getElementById("side-main-menu");
-            if (!menu) return;
-
-            const KEY = "salepro_menu_scroll";
-
-            /* ---------- Restore Scroll ---------- */
-            const saved = localStorage.getItem(KEY);
-            if (saved !== null) {
-                menu.scrollTop = parseInt(saved);
-            }
-
-            /* ---------- Save Scroll ---------- */
-            menu.addEventListener("scroll", function () {
-                localStorage.setItem(KEY, menu.scrollTop);
-            });
-
-            /* ---------- Center Active Link ---------- */
-            const active = menu.querySelector("a.active");
-
-            if (active) {
-
-                // If inside collapsed dropdown, open it first
-                let parentCollapse = active.closest(".collapse");
-                if (parentCollapse) {
-                    parentCollapse.classList.add("show");
-                }
-
-                // Let browser handle perfect centering
-                setTimeout(() => {
-                    active.scrollIntoView({
-                        behavior: "auto",
-                        block: "center",
-                        inline: "nearest"
-                    });
-                }, 50);
-            }
-
-        });
-
-        /* Clear scroll when manually clicking menu */
-        document.querySelectorAll('#side-main-menu a').forEach(function(link){
-            link.addEventListener('click', function(){
-                localStorage.removeItem('salepro_menu_scroll');
-            });
-        });
-    </script>
-
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-
-            // find any active link inside collapsed menus
-            document.querySelectorAll('#side-main-menu ul.collapse').forEach(function(submenu){
-
-                const activeChild = submenu.querySelector('a.active');
-
-                if(activeChild){
-
-                    // 1) open the collapse
-                    submenu.classList.add('show');
-
-                    // 2) mark the parent toggle as expanded
-                    const parentToggle = document.querySelector('a[href="#'+submenu.id+'"]');
-                    if(parentToggle){
-                        parentToggle.setAttribute('aria-expanded', 'true');
-                        parentToggle.classList.remove('collapsed');
-                    }
-
-                }
-            });
-
-        });
-    </script>
-
-    <script>
-        $('#toggle-btn').on('click', function() {
-            let sidebar = $('nav.side-navbar');
-            if (sidebar.hasClass('shrink')) {
-                localStorage.setItem("layout", "wide");
-            } else {
-                localStorage.setItem("layout", "shrink");
-            }
-        });
-
-    </script>
-
-    <script>
-        $(document).ready(function() {
-            let layout = localStorage.getItem("layout");
-            let sidebar = $('nav.side-navbar');
-            let page = $('.page');
-            if (layout == "shrink") {
-                sidebar.addClass('shrink');
-                page.addClass('active');
-            } else if (layout == "wide") {
-                sidebar.removeClass('shrink');
-                page.removeClass('active');
-            }
-        });
-    </script>
-
-    <script type="text/javascript">
-        $.ajaxSetup({
-            headers: {
-                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-            }
-        });
-
-        var theme = <?php echo json_encode($theme); ?>;
-        if (theme == 'dark') {
-            $('body').addClass('dark-mode');
-            $('#switch-theme i').addClass('dripicons-brightness-low');
-        } else {
-            $('body').removeClass('dark-mode');
-            $('#switch-theme i').addClass('dripicons-brightness-max');
-        }
-        $('#switch-theme').click(function() {
-            if (theme == 'light') {
-                theme = 'dark';
-                var url = <?php echo json_encode(route('switchTheme', 'dark')); ?>;
-                $('body').addClass('dark-mode');
-                $('#switch-theme i').addClass('dripicons-brightness-low');
-            } else {
-                theme = 'light';
-                var url = <?php echo json_encode(route('switchTheme', 'light')); ?>;
-                $('body').removeClass('dark-mode');
-                $('#switch-theme i').addClass('dripicons-brightness-max');
-            }
-
-            $.get(url, function(data) {
-                console.log('theme changed to ' + theme);
-            });
-        });
-
-        var alert_product = <?php echo json_encode($alert_product); ?>;
-
-        if ($(window).outerWidth() > 1199) {
-            $('nav.side-navbar').removeClass('shrink');
-        }
-
-        function myFunction() {
-            setTimeout(showPage, 100);
-        }
-
-        function showPage() {
-            document.getElementById("loader").style.display = "none";
-            document.getElementById("content").style.display = "block";
-        }
-
-        $("div.alert").delay(4000);
-
-        function confirmDelete() {
-            if (confirm("Are you sure want to delete?")) {
-                return true;
-            }
-            return false;
-        }
-
-        $("li#notification-icon").on("click", function(argument) {
-            $.get('notifications/mark-as-read', function(data) {
-                $("span.notification-number").text(alert_product);
-            });
-        });
-
-        $("a#add-expense").click(function(e) {
-            e.preventDefault();
-            $('#expense-modal').modal();
-        });
-
-        $("a#add-income").click(function(e) {
-            e.preventDefault();
-            $('#income-modal').modal();
-        });
-
-        $("a#send-notification").click(function(e) {
-            e.preventDefault();
-            $('#notification-modal').modal();
-        });
-
-        $("a#add-account").click(function(e) {
-            e.preventDefault();
-            $('#account-modal').modal();
-        });
-
-        $("a#account-statement").click(function(e) {
-            e.preventDefault();
-            $('#account-statement-modal').modal();
-        });
-
-        $("a#profitLoss-link").click(function(e) {
-            e.preventDefault();
-            $("#profitLoss-report-form").submit();
-        });
-
-        $("a#report-link").click(function(e) {
-            e.preventDefault();
-            $("#product-report-form").submit();
-        });
-
-        $("a#purchase-report-link").click(function(e) {
-            e.preventDefault();
-            $("#purchase-report-form").submit();
-        });
-
-        $("a#sale-report-link").click(function(e) {
-            e.preventDefault();
-            $("#sale-report-form").submit();
-        });
-        $("a#sale-report-chart-link").click(function(e) {
-            e.preventDefault();
-            $("#sale-report-chart-form").submit();
-        });
-
-        $("a#payment-report-link").click(function(e) {
-            e.preventDefault();
-            $("#payment-report-form").submit();
-        });
-
-        $("a#warehouse-report-link").click(function(e) {
-            e.preventDefault();
-            $('#warehouse-modal').modal();
-        });
-
-        $("a#user-report-link").click(function(e) {
-            e.preventDefault();
-            $('#user-modal').modal();
-        });
-
-        $("a#biller-report-link").click(function(e) {
-            e.preventDefault();
-            $('#biller-modal').modal();
-        });
-
-        $("a#customer-report-link").click(function(e) {
-            e.preventDefault();
-            $('#customer-modal').modal();
-        });
-
-        $("a#customer-group-report-link").click(function(e) {
-            e.preventDefault();
-            $('#customer-group-modal').modal();
-        });
-
-        $("a#supplier-report-link").click(function(e) {
-            e.preventDefault();
-            $('#supplier-modal').modal();
-        });
-
-        $("a#due-report-link").click(function(e) {
-            e.preventDefault();
-            $("#customer-due-report-form").submit();
-        });
-
-        $("a#supplier-due-report-link").click(function(e) {
-            e.preventDefault();
-            $("#supplier-due-report-form").submit();
-        });
-
-        $(function () {
-
-            // default dates
-            var start = moment().subtract(365, 'days');
-            var end = moment();
-
-            // Override initial start/end ONLY once (page load)
-            @if(isset($starting_date) || isset($start_date))
-                start = moment("{{ $starting_date ?? $start_date }}", 'YYYY-MM-DD');
-            @endif
-
-            @if(isset($ending_date) || isset($end_date))
-                end = moment("{{ $ending_date ?? $end_date }}", 'YYYY-MM-DD');
-            @endif
-
-            function setDates(start, end) {
-                var starting_date = start.format('YYYY-MM-DD');
-                var ending_date = end.format('YYYY-MM-DD');
-
-                var title = starting_date + ' To ' + ending_date;
-
-                // visible field
-                $('.daterangepicker-field').val(title);
-
-                // hidden fields (used in Laravel queries)
-                $('input[name="starting_date"],input[name="start_date"]').val(starting_date);
-                $('input[name="ending_date"],input[name="end_date"]').val(ending_date);
-
-            }
-
-            // initialize picker
-            $('.daterangepicker-field').daterangepicker({
-                startDate: start,
-                endDate: end,
-                autoUpdateInput: false,
-                autoApply: true,
-                @if( Config::get('app.locale') == 'ar' || $general_setting->is_rtl)
-                opens: 'right',
-                @endif
-                locale: {
-                    cancelLabel: 'Clear'
-                },
-                ranges: {
-                    'Today': [moment(), moment()],
-                    'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
-                    'Last 7 Days': [moment().subtract(6, 'days'), moment()],
-                    'Last 30 Days': [moment().subtract(29, 'days'), moment()],
-                    'This Month': [moment().startOf('month'), moment().endOf('month')],
-                    'Last Month': [
-                        moment().subtract(1, 'month').startOf('month'),
-                        moment().subtract(1, 'month').endOf('month')
-                    ],
-                    'Last Year': [moment().subtract(1, 'year').startOf('year'), moment().subtract(1, 'year').endOf('year')],
-                    'All Time': [moment('2000-01-01'), moment()]
-                }
-            });
-
-            // THIS is the real selection event
-            $('.daterangepicker-field').on('apply.daterangepicker', function (ev, picker) {
-                setDates(picker.startDate, picker.endDate);
-            });
-
-            $('.daterangepicker-field').on('focus', function() {
-                $(this).data('daterangepicker').show();
-            });
-
-            // set initial value on page load
-            setDates(start, end);
-
-        });
-
-        $('.date').datepicker({
-            format: "dd-mm-yyyy",
-            autoclose: true,
-            todayHighlight: true
-        });
-
-        $('.selectpicker').selectpicker({
-            style: 'btn-link',
-        });
-
-
-        // on change expense category
-        $('select[name="expense_category_id"]').on('changed.bs.select', function() {
-            let cat = $(this).val();
-
-            if (cat == "0") {
-                // employee expense selected → show employee fields
-                $('#employee-fields').show();
-
-                // enable type
-                $("#expense-type").prop("disabled", false);
-
-                let options = `
-                <option value="expense_load">Expense</option>
-                <option value="advance">Advance</option>
-            `;
-                $("#expense-type").html(options).selectpicker('refresh');
-
-            } else {
-                // hide when not employee expense
-                $('#employee-fields').hide();
-
-                // reset fields
-                $("#expense-employee").val('').selectpicker('refresh');
-                $("#expense-type").html('<option value="">Select Type</option>')
-                    .prop("disabled", true)
-                    .selectpicker('refresh');
-            }
-        });
-
-        window.appConfig = {
+        <script>
+        window.SaleproConfig = {
+            theme: @json($backendUiTheme),
+            alertProduct: <?php echo json_encode(((int) ($alert_product ?? 0)) + ((int) ($dso_alert_product_no ?? 0)) + ((int) ($expire_alert_products ?? 0)) + ((int) ($pending_ecommerce_orders ?? 0))); ?>,
+            switchThemeDarkUrl: '{{ route("switchTheme", "dark") }}',
+            switchThemeLightUrl: '{{ route("switchTheme", "light") }}',
             currency: "{{ config('currency') }}",
             currency_position: "{{ config('currency_position') }}",
-            decimal: {{ config('decimal') }}
+            decimal: {{ config('decimal') }},
+            starting_date: '{{ $starting_date ?? $start_date ?? "" }}',
+            ending_date: '{{ $ending_date ?? $end_date ?? "" }}',
+            markAsReadUrl: '{{ url("notifications/mark-as-read") }}',
+            isRtl: {{ (Config::get('app.locale') == 'ar' || gen_setting()->is_rtl) ? 'true' : 'false' }}
         };
-        function formatCurrency(amount) {
-            let formatted = parseFloat(amount).toFixed(window.appConfig.decimal);
-
-            if (window.appConfig.currency_position === 'prefix') {
-                return window.appConfig.currency + ' ' + formatted;
-            }
-
-            return formatted + ' ' + window.appConfig.currency;
-        }
     </script>
+    <script src="{{ asset($asset_prefix . 'js/layout-custom.js') }}?v={{ filemtime(public_path('js/layout-custom.js')) }}"></script>
 
+    @include('backend.layout.theme_customizer')
+    <x-toast />
+    <x-confirm-dialog />
     @stack('scripts')
 </body>
 </html>

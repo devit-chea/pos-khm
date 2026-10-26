@@ -14,6 +14,21 @@ class PurchaseProductReturn extends Model
 
     public function purchaseReturn()
     {
-        return $this->belongsTo(ReturnPurchase::class, 'return_id'); // check actual column
+        return $this->belongsTo(ReturnPurchase::class, 'return_id');
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class, 'product_id');
+    }
+
+    public function variant()
+    {
+        return $this->belongsTo(Variant::class, 'variant_id');
+    }
+
+    public function unit()
+    {
+        return $this->belongsTo(Unit::class, 'purchase_unit_id');
     }
 }

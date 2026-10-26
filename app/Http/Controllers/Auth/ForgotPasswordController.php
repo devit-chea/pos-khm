@@ -68,7 +68,7 @@ class ForgotPasswordController extends Controller
         else {
             return back()
                 ->withInput($request->only('email'))
-                ->withErrors(['email' => __('db.Mail settings are not configured. Please contact the administrator.')]);
+                ->withErrors(['email' => __('db.mail_settings_not_configured')]);
         }
     }
 }

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('installment_plan_id')->constrained('installment_plans')->cascadeOnDelete();
             $table->enum('status', ['pending', 'completed'])->default('pending');
-            $table->timestamp('payment_date');
+            $table->timestamp('payment_date')->nullable();
             $table->decimal('amount', 15, 2);
             $table->timestamps();
         });

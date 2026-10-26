@@ -17,7 +17,7 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label>{{__('db.UserName')}} *</label>
+                                        <label>{{__('db.username')}} *</label>
                                         <input type="text" name="name" required class="form-control">
                                         @if($errors->has('name'))
                                        <small>
@@ -40,7 +40,7 @@
                                         </div>
                                     </div>
                                     <div class="form-group">
-                                        <label>{{__('db.Email')}} *</strong></label>
+                                        <label>{{__('db.email')}} *</strong></label>
                                         <input type="email" name="email" placeholder="example@example.com" required class="form-control">
                                         @if($errors->has('email'))
                                        <small>
@@ -75,12 +75,10 @@
                                         <input class="mt-2" type="checkbox" name="is_active" value="1" checked>
                                         <label class="mt-2"><strong>{{__('db.Active')}}</strong></label>
                                     </div>
-                                    @if(in_array('restaurant',explode(',',$general_setting->modules)))
                                     <div class="form-group d-inline-block ml-2">
                                         <input class="mt-2" type="checkbox" name="service_staff" value="1">
                                         <label class="mt-2"><strong>{{__('db.Waiter')}}</strong></label>
                                     </div>
-                                    @endif
                                     <div class="form-group">
                                         <input type="submit" value="{{__('db.submit')}}" class="btn btn-primary">
                                     </div>
@@ -181,7 +179,7 @@
         $.ajax({
             type: 'GET',
             async: false,
-            url: '{{route("package.fetchData", $general_setting->package_id)}}',
+            url: '{{route("package.fetchData", gen_setting()->package_id)}}',
             success: function(data) {
                 if(data['number_of_user_account'] > 0 && data['number_of_user_account'] <= numberOfUserAccount) {
                     localStorage.setItem("message", "You don't have permission to create another user account as you already exceed the limit! Subscribe to another package if you wants more!");

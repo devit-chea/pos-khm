@@ -2,18 +2,19 @@
 
 /*
 |--------------------------------------------------------------------------
-| Web Routes
+| Shared Standalone / Tenant Web Routes
 |--------------------------------------------------------------------------
 |
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| contains the "web" middleware group. Now create something great!
+| Use this file as routes/web.php in standalone SalePro, or paste the
+| complete file into routes/tenant.php in SalePro SaaS. Keep the SaaS
+| landlord routes/web.php unchanged.
 |
 */
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\File;
 use App\Http\Controllers\HrmController;
 use App\Http\Controllers\TaxController;
 use Illuminate\Support\Facades\Artisan;
@@ -55,7 +56,10 @@ use App\Http\Controllers\GiftCardController;
 use App\Http\Controllers\LanguageController;
 use App\Http\Controllers\OvertimeController;
 use App\Http\Controllers\PurchaseController;
+use App\Http\Controllers\ImportBatchController;
 use App\Http\Controllers\RazorpayController;
+use App\Http\Controllers\MpesaController;
+use App\Http\Controllers\PaymentGatewayController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\TransferController;
 use App\Http\Controllers\WhatsappController;
@@ -68,6 +72,7 @@ use App\Http\Controllers\AdjustmentController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\StockCountController;
+use App\Http\Controllers\StockLedgerController;
 use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\PackingSlipController;
 use App\Http\Controllers\SmsTemplateController;
@@ -89,6 +94,21 @@ use App\Http\Controllers\ReturnPurchaseController;
 use App\Http\Controllers\ExpenseCategoryController;
 use App\Http\Controllers\InstallmentPlanController;
 
+// Standalone's provider adds web; the SaaS tenant loader does not.
+// Include it here only in SaaS so both loaders get one web middleware group.
+$isSaaS = (bool) config('database.connections.saleprosaas_landlord');
+$webMiddleware = [];
+if ($isSaaS) {
+    $webMiddleware = [
+        'web',
+        \Stancl\Tenancy\Middleware\InitializeTenancyByDomain::class,
+        \Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains::class,
+        \App\Http\Middleware\EnsureCommissionSubscriptionAccess::class,
+    ];
+}
+
+Route::middleware($webMiddleware)->group(function () use ($isSaaS) {
+
 Route::get('webview/auth', function (Request $request) {
     // Get token from Authorization header
     $authHeader = $request->header('Authorization');
@@ -103,13 +123,49 @@ Route::get('webview/auth', function (Request $request) {
     }
     Auth::login($accessToken->tokenable);
 
-    // Optional: allow redirect param as query string
+    // Only allow an application-local redirect. A bearer token must never be
+    // used as a stepping stone to an arbitrary external redirect.
     $redirect = $request->query('redirect', '/');
+    if (!is_string($redirect) || !str_starts_with($redirect, '/') || str_starts_with($redirect, '//')) {
+        $redirect = '/';
+    }
     $separator = (parse_url($redirect, PHP_URL_QUERY) == NULL) ? '?' : '&';
     return redirect($redirect . $separator . 'app=true');
 });
 
-Route::get('migrate', function () {
+Route::get('/debug/{status}', function ($status) {
+    if (!in_array($status, ['true', 'false'])) {
+        return response()->json(['message' => 'Invalid status. Use true or false.'], 400);
+    }
+
+    $envPath = base_path('.env');
+    $envContent = File::get($envPath);
+
+    // Regex to match and replace APP_DEBUG=...
+    $pattern = '/^APP_DEBUG=.*/m';
+    $replacement = "APP_DEBUG={$status}";
+
+    if (preg_match($pattern, $envContent)) {
+        $newContent = preg_replace($pattern, $replacement, $envContent);
+    } else {
+        $newContent = $envContent . PHP_EOL . $replacement;
+    }
+
+    File::put($envPath, $newContent);
+
+    // Clear Laravel's cache so the new debug setting takes effect
+    Artisan::call('config:clear');
+
+    return response()->json(['message' => "APP_DEBUG successfully set to {$status}."]);
+});
+
+Route::get('migrate', function () use ($isSaaS) {
+    if ($isSaaS) {
+        Artisan::call('tenants:migrate');
+        Artisan::call('tenants:seed');
+        dd('migrated and seeded for all tenants');
+    }
+
     Artisan::call('migrate');
     Artisan::call('db:seed');
     dd('migrated');
@@ -138,28 +194,62 @@ Route::get('clear', function () {
     dd('cleared');
 });
 
-Route::get('update-coupon', [CouponController::class, 'updateCoupon']);
 
-Route::controller(InstallController::class)->group(function () {
-    Route::get('install/step-1', 'installStep1')->name('install-step-1');
-    Route::get('install/step-2', 'installStep2')->name('install-step-2');
-    Route::get('install/step-3', 'installStep3')->name('install-step-3');
-    Route::post('install/process', 'installProcess')->name('install-process');
-    Route::get('install/step-4', 'installStep4')->name('install-step-4');
-});
+// Security: production maintenance actions (debug toggle, migrate/seed, cache clear)
+// must not be exposed as public web routes. Use CLI / hosting control panel instead.
+
+// Tenant provisioning is handled centrally; the installer belongs to standalone.
+if (!$isSaaS) {
+    Route::controller(InstallController::class)->group(function () {
+        Route::get('install/step-1', 'installStep1')->name('install-step-1');
+        Route::get('install/step-2', 'installStep2')->name('install-step-2');
+        Route::get('install/step-3', 'installStep3')->name('install-step-3');
+        Route::post('install/process', 'installProcess')->name('install-process');
+        Route::get('install/step-4', 'installStep4')->name('install-step-4');
+    });
+}
 
 Route::get('delete-account', [\App\Http\Controllers\DeleteAccountRequestController::class, 'show'])->name('delete-account');
 Route::post('delete-account', [\App\Http\Controllers\DeleteAccountRequestController::class, 'submit'])->name('delete-account.submit');
 
 Auth::routes();
 
+Route::get('impersonate/{token}', [\App\Http\Controllers\TenantImpersonationController::class, 'consume'])
+    ->where('token', '[A-Za-z0-9]{64}')
+    ->middleware('throttle:10,1')
+    ->name('tenant.impersonation.consume');
+
+// ===== Payment Gateway Callbacks (public — auth ছাড়া, Safaricom/MTN/PayHere এর সার্ভার থেকে আসে) =====
+Route::post('/payment/{gateway}/callback', [PaymentGatewayController::class, 'callback'])
+    ->name('payment.callback')
+    ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+
+// Legacy M-Pesa callback (backward compat)
+Route::post('/mpesa/callback', [PaymentGatewayController::class, 'callback'])
+    ->defaults('gateway', 'mpesa')
+    ->name('mpesa.callback')
+    ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+
+// Razorpay UPI webhook — public, authenticated by Razorpay signature
+Route::post(
+    '/payment/razorpay/webhook',
+    [PaymentGatewayController::class, 'razorpayWebhook']
+)->name('payment.razorpay.webhook')
+  ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+
 Route::group(['middleware' => 'auth'], function () {
+    if (config('database.connections.saleprosaas_landlord')) {
+        Route::get('subscription/billing', [\App\Http\Controllers\CommissionSubscriptionController::class, 'index'])
+            ->middleware('common')->name('subscription.billing');
+        Route::post('subscription/billing/{id}/claim', [\App\Http\Controllers\CommissionSubscriptionController::class, 'claim'])
+            ->name('subscription.billing.claim');
+    }
     Route::controller(HomeController::class)->group(function () {
         Route::get('home', 'home');
     });
 });
 
-Route::group(['middleware' => ['common', 'auth', 'active']], function () {
+Route::group(['middleware' => ['common', 'auth', 'active', 'warehouse.access']], function () {
 
     Route::get('/languages', [LanguageController::class, 'index'])->name('languages');
     Route::post('/languages/create', [LanguageController::class, 'store']);
@@ -188,18 +278,19 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         Route::get('/recent-quotation', 'recentQuotation');
         Route::get('/recent-payment', 'recentPayment');
         Route::get('switch-theme/{theme}', 'switchTheme')->name('switchTheme');
+        Route::post('theme-setting/update', 'updateThemeSettings')->name('themeSetting.update');
         Route::get('/dashboard-filter/{start_date}/{end_date}/{warehouse_id}', 'dashboardFilter');
-        Route::get('addon-list', 'addonList');
         Route::get('my-transactions/{year}/{month}', 'myTransaction');
     });
 
-    // Need to check again
     Route::controller(CustomerGroupPriceController::class)->group(function () {
         Route::get('customer-group-prices', 'index')->name('customer_group_price.index');
         Route::get('customer-group-prices/data', 'data')->name('customer_group_price.data');
         Route::post('customer-group-prices/save', 'save')->name('customer_group_price.save');
     });
-    Route::resource('products', ProductController::class)->except(['show']);
+
+    // Need to check again
+    Route::resource('products', ProductController::class)->except(['show', 'update']);
     Route::controller(ProductController::class)->group(function () {
         Route::post('products/product-data', 'productData');
         Route::get('products/gencode', 'generateCode')->name('product.gencode');
@@ -210,6 +301,7 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         Route::get('products/print_barcode', 'printBarcode')->name('product.printBarcode');
         Route::get('products/lims_product_search', 'limsProductSearch')->name('product.search');
         Route::post('products/deletebyselection', 'deleteBySelection')->name('products.deletebyselection');
+        Route::post('products/{id}/toggle-active', 'toggleActive')->name('products.toggle-active');
         Route::post('products/update', 'updateProduct');
         Route::get('products/variant-data/{id}', 'variantData');
         Route::get('products/history', 'history')->name('products.history');
@@ -221,7 +313,9 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         Route::post('products/transfer-history-data', 'transferHistoryData');
 
         Route::post('importproduct', 'importProduct')->name('product.import');
-        Route::post('exportproduct', 'exportProduct')->name('product.export');
+        if (method_exists(ProductController::class, 'exportProduct')) {
+            Route::post('exportproduct', 'exportProduct')->name('product.export');
+        }
         Route::get('products/all-product-in-stock', 'allProductInStock')->name('product.allProductInStock');
         Route::get('products/show-all-product-online', 'showAllProductOnline')->name('product.showAllProductOnline');
         Route::get('check-batch-availability/{product_id}/{batch_no}/{warehouse_id}', 'checkBatchAvailability');
@@ -231,15 +325,15 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
 
     Route::get('language_switch/{id}', [LanguageController::class, 'switchLanguage']);
 
-    Route::resource('role', RoleController::class);
+    Route::resource('role', RoleController::class)->except(['create', 'show']);
     Route::controller(RoleController::class)->group(function () {
         Route::get('role/permission/{id}', 'permission')->name('role.permission');
         Route::post('role/set_permission', 'setPermission')->name('role.setPermission');
     });
 
     //Sms Template
-    Route::resource('smstemplates', SmsTemplateController::class);
-    Route::resource('unit', UnitController::class);
+    Route::resource('smstemplates', SmsTemplateController::class)->except(['create', 'edit', 'show']);
+    Route::resource('unit', UnitController::class)->except(['create', 'show']);
     Route::controller(UnitController::class)->group(function () {
         Route::post('importunit', 'importUnit')->name('unit.import');
         Route::post('unit/deletebyselection', 'deleteBySelection');
@@ -251,15 +345,17 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         Route::post('category/deletebyselection', 'deleteBySelection');
         Route::post('category/category-data', 'categoryData');
     });
-    Route::resource('category', CategoryController::class);
+    Route::resource('category', CategoryController::class)->except(['create', 'show']);
 
 
     Route::controller(BrandController::class)->group(function () {
         Route::post('importbrand', 'importBrand')->name('brand.import');
         Route::post('brand/deletebyselection', 'deleteBySelection');
-        Route::get('brand/lims_brand_search', 'limsBrandSearch')->name('brand.search');
+        if (method_exists(BrandController::class, 'limsBrandSearch')) {
+            Route::get('brand/lims_brand_search', 'limsBrandSearch')->name('brand.search');
+        }
     });
-    Route::resource('brand', BrandController::class);
+    Route::resource('brand', BrandController::class)->except(['create', 'show']);
 
 
     Route::controller(SupplierController::class)->group(function () {
@@ -269,21 +365,26 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         Route::get('suppliers/all', 'suppliersAll')->name('supplier.all');
         Route::get('suppliers/ledger/{id}', 'ledger')->name('suppliers.ledger');
         Route::get('supplier-due/{id}', 'supplierDue')->name('supplier.due');
+        Route::get('suppliers/returns/{id}', 'supplierReturns')->name('suppliers.returns');
         Route::get('suppliers/{supplier_id}', 'supplierPayments')->name('suppliers.payments');
     });
     Route::resource('supplier', SupplierController::class);
 
 
     Route::controller(WarehouseController::class)->group(function () {
+        Route::get('warehouse-data', [WarehouseController::class, 'warehouseData'])->name('warehouse.data');
         Route::post('importwarehouse', 'importWarehouse')->name('warehouse.import');
         Route::post('warehouse/deletebyselection', 'deleteBySelection');
-        Route::get('warehouse/lims_warehouse_search', 'limsWarehouseSearch')->name('warehouse.search');
+        if (method_exists(WarehouseController::class, 'limsWarehouseSearch')) {
+            Route::get('warehouse/lims_warehouse_search', 'limsWarehouseSearch')->name('warehouse.search');
+        }
         Route::get('warehouse/all', 'warehouseAll')->name('warehouse.all');
     });
-    Route::resource('warehouse', WarehouseController::class);
+    Route::resource('warehouse', WarehouseController::class)->except(['create', 'show']);
 
-    Route::resource('printers', PrinterController::class);
+    Route::resource('printers', PrinterController::class)->except(['create', 'show']);
 
+    Route::get('tables/floorplan-status', [TableController::class, 'floorplanStatus'])->name('tables.floorplan_status');
     Route::resource('tables', TableController::class);
 
 
@@ -292,27 +393,31 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         Route::post('tax/deletebyselection', 'deleteBySelection');
         Route::get('tax/lims_tax_search', 'limsTaxSearch')->name('tax.search');
     });
-    Route::resource('tax', TaxController::class);
+    Route::resource('tax', TaxController::class)->except(['create', 'show']);
 
 
     Route::controller(CustomerGroupController::class)->group(function () {
         Route::post('importcustomer_group', 'importCustomerGroup')->name('customer_group.import');
         Route::post('customer_group/deletebyselection', 'deleteBySelection');
-        Route::get('customer_group/lims_customer_group_search', 'limsCustomerGroupSearch')->name('customer_group.search');
+        if (method_exists(CustomerGroupController::class, 'limsCustomerGroupSearch')) {
+            Route::get('customer_group/lims_customer_group_search', 'limsCustomerGroupSearch')->name('customer_group.search');
+        }
         Route::get('customer_group/all', 'customerGroupAll')->name('customer_group.all');
     });
-    Route::resource('customer_group', CustomerGroupController::class);
+    Route::resource('customer_group', CustomerGroupController::class)->except(['create', 'show']);
 
 
-    Route::resource('discount-plans', DiscountPlanController::class);
-    Route::resource('discounts', DiscountController::class);
+    Route::resource('discount-plans', DiscountPlanController::class)->except(['show', 'destroy']);
+    Route::resource('discounts', DiscountController::class)->except(['show']);
     Route::get('discounts/product-search/{code}', [DiscountController::class, 'productSearch']);
 
 
     Route::controller(CustomerController::class)->group(function () {
         Route::post('importcustomer', 'importCustomer')->name('customer.import');
         Route::post('customer/deletebyselection', 'deleteBySelection');
-        Route::get('customer/lims_customer_search', 'limsCustomerSearch')->name('customer.search');
+        if (method_exists(CustomerController::class, 'limsCustomerSearch')) {
+            Route::get('customer/lims_customer_search', 'limsCustomerSearch')->name('customer.search');
+        }
         Route::post('customers/clear-due', 'clearDue')->name('customer.clearDue');
         Route::post('customers/customer-data', 'customerData');
         Route::get('customers/all', 'customersAll')->name('customer.all');
@@ -331,6 +436,7 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         Route::get('customers/{customer_id}', 'customerPayments')->name('customers.payments');
         Route::get('customers/ledger/{id}', 'ledger')->name('customers.ledger');
         Route::get('customers/installments/{id}', 'installments')->name('customers.installments');
+        Route::get('customers/returns/{id}', 'customerReturns')->name('customers.returns');
         Route::get('/customer/{id}/due','getCustomerDue');
     });
 
@@ -340,9 +446,11 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
     Route::controller(BillerController::class)->group(function () {
         Route::post('importbiller', 'importBiller')->name('biller.import');
         Route::post('biller/deletebyselection', 'deleteBySelection');
-        Route::get('biller/lims_biller_search', 'limsBillerSearch')->name('biller.search');
+        if (method_exists(BillerController::class, 'limsBillerSearch')) {
+            Route::get('biller/lims_biller_search', 'limsBillerSearch')->name('biller.search');
+        }
     });
-    Route::resource('biller', BillerController::class);
+    Route::resource('biller', BillerController::class)->except(['show']);
 
 
     Route::controller(SaleController::class)->group(function () {
@@ -360,10 +468,15 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         Route::get('pos/{id?}', 'posSale')->name('sale.pos');
         Route::get('sales/recent-sale', 'recentSale');
         Route::get('sales/recent-draft', 'recentDraft');
-        Route::get('sales/lims_sale_search', 'limsSaleSearch')->name('sale.search');
+        if (method_exists(SaleController::class, 'limsSaleSearch')) {
+            Route::get('sales/lims_sale_search', 'limsSaleSearch')->name('sale.search');
+        }
         Route::get('sales/lims_product_search', 'limsProductSearch')->name('product_sale.search');
+        Route::get('sales/offline_products/{warehouse_id}', 'offlineProductsData')->name('product_sale.offline_products');
         Route::get('sales/getcustomergroup/{id}', 'getCustomerGroup')->name('sale.getcustomergroup');
-        Route::get('sales/customer-discounts/{id}', 'getCustomerDiscounts')->name('sale.customer-discounts');
+        if (method_exists(SaleController::class, 'getCustomerDiscounts')) {
+            Route::get('sales/customer-discounts/{id}', 'getCustomerDiscounts')->name('sale.customer-discounts');
+        }
 
         Route::get('sales/getproduct/{id}', 'getProduct')->name('sale.getproduct');
 
@@ -380,6 +493,8 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         Route::get('sales/payment-receipt/{id}', 'paymentReceipt')->name('sale.payment-receipt');
         Route::post('sales/updatepayment', 'updatePayment')->name('sale.update-payment');
         Route::post('sales/deletepayment', 'deletePayment')->name('sale.delete-payment');
+        Route::post('sales/{id}/void', 'voidSale')->name('sales.void');
+        Route::patch('sales/{id}/sales-agent', 'updateSalesAgent')->name('sales.sales-agent');
         Route::get('sales/{id}/create', 'createSale')->name('sale.draft');
         Route::post('sales/deletebyselection', 'deleteBySelection');
         Route::get('customer-display', 'customerDisplay')->name('sales.customerDisplay');
@@ -394,6 +509,15 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
 
         Route::post('sales/set-price-type', 'setPriceType')->name('set.price.type');
     });
+
+    Route::controller(\App\Http\Controllers\PendingCollectionController::class)->group(function() {
+        Route::get('pending-collections', 'index')->name('pending-collections.index');
+        Route::post('pending-collections/{id}/approve', 'approve')->name('pending-collections.approve');
+        Route::post('pending-collections/{id}/reject', 'reject')->name('pending-collections.reject');
+        Route::post('pending-collections/{id}/reverse', 'reverse')->name('pending-collections.reverse');
+        Route::post('pending-collections/{id}/handover', 'handover')->name('pending-collections.handover');
+    });
+
     Route::resource('sales', SaleController::class)->except('show');
 
     Route::controller(InstallmentPlanController::class)->group(function () {
@@ -404,6 +528,31 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
 
     Route::post('/razorpay/pay', [RazorpayController::class, 'createOrder']);
     Route::post('/razorpay/verify', [RazorpayController::class, 'verifyPayment']);
+
+    // Razorpay UPI — authenticated POS endpoints
+    Route::post(
+        '/payment/razorpay/create-upi-order',
+        [PaymentGatewayController::class, 'createRazorpayUpiOrder']
+    )->name('payment.razorpay.createUpiOrder');
+
+    Route::post(
+        '/payment/razorpay/verify-upi',
+        [PaymentGatewayController::class, 'verifyRazorpayUpi']
+    )->name('payment.razorpay.verifyUpi');
+
+    // M-Pesa Dynamic QR Code (called from POS — requires auth)
+    Route::post('/payment/mpesa/generate-qr', [PaymentGatewayController::class, 'generateQr'])->name('mpesa.generateQr');
+
+    // MTN MoMo USSD QR Code (called from POS — requires auth)
+    Route::post('/payment/mtnmomo/generate-qr', [PaymentGatewayController::class, 'generateMtnQr'])->name('mtnmomo.generateQr');
+
+    // POS payment initiation/status polling must remain authenticated. Gateway
+    // callbacks below are intentionally public because they originate at the
+    // payment providers and are separately validated by their services.
+    Route::post('/payment/{gateway}/push', [PaymentGatewayController::class, 'push'])->name('payment.push');
+    Route::post('/payment/{gateway}/query-status', [PaymentGatewayController::class, 'queryStatus'])->name('payment.queryStatus');
+    Route::post('/mpesa/stk-push', [PaymentGatewayController::class, 'push'])->defaults('gateway', 'mpesa')->name('mpesa.stkPush');
+    Route::post('/mpesa/query-status', [PaymentGatewayController::class, 'queryStatus'])->defaults('gateway', 'mpesa')->name('mpesa.queryStatus');
 
     Route::controller(PackingSlipController::class)->group(function () {
         Route::prefix('packing-slips')->group(function () {
@@ -470,7 +619,7 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
 
         });
     });
-    Route::resource('quotations', QuotationController::class);
+    Route::resource('quotations', QuotationController::class)->except(['show']);
 
 
     Route::controller(PurchaseController::class)->group(function () {
@@ -494,7 +643,26 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         });
         Route::post('importpurchase', 'importPurchase')->name('purchase.import');
     });
-    Route::resource('purchases', PurchaseController::class);
+    Route::resource('purchases', PurchaseController::class)->except(['show']);
+
+    Route::controller(ImportBatchController::class)->group(function () {
+        Route::prefix('import-batches')->group(function () {
+            Route::get('/', 'index')->name('import-batches.index')->middleware('import.permission:import_batch-index');
+            Route::get('create', 'create')->name('import-batches.create')->middleware('import.permission:import_batch-add');
+            Route::post('/', 'store')->name('import-batches.store')->middleware('import.permission:import_batch-add');
+            Route::get('purchases-by-warehouse/{warehouseId}', 'getPurchasesByWarehouse')->name('import-batches.purchases-by-warehouse')->middleware('import.permission:import_batch-add|import_batch-edit');
+            Route::get('{id}/edit', 'edit')->name('import-batches.edit')->middleware('import.permission:import_batch-edit');
+            Route::put('{id}', 'update')->name('import-batches.update')->middleware('import.permission:import_batch-edit');
+            Route::delete('{id}', 'destroy')->name('import-batches.destroy')->middleware('import.permission:import_batch-delete');
+            Route::get('{id}/landed-cost', 'landedCost')->name('import-batches.landed-cost')->middleware('import.permission:import_batch-landed-cost');
+            Route::post('{id}/costs', 'addCost')->name('import-batches.costs.add')->middleware('import.permission:import_batch-landed-cost');
+            Route::put('costs/{costId}', 'updateCost')->name('import-batches.costs.update')->middleware('import.permission:import_batch-landed-cost');
+            Route::delete('costs/{costId}', 'deleteCost')->name('import-batches.costs.delete')->middleware('import.permission:import_batch-landed-cost');
+            Route::post('{id}/finalize', 'finalize')->name('import-batches.finalize')->middleware('import.permission:import_batch-landed-cost');
+            Route::post('{id}/reopen', 'reopen')->name('import-batches.reopen')->middleware('import.permission:import_batch-landed-cost');
+            Route::get('{id}/profitability', 'profitability')->name('import-batches.profitability')->middleware('import.permission:import_batch-profit-report');
+        });
+    });
 
 
 
@@ -510,7 +678,7 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         });
         Route::post('importtransfer', 'importTransfer')->name('transfer.import');
     });
-    Route::resource('transfers', TransferController::class);
+    Route::resource('transfers', TransferController::class)->except(['show']);
 
 
 
@@ -519,7 +687,7 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         Route::get('qty_adjustment/lims_product_search', 'limsProductSearch')->name('product_adjustment.search');
         Route::post('qty_adjustment/deletebyselection', 'deleteBySelection');
     });
-    Route::resource('qty_adjustment', AdjustmentController::class);
+    Route::resource('qty_adjustment', AdjustmentController::class)->except(['show']);
 
 
     Route::controller(ReturnController::class)->group(function () {
@@ -533,29 +701,39 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
             Route::post('deletebyselection', 'deleteBySelection');
         });
     });
-    Route::resource('return-sale', ReturnController::class);
+    Route::resource('return-sale', ReturnController::class)->except(['show']);
 
     // Replace your existing exchange routes with these:
 
     Route::controller(ExchangeController::class)->prefix('exchange')->group(function () {
         Route::post('exchange-data', 'exchangeData')->name('exchange.data');
         Route::get('getcustomergroup/{id}', 'getCustomerGroup')->name('exchange.getcustomergroup');
-        Route::post('sendmail', 'sendMail')->name('exchange.sendmail');
-        Route::get('getproduct/{id}', 'getProduct')->name('exchange.getproduct');
-        Route::get('lims_product_search', 'limsProductSearch')->name('exchange.lims_product_search');
+        if (method_exists(ExchangeController::class, 'sendMail')) {
+            Route::post('sendmail', 'sendMail')->name('exchange.sendmail');
+        }
+        if (method_exists(ExchangeController::class, 'getProduct')) {
+            Route::get('getproduct/{id}', 'getProduct')->name('exchange.getproduct');
+        }
+        if (method_exists(ExchangeController::class, 'limsProductSearch')) {
+            Route::get('lims_product_search', 'limsProductSearch')->name('exchange.lims_product_search');
+        }
         // FIXED: Changed from exchangeData to productExchange
         Route::get('product_exchange/{id}', 'productExchange')->name('exchange.product_exchange');
-        Route::post('deletebyselection', 'deleteBySelection')->name('exchange.deletebyselection');
+        if (method_exists(ExchangeController::class, 'deleteBySelection')) {
+            Route::post('deletebyselection', 'deleteBySelection')->name('exchange.deletebyselection');
+        }
     });
 
-    Route::resource('exchange', ExchangeController::class);
+    Route::resource('exchange', ExchangeController::class)->except(['show', 'edit', 'update', 'destroy']);
     Route::get('/sale-exchange/search', [ExchangeController::class, 'searchByReference'])
         ->name('sale.exchange.search');
 
     Route::controller(ReturnPurchaseController::class)->group(function () {
         Route::prefix('return-purchase')->group(function () {
             Route::post('return-data', 'returnData');
-            Route::get('getcustomergroup/{id}', 'getCustomerGroup')->name('return-purchase.getcustomergroup');
+            if (method_exists(ReturnPurchaseController::class, 'getCustomerGroup')) {
+                Route::get('getcustomergroup/{id}', 'getCustomerGroup')->name('return-purchase.getcustomergroup');
+            }
             Route::post('sendmail', 'sendMail')->name('return-purchase.sendmail');
             Route::get('getproduct/{id}', 'getProduct')->name('return-purchase.getproduct');
             Route::get('lims_product_search', 'limsProductSearch')->name('product_return-purchase.search');
@@ -564,7 +742,7 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         });
     });
 
-    Route::resource('return-purchase', ReturnPurchaseController::class);
+    Route::resource('return-purchase', ReturnPurchaseController::class)->except(['show']);
 
     Route::controller(ReportController::class)->group(function () {
         Route::prefix('report')->group(function () {
@@ -585,6 +763,20 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
             Route::post('best_seller', 'bestSellerByWarehouse')->name('report.bestSellerByWarehouse');
             Route::get('profit-loss', 'summary')->name('report.profitLossSummary');
             Route::post('profit-loss', 'profitLoss')->name('report.profitLoss');
+            Route::middleware('permission:profit-loss')->group(function () {
+                Route::get('profitability/product', 'profitabilityProduct')->name('report.profitability.product');
+                Route::post('profitability/product-data', 'profitabilityProductData')->name('report.profitability.productData');
+                Route::get('profitability/category', 'profitabilityCategory')->name('report.profitability.category');
+                Route::post('profitability/category-data', 'profitabilityCategoryData')->name('report.profitability.categoryData');
+                Route::get('profitability/brand', 'profitabilityBrand')->name('report.profitability.brand');
+                Route::post('profitability/brand-data', 'profitabilityBrandData')->name('report.profitability.brandData');
+                Route::get('profitability/customer', 'profitabilityCustomer')->name('report.profitability.customer');
+                Route::post('profitability/customer-data', 'profitabilityCustomerData')->name('report.profitability.customerData');
+                Route::get('profitability/location', 'profitabilityLocation')->name('report.profitability.location');
+                Route::post('profitability/location-data', 'profitabilityLocationData')->name('report.profitability.locationData');
+                Route::get('profitability/invoice', 'profitabilityInvoice')->name('report.profitability.invoice');
+                Route::post('profitability/invoice-data', 'profitabilityInvoiceData')->name('report.profitability.invoiceData');
+            });
             Route::get('product_report', 'productReport')->name('report.product');
             Route::post('product_report_data', 'productReportData');
             Route::post('purchase', 'purchaseReport')->name('report.purchase');
@@ -593,6 +785,13 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
             Route::post('sale_report_data', 'saleReportData');
             Route::get('stock', 'stockReport')->name('report.stock');
             Route::post('stock-data', 'stockReportData')->name('report.stock-data');
+            Route::match(['get', 'post'], 'stock-export', 'stockReportExport')->name('report.stock-export');
+            Route::match(['get', 'post'], 'stock-print', 'stockReportPrint')->name('report.stock-print');
+            Route::middleware('permission:stock-report')->controller(StockLedgerController::class)->group(function () {
+                Route::get('stock-ledger', 'index')->name('report.stock-ledger');
+                Route::get('stock-ledger/export', 'export')->name('report.stock-ledger.export');
+                Route::get('stock-ledger/print', 'print')->name('report.stock-ledger.print');
+            });
             Route::get('challan-report', 'challanReport')->name('report.challan');
             Route::post('sale-report-chart', 'saleReportChart')->name('report.saleChart');
             Route::post('payment_report_by_date', 'paymentReportByDate')->name('report.paymentByDate');
@@ -632,8 +831,58 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
             Route::post('customer-due-report', 'customerDueReportByDate')->name('report.customerDueByDate');
             Route::post('customer-due-report-data', 'customerDueReportData');
             Route::post('supplier-due-report', 'supplierDueReportByDate')->name('report.supplierDueByDate');
-            Route::post('supplier-due-report-data', 'supplierDueReportData');
+            if (method_exists(ReportController::class, 'supplierDueReportData')) {
+                Route::post('supplier-due-report-data', 'supplierDueReportData');
+            }
         });
+    });
+
+    Route::controller(\App\Http\Controllers\TaxReportController::class)->group(function () {
+        Route::prefix('report/tax-report')->group(function () {
+            Route::get('/', 'index')->name('report.tax.index');
+            Route::post('/output-data', 'outputData')->name('report.tax.outputData');
+            Route::post('/input-data', 'inputData')->name('report.tax.inputData');
+            Route::post('/expense-data', 'expenseData')->name('report.tax.expenseData');
+            Route::post('/summary', 'summary')->name('report.tax.summary');
+            Route::get('/export', 'export')->name('report.tax.export');
+            Route::get('/print', 'printView')->name('report.tax.print');
+        });
+    });
+
+    Route::controller(\App\Http\Controllers\AccountingActivationController::class)->group(function () {
+        Route::prefix('accounting/activation')->group(function () {
+            Route::get('/', 'index')->name('accounting.activation.index');
+            Route::post('/', 'activate')->name('accounting.activation.activate');
+        });
+    });
+
+    Route::middleware('accounting.activated')->group(function () {
+        Route::middleware('permission:chart-of-accounts-manage')->group(function () {
+            Route::get('accounting/chart-of-accounts', [\App\Http\Controllers\ChartOfAccountsController::class, 'index'])->name('accounting.chart-of-accounts.index');
+            Route::get('accounting/chart-of-accounts/{account}/edit', [\App\Http\Controllers\ChartOfAccountsController::class, 'edit'])->name('accounting.chart-of-accounts.edit');
+            Route::patch('accounting/chart-of-accounts/{account}', [\App\Http\Controllers\ChartOfAccountsController::class, 'update'])->name('accounting.chart-of-accounts.update');
+            Route::delete('accounting/chart-of-accounts/{account}', [\App\Http\Controllers\ChartOfAccountsController::class, 'destroy'])->name('accounting.chart-of-accounts.destroy');
+        });
+
+        Route::middleware('permission:semantic-account-mappings-manage')->group(function () {
+            Route::get('accounting/semantic-account-mappings', [\App\Http\Controllers\SemanticAccountMappingController::class, 'index'])->name('accounting.semantic-mappings.index');
+            Route::patch('accounting/semantic-account-mappings/{role}', [\App\Http\Controllers\SemanticAccountMappingController::class, 'update'])->name('accounting.semantic-mappings.update');
+            Route::post('accounting/semantic-account-mappings/{role}/restore-default', [\App\Http\Controllers\SemanticAccountMappingController::class, 'restoreDefault'])->name('accounting.semantic-mappings.restore-default');
+        });
+
+        Route::controller(\App\Http\Controllers\AccountingReportController::class)->group(function () {
+            Route::prefix('accounting')->group(function () {
+                Route::get('trial-balance', 'trialBalance')->name('accounting.trialBalance');
+                Route::get('general-ledger', 'generalLedger')->name('accounting.generalLedger');
+                Route::get('balance-sheet', 'balanceSheet')->name('accounting.balanceSheet');
+                Route::get('profit-loss', 'profitAndLoss')->name('accounting.profitAndLoss');
+                Route::get('cash-flow-statement', 'cashFlowStatement')->name('accounting.cashFlowStatement');
+            });
+        });
+        Route::get('accounting/inventory-close', [\App\Http\Controllers\PeriodicInventoryCloseController::class, 'index'])->name('accounting.inventory-close.index');
+        Route::post('accounting/inventory-close', [\App\Http\Controllers\PeriodicInventoryCloseController::class, 'store'])->middleware('throttle:6,1')->name('accounting.inventory-close.store');
+        Route::post('accounting/inventory-close/{close}/reverse', [\App\Http\Controllers\PeriodicInventoryCloseController::class, 'reverse'])->middleware('throttle:6,1')->name('accounting.inventory-close.reverse');
+        Route::post('accounting/inventory-close/{close}/recalculate', [\App\Http\Controllers\PeriodicInventoryCloseController::class, 'recalculate'])->middleware('throttle:6,1')->name('accounting.inventory-close.recalculate');
     });
 
 
@@ -647,14 +896,16 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         Route::get('user/all', 'allUsers')->name('user.all');
         Route::post('user/toggle-status', [UserController::class, 'toggleStatus'])->name('user.toggleStatus');
     });
-    Route::resource('user', UserController::class);
+    Route::resource('user', UserController::class)->except(['show']);
 
 
     Route::controller(SettingController::class)->group(function () {
         Route::prefix('setting')->group(function () {
             Route::get('activity-log', 'activityLog')->name('setting.activityLog');
-            Route::get('general_setting', 'generalSetting')->name('setting.general')->middleware('permission:general_setting');
-            Route::post('general_setting_store', 'generalSettingStore')->name('setting.generalStore')->middleware('permission:general_setting');
+            Route::get('general_setting', 'generalSetting')->name('setting.general');
+            Route::post('general_setting_store', 'generalSettingStore')->name('setting.generalStore');
+            Route::get('modules', [\App\Http\Controllers\ModuleSettingsController::class, 'index'])->name('setting.modules');
+            Route::post('modules', [\App\Http\Controllers\ModuleSettingsController::class, 'update'])->name('setting.modules.update');
 
             Route::get('app_setting', 'appSetting')->name('setting.app');
             Route::delete('app_setting/{id}', 'appSettingDelete')->name('setting.tokenDelete');
@@ -673,15 +924,17 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
             Route::post('hrm_setting_store', 'hrmSettingStore')->name('setting.hrmStore');
             Route::post('mail_setting_store', 'mailSettingStore')->name('setting.mailStore');
             Route::post('sms_setting_store', 'smsSettingStore')->name('setting.smsStore');
+            Route::post('test_custom_http_sms', 'testCustomHttpSms')->name('setting.testCustomHttpSms');
             Route::get('pos_setting', 'posSetting')->name('setting.pos');
             Route::post('pos_setting_store', 'posSettingStore')->name('setting.posStore');
-            Route::get('empty-database', 'emptyDatabase')->name('setting.emptyDatabase');
+            Route::get('fresh-business-reset', [\App\Http\Controllers\FreshBusinessResetController::class, 'index'])->name('setting.freshBusinessReset');
+            Route::post('fresh-business-reset', [\App\Http\Controllers\FreshBusinessResetController::class, 'store'])->name('setting.freshBusinessReset.store');
         });
         Route::get('backup', 'backup')->name('setting.backup');
     });
 
     Route::prefix('setting')->name('settings.')->group(function () {
-        Route::resource('invoice', InvoiceSettingController::class);
+        Route::resource('invoice', InvoiceSettingController::class)->except(['show']);
     });
 
     Route::prefix('setting')->name('setting.')->group(function () {
@@ -695,7 +948,9 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         Route::put('theme-settings/{themeSetting}/active-for', [ThemeSettingController::class, 'updateActiveFor'])->name('themeSettings.activeFor');
     });
 
-    Route::get('/barcodes/set_default/{id}', [BarcodeController::class, 'setDefault']);
+    if (method_exists(BarcodeController::class, 'setDefault')) {
+        Route::get('/barcodes/set_default/{id}', [BarcodeController::class, 'setDefault']);
+    }
     Route::controller(BarcodeController::class)->group(function () {
         Route::post('barcodes/barcode-data', 'barcodeData')->name('barcodes.data');
     });
@@ -703,7 +958,9 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
 
 
     Route::get('/labels/show', [LabelsController::class, 'show'])->name('print.labels');
-    Route::get('/labels/add-product-row', [LabelsController::class, 'addProductRow']);
+    if (method_exists(LabelsController::class, 'addProductRow')) {
+        Route::get('/labels/add-product-row', [LabelsController::class, 'addProductRow']);
+    }
     Route::get('/labels/print', [LabelsController::class, 'printLabel'])->name('print.label');
 
     Route::controller(ExpenseCategoryController::class)->group(function () {
@@ -715,20 +972,23 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
     Route::resource('expense_categories', ExpenseCategoryController::class);
 
 
-    Route::controller(ExpenseController::class)->group(function () {
-        Route::post('expenses/expense-data', 'expenseData')->name('expenses.data');
+    Route::controller(ExpenseController::class)->group(function () {        Route::post('expenses/expense-data', 'expenseData')->name('expenses.data');
         Route::post('expenses/deletebyselection', 'deleteBySelection');
     });
-    Route::resource('expenses', ExpenseController::class);
+    Route::resource('expenses', ExpenseController::class)->except(['create', 'show']);
 
     // IncomeCategory & Income Start
     Route::controller(IncomeCategoryController::class)->group(function () {
         Route::get('income_categories/gencode', 'generateCode');
-        Route::post('income_categories/import', 'import')->name('income_category.import');
+        if (method_exists(IncomeCategoryController::class, 'import')) {
+            Route::post('income_categories/import', 'import')->name('income_category.import');
+        }
         Route::post('income_categories/deletebyselection', 'deleteBySelection');
-        Route::get('income_categories/all', 'incomeCategoriesAll')->name('income_category.all');;
+        if (method_exists(IncomeCategoryController::class, 'incomeCategoriesAll')) {
+            Route::get('income_categories/all', 'incomeCategoriesAll')->name('income_category.all');
+        }
     });
-    Route::resource('income_categories', IncomeCategoryController::class);
+    Route::resource('income_categories', IncomeCategoryController::class)->except(['create', 'show']);
 
 
     Route::controller(IncomeController::class)->group(function () {
@@ -744,9 +1004,9 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         Route::post('gift_cards/recharge/{id}', 'recharge')->name('gift_cards.recharge');
         Route::post('gift_cards/deletebyselection', 'deleteBySelection');
     });
-    Route::resource('gift_cards', GiftCardController::class);
+    Route::resource('gift_cards', GiftCardController::class)->except(['create', 'show']);
 
-    Route::resource('couriers', CourierController::class);
+    Route::resource('couriers', CourierController::class)->except(['create', 'show', 'edit']);
 
     Route::controller(CouponController::class)->group(function () {
         Route::get('coupons/gencode', 'generateCode');
@@ -759,29 +1019,52 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
     })->name('phpfileinfo');
 
 
-    //accounting routes
+    // Operational payment-account routes must support both legacy and
+    // double-entry modes. The controller redirects legacy balance sheet /
+    // account statement behavior appropriately when double-entry is active.
     Route::controller(AccountsController::class)->group(function () {
         Route::get('make-default/{id}', 'makeDefault');
         Route::get('balancesheet', 'balanceSheet')->name('accounts.balancesheet');
         Route::post('account-statement', 'accountStatement')->name('accounts.statement');
         Route::get('accounts/all', 'accountsAll')->name('account.all');
     });
-    Route::resource('accounts', AccountsController::class);
+    Route::resource('accounts', AccountsController::class)->except(['create', 'show', 'edit']);
+
+    Route::middleware('accounting.activated')->group(function () {
+        Route::controller(\App\Http\Controllers\AccountingReconciliationController::class)->group(function () {
+            Route::get('accounting/reconciliation', 'index')->name('accounting.reconciliation.index');
+            Route::post('accounting/reconciliation/run-health-check', 'runHealthCheck')->name('accounting.reconciliation.run-health-check');
+            Route::post('accounting/reconciliation/retry/{id}', 'retry')->name('accounting.reconciliation.retry');
+            Route::post('accounting/reconciliation/deep-scans', 'startDeepScan')->middleware('throttle:6,1')->name('accounting.reconciliation.deep-scans.start');
+            Route::post('accounting/reconciliation/diagnostic-settings', 'updateDiagnosticSettings')->middleware('throttle:6,1')->name('accounting.reconciliation.diagnostic-settings.update');
+            Route::post('accounting/reconciliation/deep-scan-worker-test', 'testDeepScanWorker')->middleware('throttle:6,1')->name('accounting.reconciliation.deep-scan-worker-test');
+            Route::get('accounting/reconciliation/payment-mappings', 'paymentMappingWorkspace')->name('accounting.reconciliation.payment-mappings.index');
+            Route::get('accounting/reconciliation/deep-scans/{scan}', 'deepScanStatus')->name('accounting.reconciliation.deep-scans.status');
+            Route::post('accounting/reconciliation/deep-scans/{scan}/cancel', 'cancelDeepScan')->middleware('throttle:20,1')->name('accounting.reconciliation.deep-scans.cancel');
+            Route::post('accounting/reconciliation/deep-scans/{scan}/resume', 'resumeDeepScan')->middleware('throttle:20,1')->name('accounting.reconciliation.deep-scans.resume');
+            Route::post('accounting/reconciliation/queue/{queue}/repair-plans', 'previewRepair')->middleware('throttle:10,1')->name('accounting.reconciliation.repairs.preview');
+            Route::post('accounting/reconciliation/payment-accounts/{account}/repair-plans', 'previewPaymentMappingRepair')->middleware('throttle:10,1')->name('accounting.reconciliation.payment-mapping-repairs.preview');
+            Route::post('accounting/reconciliation/orphan-journals/{journal}/repair-plans', 'previewOrphanJournalRepair')->middleware('throttle:10,1')->name('accounting.reconciliation.orphan-journal-repairs.preview');
+            Route::post('accounting/reconciliation/repair-plans/{plan}/approve', 'approveRepair')->middleware('throttle:10,1')->name('accounting.reconciliation.repairs.approve');
+            Route::post('accounting/reconciliation/repair-plans/{plan}/execute', 'executeRepair')->middleware('throttle:10,1')->name('accounting.reconciliation.repairs.execute');
+            Route::get('accounting/reconciliation/repair-plans/{plan}/audit', 'repairAudit')->name('accounting.reconciliation.repairs.audit');
+        });
+    });
 
 
-    Route::resource('money-transfers', MoneyTransferController::class);
+    Route::resource('money-transfers', MoneyTransferController::class)->except(['show', 'edit']);
 
 
     //HRM routes
     Route::post('departments/deletebyselection', [DepartmentController::class, 'deleteBySelection']);
-    Route::resource('departments', DepartmentController::class);
-    Route::resource('designations', DesignationController::class);
-    Route::resource('shift', ShiftController::class);
-    Route::resource('overtime', OvertimeController::class);
-    Route::resource('leave-type', LeaveTypeController::class);
-    Route::resource('leave', LeaveController::class);
+    Route::resource('departments', DepartmentController::class)->except(['create', 'show', 'edit']);
+    Route::resource('designations', DesignationController::class)->except(['create', 'show', 'edit']);
+    Route::resource('shift', ShiftController::class)->except(['create', 'show', 'edit']);
+    Route::resource('overtime', OvertimeController::class)->except(['create', 'show', 'edit']);
+    Route::resource('leave-type', LeaveTypeController::class)->except(['create', 'show', 'edit']);
+    Route::resource('leave', LeaveController::class)->except(['create', 'show', 'edit']);
     Route::get('hrm-panel', [HrmController::class, 'index'])->name('hrm-panel');
-    Route::resource('sale-agents', SaleAgentController::class)->except('show');
+    Route::resource('sale-agents', SaleAgentController::class)->except(['show', 'edit']);
     Route::get('/payroll/monthly-data', [PayrollController::class, 'monthlyData'])->name('payroll.monthlyData');
     Route::get('payroll/get-employees-by-warehouse', [PayrollController::class, 'getEmployeesByWarehouse'])->name('payroll.getEmployeesByWarehouse');
     Route::post('payroll/store-multiple', [PayrollController::class, 'storeMultiple'])->name('payroll.storeMultiple');
@@ -792,24 +1075,24 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
 
 
     Route::post('employees/deletebyselection', [EmployeeController::class, 'deleteBySelection']);
-    Route::resource('employees', EmployeeController::class);
+    Route::resource('employees', EmployeeController::class)->except(['show', 'edit']);
 
 
     Route::post('payroll/deletebyselection', [PayrollController::class, 'deleteBySelection']);
-    Route::resource('payroll', PayrollController::class);
+    Route::resource('payroll', PayrollController::class)->except(['show']);
 
 
-    Route::post('attendance/delete/{date}/{employee_id}', [AttendanceController::class, 'delete'])->name('attendances.delete');
+    Route::delete('attendance/delete/{date}/{employee_id}', [AttendanceController::class, 'delete'])->name('attendances.delete');
     Route::post('attendance/deletebyselection', [AttendanceController::class, 'deleteBySelection']);
     Route::post('attendance/importDeviceCsv', [AttendanceController::class, 'importDeviceCsv'])->name('attendances.importDeviceCsv');
-    Route::resource('attendance', AttendanceController::class);
+    Route::resource('attendance', AttendanceController::class)->except(['show', 'edit', 'update', 'destroy']);
 
     Route::controller(StockCountController::class)->group(function () {
         Route::post('stock-count/finalize', 'finalize')->name('stock-count.finalize');
         Route::get('stock-count/stockdif/{id}', 'stockDif');
         Route::get('stock-count/{id}/qty_adjustment', 'qtyAdjustment')->name('stock-count.adjustment');
     });
-    Route::resource('stock-count', StockCountController::class);
+    Route::resource('stock-count', StockCountController::class)->except(['create', 'show', 'edit', 'update', 'destroy']);
 
 
     Route::controller(HolidayController::class)->group(function () {
@@ -817,7 +1100,7 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         Route::get('approve-holiday/{id}', 'approveHoliday')->name('approveHoliday');
         Route::get('holidays/my-holiday/{year}/{month}', 'myHoliday')->name('myHoliday');
     });
-    Route::resource('holidays', HolidayController::class);
+    Route::resource('holidays', HolidayController::class)->except(['edit']);
 
 
     Route::controller(CashRegisterController::class)->group(function () {
@@ -825,7 +1108,7 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
             Route::get('/', 'index')->name('cashRegister.index');
             Route::get('check-availability/{warehouse_id}', 'checkAvailability')->name('cashRegister.checkAvailability');
             Route::post('store', 'store')->name('cashRegister.store');
-            Route::get('getDetails/{id}', 'getDetails');
+            Route::get('getDetails/{id}', 'getDetails')->name('cashRegister.details');
             Route::post('close', 'close')->name('cashRegister.close');
         });
     });
@@ -836,11 +1119,14 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
             Route::get('/', 'index')->name('notifications.index');
             Route::post('store', 'store')->name('notifications.store');
             Route::get('mark-as-read', 'markAsRead');
+            // Added for Settings Matrix
+            Route::get('settings', 'settings')->name('notifications.settings');
+            Route::post('settings', 'updateSettings')->name('notifications.settings.update');
         });
     });
 
 
-    Route::resource('currency', CurrencyController::class);
+    Route::resource('currency', CurrencyController::class)->except(['create', 'show', 'edit']);
 
     Route::resource('custom-fields', CustomFieldController::class);
 
@@ -862,37 +1148,46 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
         Route::post('/send', [WhatsappController::class, 'sendMessage'])->name('whatsapp.send');
     });
 
-    //ticket routes
-    Route::controller(\App\Http\Controllers\landlord\TicketController::class)->group(function () {
-        Route::get('tickets', 'index')->name('tickets.index');
-        Route::get('tickets/create', 'create')->name('tickets.create');
-        Route::post('tickets', 'store')->name('tickets.store');
-        Route::get('tickets/{id}', 'show')->name('tickets.show');
-        Route::post('tickets/{id}/reply', 'reply')->name('tickets.reply');
-        Route::delete('tickets/{id}', 'destroy')->name('tickets.destroy');
-    });
+    // Optional SaaS support-ticket routes. Register only when the landlord
+    // controller exists so route:list and route:cache do not depend on a
+    // missing optional namespace.
+    if (class_exists(\App\Http\Controllers\landlord\TicketController::class)) {
+        Route::controller(\App\Http\Controllers\landlord\TicketController::class)->group(function () {
+            Route::get('tickets', 'index')->name('tickets.index');
+            Route::get('tickets/create', 'create')->name('tickets.create');
+            Route::post('tickets', 'store')->name('tickets.store');
+            Route::get('tickets/{id}', 'show')->name('tickets.show');
+            Route::post('tickets/{id}/reply', 'reply')->name('tickets.reply');
+            Route::delete('tickets/{id}', 'destroy')->name('tickets.destroy');
+        });
+    }
 
     Route::controller(DamageStockController::class)->group(function () {
         Route::get('damage-stock/getproduct/{id}',       'getProduct')         ->name('damage-stock.getproduct');
         Route::get('damage-stock/lims_product_search',   'limsProductSearch')  ->name('damage-stock.search');
         Route::post('damage-stock/deletebyselection',    'deleteBySelection');
     });
-    Route::resource('damage-stock', DamageStockController::class);
+    Route::resource('damage-stock', DamageStockController::class)->except(['show']);
 
     // booking route..........
     Route::controller(BookingController::class)->group(function () {
         Route::get('bookings/calendar', 'index')->name('booking.index');
         Route::get('bookings/events', 'getEvents')->name('booking.events');
-        Route::post('bookings/deletebyselection', 'deleteBySelection');
+        if (method_exists(BookingController::class, 'deleteBySelection')) {
+            Route::post('bookings/deletebyselection', 'deleteBySelection');
+        }
     });
     Route::resource('bookings', BookingController::class)->except(['create', 'edit']);
 
     // QR Code routes (Protected)
     Route::prefix('qr')->group(function () {
         Route::get('/', [QrCodeController::class, 'index'])->name('qr.index');
-        Route::post('/generate/{type}/{id}', [QrCodeController::class, 'generate']);
-        Route::get('/show/{id}', [QrCodeController::class, 'show']);
-        Route::get('/download/{id}', [QrCodeController::class, 'download']);
+        Route::post('/generate/{type}/{id}', [QrCodeController::class, 'generate'])
+            ->whereIn('type', ['warehouse', 'table'])->whereNumber('id')->name('qr.generate');
+        Route::get('/show/{id}', [QrCodeController::class, 'show'])->whereNumber('id')->name('qr.show');
+        Route::get('/image/{id}', [QrCodeController::class, 'image'])->whereNumber('id')->name('qr.image');
+        Route::get('/download/{id}', [QrCodeController::class, 'download'])->whereNumber('id')->name('qr.download');
+        Route::post('/save-settings', [QrCodeController::class, 'saveSettings'])->name('qr.saveSettings');
     });
 
 });
@@ -901,7 +1196,17 @@ Route::group(['middleware' => ['common', 'auth', 'active']], function () {
 // Public QR Menu — no authentication required
 Route::get('/menu/{slug}', [\App\Http\Controllers\PublicMenuController::class, 'index'])->name('public.menu');
 Route::get('/menu/{slug}/products', [\App\Http\Controllers\PublicMenuController::class, 'getProducts'])->name('public.menu.products');
+Route::post('/menu/place-order', [\App\Http\Controllers\PublicMenuController::class, 'placeOrder'])->name('public.menu.placeOrder');
 
 // QR Code Redirect Route (Public)
 Route::get('/q/{code}', [QrCodeController::class, 'redirect']);
 
+// ===== Public Payment Gateway Routes (M-Pesa, MTN MoMo, PayHere, Stripe QR Checkouts) =====
+Route::get('/payment/payhere/checkout/{order_id}', [PaymentGatewayController::class, 'payhereCheckout'])->name('payhere.qr_checkout');
+
+// Generic Payment Success/Failed screens for Customer's Mobile Browser
+Route::get('/payment/success', [PaymentGatewayController::class, 'paymentSuccess'])->name('payment.success');
+
+Route::get('/payment/failed', [PaymentGatewayController::class, 'paymentFailed'])->name('payment.failed');
+
+});

@@ -37,6 +37,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('qr_code');
+        Schema::dropIfExists('qr_codes');
     }
 };

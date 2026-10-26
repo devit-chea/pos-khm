@@ -1,4 +1,8 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
     <x-validation-error fieldName="name" />
     <x-validation-error fieldName="warehouse_id" />
@@ -8,7 +12,7 @@
     <section>
         <div class="container-fluid">
             <a href="#" data-toggle="modal" data-target="#createModal" class="btn btn-info add-printer-btn"><i
-                    class="dripicons-plus"></i> {{ __('db.Add Printer') }}</a>
+                    class="ti ti-plus"></i> {{ __('db.Add Printer') }}</a>
         </div>
         <div class="table-responsive">
             <table id="printer-table" class="table">
@@ -18,7 +22,7 @@
                         <th>{{ __('db.Printer Name') }}</th>
                         <th>{{ __('db.Warehouse') }}</th>
                         <th>{{ __('db.Connection Type') }}</th>
-                        <th>{{ __('db.Capability Profile') }}</th>
+                        <th>{{ __('db.capability_profile') }}</th>
                         <th>{{ __('db.Characters per line') }}</th>
                         <th>{{ __('db.IP Address') }}</th>
                         <th>{{ __('db.Port') }}</th>
@@ -51,7 +55,7 @@
                                         <li>
                                             <button type="button" data-id="{{ $printer->id }}"
                                                 class="open-EditPrinterDialog btn btn-link" data-toggle="modal"
-                                                data-target="#editModal"><i class="dripicons-document-edit"></i>
+                                                data-target="#editModal"><i class="ti ti-edit"></i>
                                                 {{ __('db.edit') }}
                                             </button>
                                         </li>
@@ -60,8 +64,8 @@
                                             @csrf
                                             @method('DELETE')
                                             <li>
-                                                <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i
-                                                        class="dripicons-trash"></i> {{ __('db.delete') }}</button>
+                                                <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i
+                                                        class="ti ti-trash"></i> {{ __('db.delete') }}</button>
                                             </li>
                                         </form>
                                     </ul>
@@ -83,7 +87,7 @@
                     <div class="modal-header">
                         <h5 id="exampleModalLabel" class="modal-title">{{ __('db.Add Printer') }}</h5>
                         <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                                aria-hidden="true"><i class="ti ti-x"></i></span></button>
                     </div>
                     <div class="modal-body">
                         <p class="italic">
@@ -112,7 +116,7 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>{{ __('db.capability_profile') }} *</label> <i class="dripicons-question" data-toggle="tooltip" title="{{__('db.Different printers support different commands and code pages. If you are not sure, it is safest to use the Simple Capability Profile')}}"></i>
+                            <label>{{ __('db.capability_profile') }} *</label> <i class="ti ti-info-circle" data-toggle="tooltip" title="{{__('db.Different printers support different commands and code pages. If you are not sure, it is safest to use the Simple Capability Profile')}}"></i>
                             <select name="capability_profile" class="form-control selectpicker" id="capability_profile">
                                 @foreach($capability_profiles as $key => $capability_profile)
                                 <option value="{{$key}}" @selected($loop->first)>{{$capability_profile}}</option>
@@ -130,7 +134,7 @@
                                 required="required" class="form-control">
                         </div>
                         <div class="form-group field-for-network">
-                            <label>{{ __('db.Port') }} *</label> <i class="dripicons-question" data-toggle="tooltip" title="{{__('db.Most printers use port 9100')}}"></i>
+                            <label>{{ __('db.Port') }} *</label> <i class="ti ti-info-circle" data-toggle="tooltip" title="{{__('db.Most printers use port 9100')}}"></i>
                             <input type="text" value="9100" name="port" required="required" class="form-control">
                         </div>
                         <div class="form-group field-for-win-linux">
@@ -158,9 +162,9 @@
                     @csrf
                     @method('PUT')
                     <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title"> {{ __('db.Update Printer') }}</h5>
+                        <h5 id="exampleModalLabel" class="modal-title"> {{ __('db.update_printer') }}</h5>
                         <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                                aria-hidden="true"><i class="ti ti-x"></i></span></button>
                     </div>
                     <div class="modal-body">
                         <p class="italic">
@@ -188,7 +192,7 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>{{ __('db.capability_profile') }} *</label> <i class="dripicons-question" data-toggle="tooltip" title="{{__('db.Different printers support different commands and code pages. If you are not sure, it is safest to use the Simple Capability Profile')}}"></i>
+                            <label>{{ __('db.capability_profile') }} *</label> <i class="ti ti-info-circle" data-toggle="tooltip" title="{{__('db.Different printers support different commands and code pages. If you are not sure, it is safest to use the Simple Capability Profile')}}"></i>
                             <select name="capability_profile" class="form-control selectpicker" id="capability_profile">
                                 @foreach($capability_profiles as $key => $capability_profile)
                                 <option value="{{$key}}">{{$capability_profile}}</option>
@@ -206,7 +210,7 @@
                                 required="required" class="form-control">
                         </div>
                         <div class="form-group field-for-network">
-                            <label>{{ __('db.Port') }} *</label> <i class="dripicons-question" data-toggle="tooltip" title="{{__('db.Most printers use port 9100')}}"></i>
+                            <label>{{ __('db.Port') }} *</label> <i class="ti ti-info-circle" data-toggle="tooltip" title="{{__('db.Most printers use port 9100')}}"></i>
                             <input type="text" name="port" required="required" class="form-control">
                         </div>
                         <div class="form-group field-for-win-linux">
@@ -228,9 +232,10 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
     <script type="text/javascript">
 
-        var user_verified = <?php echo json_encode(env('USER_VERIFIED')); ?>;
+        var user_verified = <?php echo json_encode(config('app.user_verified')); ?>;
 
         $.ajaxSetup({
             headers: {
@@ -238,12 +243,7 @@
             }
         });
 
-        function confirmDelete() {
-            if (confirm("Are you sure want to delete?")) {
-                return true;
-            }
-            return false;
-        }
+        function confirmDelete() { return true; }
 
         $(document).ready(function() {
 
@@ -273,8 +273,8 @@
                 "info": '<small>{{ __('db.Showing') }} _START_ - _END_ (_TOTAL_)</small>',
                 "search": '{{ __('db.Search') }}',
                 'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
                 }
             },
             'columnDefs': [{
@@ -335,7 +335,7 @@
                     },
                 },
                 {
-                    text: '<i title="delete" class="dripicons-cross"></i>',
+                    text: '<i title="delete" class="ti ti-x"></i>',
                     className: 'buttons-delete',
                     action: function(e, dt, node, config) {
                         if (user_verified == '1') {
@@ -343,7 +343,7 @@
                             $('table tbody :checkbox:checked').each(function(i) {
                                 printer_id[i] = $(this).closest('tr').data('id');
                             });
-                            if (printer_id.length && confirm("Are you sure want to delete?")) {
+                            if (printer_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                                 $.ajax({
                                     type: 'DELETE',
                                     url: '/printer/0',
@@ -357,18 +357,20 @@
                                                     .draw(false);
                                             }
                                         });
-                                        alert(data);
+                                        SaleProToast.show(data);
                                     }
                                 });
+                            }
+                            });
                             } else if (!printer_id.length)
-                                alert('No printer is selected!');
+                                SaleProToast.show('No printer is selected!');
                         } else
-                            alert('This feature is disable for demo!');
+                            SaleProToast.show('This feature is disable for demo!');
                     }
                 },
                 {
                     extend: 'colvis',
-                    text: '<i title="" class="fa fa-eye"></i>',
+                    text: '<i title="" class="ti ti-eye"></i>',
                     columns: ':gt(0)'
                 },
             ],

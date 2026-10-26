@@ -122,7 +122,7 @@ class DataRetrievalService
     public function getAllAccounts()
     {
         try {
-            $lims_account_list = Account::where('is_active', true)->get();
+            $lims_account_list = app(PaymentAccountService::class)->validOperationalAccounts();
             return $lims_account_list;
         } catch (\Exception $e) {
             // Handle unexpected errors
@@ -182,7 +182,7 @@ class DataRetrievalService
     public function getAccountList()
     {
         try {
-            $lims_account_list = Account::where('is_active', true)->get();
+            $lims_account_list = app(PaymentAccountService::class)->validOperationalAccounts();
             return AccountResource::collection($lims_account_list);
         } catch (\Exception $e) {
             return response()->json([

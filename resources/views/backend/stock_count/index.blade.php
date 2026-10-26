@@ -1,11 +1,18 @@
-@extends('backend.layout.main') @section('content')
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <x-success-message key="message" />
 <x-error-message key="not_permitted" />
 
 <section>
     <div class="container-fluid">
-        <button class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="dripicons-plus"></i> {{__('db.Count Stock')}} </button>
+        <button class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="ti ti-plus"></i> {{__('db.Count Stock')}} </button>
     </div>
     <div class="table-responsive">
         <table id="stock-count-table" class="table stock-count-list">
@@ -34,7 +41,7 @@
                 ?>
                 <tr>
                     <td>{{$key}}</td>
-                    <td>{{ date($general_setting->date_format, strtotime($stock_count->created_at->toDateString())) . ' '. $stock_count->created_at->toTimeString() }}</td>
+                    <td>{{ date(gen_setting()->date_format, strtotime($stock_count->created_at->toDateString())) . ' '. $stock_count->created_at->toTimeString() }}</td>
                     <td>{{ $stock_count->reference_no }}</td>
                     <td>{{ $warehouse->name }}</td>
                     <td>
@@ -75,16 +82,16 @@
                         <td><div class="badge badge-info">{{__('db.Partial')}}</div></td>
                     @endif
                     <td class="text-center">
-                        <a download href="{{'stock_count/'.$stock_count->initial_file}}" title="{{__('db.Download')}}"><i class="dripicons-copy"></i></a>
+                        <a download href="{{'stock_count/'.$stock_count->initial_file}}" title="{{__('db.Download')}}"><i class="ti ti-copy"></i></a>
                     </td>
                     <td class="text-center">
                         @if($stock_count->final_file)
-                        <a download href="{{'stock_count/'.$stock_count->final_file}}" title="{{__('db.Download')}}"><i class="dripicons-copy"></i></a>
+                        <a download href="{{'stock_count/'.$stock_count->final_file}}" title="{{__('db.Download')}}"><i class="ti ti-copy"></i></a>
                         @endif
                     </td>
                     <td>
                         @if($stock_count->final_file)
-                            <div style="cursor: pointer;" class="badge badge-success final-report" data-stock_count='["{{date($general_setting->date_format, strtotime($stock_count->created_at->toDateString()))}}", "{{$stock_count->reference_no}}", "{{$warehouse->name}}", "{{$type}}", "{{implode(", ", $category_name)}}", "{{implode(", ", $brand_name)}}", "{{$initial_file}}", "{{$final_file}}", "{{$stock_count->id}}"]'>{{__('db.Final Report')}}
+                            <div style="cursor: pointer;" class="badge badge-success final-report" data-stock_count='["{{date(gen_setting()->date_format, strtotime($stock_count->created_at->toDateString()))}}", "{{$stock_count->reference_no}}", "{{$warehouse->name}}", "{{$type}}", "{{implode(", ", $category_name)}}", "{{implode(", ", $brand_name)}}", "{{$initial_file}}", "{{$final_file}}", "{{$stock_count->id}}"]'>{{__('db.Final Report')}}
                             </div>
                         @else
                             <div style="cursor: pointer;" class="badge badge-primary finalize" data-id="{{$stock_count->id}}">{{__('db.Finalize')}}
@@ -117,7 +124,7 @@
           @csrf
         <div class="modal-header">
           <h5 id="exampleModalLabel" class="modal-title">{{__('db.Count Stock')}}</h5>
-          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
         </div>
         <div class="modal-body">
           <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -141,7 +148,7 @@
                 <div class="col-md-4 form-group" id="category">
                     <label>{{__('db.category')}}</label>
                     <select name="category_id[]" id="category_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" title="Select Category..." multiple>
-                        @foreach($lims_category_list as $category)
+                        @foreach (get_active_categories() as $category)
                         <option value="{{$category->id}}">{{$category->name}}</option>
                         @endforeach
                     </select>
@@ -171,7 +178,7 @@
             @csrf
         <div class="modal-header">
             <h5 id="exampleModalLabel" class="modal-title"> {{__('db.Finalize Stock Count')}}</h5>
-            <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+            <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
         </div>
         <div class="modal-body">
             <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.<strong>{{__('db.You just need to update the Counted column in the initial file')}}</strong> </small></p>
@@ -181,7 +188,7 @@
             </div>
             <input type="hidden" name="stock_count_id">
             <div class="form-group">
-                <label>{{__('db.Note')}}</label>
+                <label>{{__('db.note')}}</label>
                 <textarea rows="3" name="note" class="form-control"></textarea>
             </div>
             <div class="form-group">
@@ -199,13 +206,13 @@
             <div class="container mt-3 pb-3">
                 <div class="row border-bottom pb-2">
                     <div class="col-md-3">
-                        <button id="print-btn" type="button" class="btn btn-default btn-sm d-print-none"><i class="dripicons-print"></i> {{__('db.Print')}}</button>
+                        <button id="print-btn" type="button" class="btn btn-default btn-sm d-print-none"><i class="ti ti-printer"></i> {{__('db.print')}}</button>
                     </div>
                     <div class="col-md-6">
-                        <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">{{$general_setting->site_title}}</h3>
+                        <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">{{gen_setting()->site_title}}</h3>
                     </div>
                     <div class="col-md-3">
-                        <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close d-print-none"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                        <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close d-print-none"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                     </div>
                     <div class="col-md-12 text-center">
                         <i style="font-size: 15px;">{{__('db.Stock Count')}}</i>
@@ -237,6 +244,7 @@
 
 @endsection
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $("ul#product").siblings('a').attr('aria-expanded','true');
@@ -264,7 +272,7 @@
             htmltext += '<br><strong>{{__("db.category")}}: </strong>'+stock_count[4];
         if(stock_count[5])
             htmltext += '<br><strong>{{__("db.Brand")}}: </strong>'+stock_count[5];
-        htmltext += '<br><span class="d-print-none mt-1"><strong>{{__("db.Files")}}: </strong>&nbsp;&nbsp;<a href="'+stock_count[6]+'" class="btn btn-sm btn-primary"><i class="dripicons-download"></i> {{__("db.Initial File")}}</a>&nbsp;&nbsp;<a href="'+stock_count[7]+'" class="btn btn-sm btn-info"><i class="dripicons-download"></i> {{__("db.Final File")}}</a></span>';
+        htmltext += '<br><span class="d-print-none mt-1"><strong>{{__("db.Files")}}: </strong>&nbsp;&nbsp;<a href="'+stock_count[6]+'" class="btn btn-sm btn-primary"><i class="ti ti-download"></i> {{__("db.Initial File")}}</a>&nbsp;&nbsp;<a href="'+stock_count[7]+'" class="btn btn-sm btn-info"><i class="ti ti-download"></i> {{__("db.Final File")}}</a></span>';
         $.get('stock-count/stockdif/' + stock_count[8], function(data){
             $(".stockdif-list tbody").remove();
             var name_code = data[0];
@@ -280,16 +288,16 @@
                     var cols = '';
                     cols += '<td><strong>' + (index+1) + '</strong></td>';
                     cols += '<td>' + name_code[index] + '</td>';
-                    cols += '<td>' + parseFloat(expected[index]).toFixed({{$general_setting->decimal}}) + '</td>';
-                    cols += '<td>' + parseFloat(counted[index]).toFixed({{$general_setting->decimal}}) + '</td>';
-                    cols += '<td>' + parseFloat(dif[index]).toFixed({{$general_setting->decimal}}) + '</td>';
-                    cols += '<td>' + parseFloat(cost[index]).toFixed({{$general_setting->decimal}}) + '</td>';
+                    cols += '<td>' + parseFloat(expected[index]).toFixed({{gen_setting()->decimal}}) + '</td>';
+                    cols += '<td>' + parseFloat(counted[index]).toFixed({{gen_setting()->decimal}}) + '</td>';
+                    cols += '<td>' + parseFloat(dif[index]).toFixed({{gen_setting()->decimal}}) + '</td>';
+                    cols += '<td>' + parseFloat(cost[index]).toFixed({{gen_setting()->decimal}}) + '</td>';
                     newRow.append(cols);
                     newBody.append(newRow);
                 });
 
                 if( !parseInt(data[5]) ) {
-                    htmlFooter = '<a class="btn btn-primary d-print-none" href="stock-count/'+stock_count[8]+'/qty_adjustment"><i class="dripicons-plus"></i> {{__("db.Add Adjustment")}}</a>';
+                    htmlFooter = '<a class="btn btn-primary d-print-none" href="stock-count/'+stock_count[8]+'/qty_adjustment"><i class="ti ti-plus"></i> {{__("db.Add Adjustment")}}</a>';
                     $('#stock-count-footer').html(htmlFooter);
                 }
             }
@@ -320,7 +328,7 @@
           var divToPrint=document.getElementById('stock-count-details');
           var newWin=window.open('','Print-Window');
           newWin.document.open();
-          newWin.document.write('<link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css"><style type="text/css">@media print {.modal-dialog { max-width: 1000px;} }</style><body onload="window.print()">'+divToPrint.innerHTML+'</body>');
+          newWin.document.write('<link rel="stylesheet" href="{{ asset($asset_prefix . 'vendor/bootstrap/css/bootstrap.min.css') }}" type="text/css"><style type="text/css">@media print {.modal-dialog { max-width: 1000px;} }</style><body onload="window.print()">'+divToPrint.innerHTML+'</body>');
           newWin.document.close();
           setTimeout(function(){newWin.close();},10);
     });
@@ -332,8 +340,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -362,7 +370,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -370,7 +378,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -378,7 +386,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -386,7 +394,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -394,7 +402,7 @@
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],

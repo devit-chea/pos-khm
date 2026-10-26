@@ -1,31 +1,38 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 
 @section('content')
+@php
+    $tr = fn ($key, $fallback) => __($key) === $key ? $fallback : __($key);
+@endphp
 <div class="container-fluid">
 
     <x-success-message key="message" />
     <x-error-message key="not_permitted" />
 
     <button id="full-page-print-btn" type="button" class="btn btn-default btn-sm">
-        <i class="dripicons-print"></i> {{__('db.Print')}}
+        <i class="ti ti-printer"></i> {{__('db.print')}}
     </button>
     <div class="card mt-5" id="supplier-info">
         <div class="card-header d-flex justify-content-between align-items-start">
             <!-- Left side: Name, Company, Phone -->
             <div>
-                <span><h4 class="mb-1">{{ $lims_supplier_data->name ?? '-' }}</h4>Supplier</span>
-                <p class="mb-0"><strong>Company:</strong> {{ $lims_supplier_data->company_name ?? '-' }}</p>
-                <p class="mb-0"><strong>Phone:</strong> {{ $lims_supplier_data->phone_number ?? '-' }}</p>
+                <span><h4 class="mb-1">{{ $lims_supplier_data->name ?? '-' }}</h4>{{ __('db.Supplier') }}</span>
+                <p class="mb-0"><strong>{{ $tr('db.Company', 'Company') }}:</strong> {{ $lims_supplier_data->company_name ?? '-' }}</p>
+                <p class="mb-0"><strong>{{ $tr('db.Phone Number', 'Phone') }}:</strong> {{ $lims_supplier_data->phone_number ?? '-' }}</p>
             </div>
 
             <!-- Right side: Address, city & country -->
             <div class="text-end">
                 <p class="mb-0">
-                    <strong>Address:</strong> {{ $lims_supplier_data->address ?? '-' }}<br>
-                    <strong>City:</strong> {{ $lims_supplier_data->city ?? '-' }}<br>
-                    <strong>Country:</strong> {{ $lims_supplier_data->country ?? '-' }}
+                    <strong>{{ $tr('db.Address', 'Address') }}:</strong> {{ $lims_supplier_data->address ?? '-' }}<br>
+                    <strong>{{ $tr('db.City', 'City') }}:</strong> {{ $lims_supplier_data->city ?? '-' }}<br>
+                    <strong>{{ $tr('db.Country', 'Country') }}:</strong> {{ $lims_supplier_data->country ?? '-' }}
                     @if($lims_supplier_data->map_link)
-                        <br><strong>{{__('db.Map')}}:</strong> <a href="{{ $lims_supplier_data->map_link }}" target="_blank" rel="noopener noreferrer"><i class="dripicons-location"></i> {{__('db.Open in Google Maps')}}</a>
+                        <br><strong>{{ $tr('db.Map', 'Map') }}:</strong> <a href="{{ $lims_supplier_data->map_link }}" target="_blank" rel="noopener noreferrer"><i class="dripicons-location"></i> {{ $tr('db.Open in Google Maps', 'Open in Google Maps') }}</a>
                     @endif
                 </p>
             </div>
@@ -35,7 +42,7 @@
     <ul class="nav nav-tabs" id="lpp-tabs" role="tablist">
         <li class="nav-item">
             <a class="nav-link active" href="#ledger-latest" role="tab" data-toggle="tab">
-                Ledger
+                {{ $tr('db.Ledger', 'Ledger') }}
             </a>
         </li>
         <li class="nav-item">
@@ -48,33 +55,43 @@
                 {{ __('db.Payment') }}
             </a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#purchase-return-latest" role="tab" data-toggle="tab">
+                {{ $tr('db.Purchase Return', 'Purchase Return') }}
+            </a>
+        </li>
     </ul>
 
     <div id="ledger-summery"
      class="d-flex mt-3 text-center d-none gap-2" style="gap: 0.75rem;">
 
         <div class="flex-fill p-2 border rounded bg-light">
-            <strong>Opening Balance</strong><br>
+            <strong>{{ $tr('db.Opening Balance', 'Opening Balance') }}</strong><br>
             <h5>{{ number_format($opening_balance, 2) }}</h5>
         </div>
 
         <div class="flex-fill p-2 border rounded bg-light">
-            <strong>Total Purchase</strong><br>
+            <strong>{{ $tr('db.Gross Purchase', 'Gross Purchase') }}</strong><br>
             <h5>{{ number_format($total_purchase, 2) }}</h5>
         </div>
 
         <div class="flex-fill p-2 border rounded bg-light">
-            <strong>Total Paid</strong><br>
-            <h5>{{ number_format($total_paid, 2) }}</h5>
-        </div>
-
-        <div class="flex-fill p-2 border rounded bg-light">
-            <strong>Total Returns</strong><br>
+            <strong>{{ $tr('db.Total Returns', 'Total Returns') }}</strong><br>
             <h5>{{ number_format($total_returns, 2) }}</h5>
         </div>
 
         <div class="flex-fill p-2 border rounded bg-light">
-            <strong>Balance Due</strong><br>
+            <strong>{{ $tr('db.Net Purchase', 'Net Purchase') }}</strong><br>
+            <h5>{{ number_format($net_purchase, 2) }}</h5>
+        </div>
+
+        <div class="flex-fill p-2 border rounded bg-light">
+            <strong>{{ $tr('db.Total Paid', 'Total Paid') }}</strong><br>
+            <h5>{{ number_format($total_paid, 2) }}</h5>
+        </div>
+
+        <div class="flex-fill p-2 border rounded bg-light">
+            <strong>{{ $tr('db.Balance Due', 'Balance Due') }}</strong><br>
             <h5 class="text-danger">{{ number_format($balance_due, 2) }}</h5>
         </div>
 
@@ -88,11 +105,11 @@
                     <thead>
                         <tr>
                             <th>{{ __('db.date') }}</th>
-                            <th>Type</th>
+                            <th>{{ $tr('db.Type', 'Type') }}</th>
                             <th>{{ __('db.reference') }}</th>
-                            <th>Debit</th>
-                            <th>Credit</th>
-                            <th>Balance</th>
+                            <th>{{ $tr('db.Debit', 'Debit') }}</th>
+                            <th>{{ $tr('db.Credit', 'Credit') }}</th>
+                            <th>{{ $tr('db.Balance', 'Balance') }}</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -136,6 +153,26 @@
                 </table>
             </div>
         </div>
+        <div role="tabpanel" class="tab-pane fade" id="purchase-return-latest">
+            <div class="table-responsive">
+                <table id="recent-purchase-return" class="table w-100">
+                    <thead>
+                        <tr>
+                            <th>{{ __('db.date') }}</th>
+                            <th>{{ __('db.reference') }}</th>
+                            <th>{{ $tr('db.Purchase Reference', 'Purchase Reference') }}</th>
+                            <th>{{ __('db.Warehouse') }}</th>
+                            <th>{{ $tr('db.Items', 'Items') }}</th>
+                            <th>{{ $tr('db.Quantity', 'Quantity') }}</th>
+                            <th>{{ __('db.grand total') }}</th>
+                            <th>{{ $tr('db.Return Note', 'Return Note') }}</th>
+                            <th>{{ $tr('db.Staff Note', 'Staff Note') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <div id="purchase-details" class="modal fade text-left" tabindex="-1" aria-hidden="true">
@@ -145,16 +182,16 @@
                     <div class="row">
                         <div class="col-md-6 d-print-none">
                             <button id="print-btn" type="button" class="btn btn-default btn-sm">
-                                <i class="dripicons-print"></i> {{__('db.Print')}}
+                                <i class="ti ti-printer"></i> {{__('db.print')}}
                             </button>
                         </div>
                         <div class="col-md-6 d-print-none">
                             <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                                <span aria-hidden="true"><i class="ti ti-x"></i></span>
                             </button>
                         </div>
                         <div class="col-md-12 text-center">
-                            <h3 class="modal-title">{{$general_setting->site_title}}</h3>
+                            <h3 class="modal-title">{{gen_setting()->site_title}}</h3>
                             <i style="font-size: 15px;">{{__('db.Purchase Details')}}</i>
                         </div>
                     </div>
@@ -188,8 +225,17 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script>
     $(document).ready(function () {
+        const exportTitles = {
+            ledger: @json($tr('db.Supplier Ledger', 'Supplier Ledger')),
+            purchases: @json($tr('db.Supplier Purchases', 'Supplier Purchases')),
+            payments: @json($tr('db.Supplier Payments', 'Supplier Payments')),
+            returns: @json($tr('db.Supplier Purchase Returns', 'Supplier Purchase Returns')),
+            print: @json($tr('db.Supplier Details', 'Supplier Details'))
+        };
+
         // SUPPLIER LEDGER
         $('#recent-ledger').DataTable({
             ajax: "{{ route('suppliers.ledger', $lims_supplier_data->id) }}",
@@ -207,9 +253,9 @@
             buttons: [
                 {
                     extend: "pdfHtml5",
-                    text: '<i class="fa fa-file-pdf-o"></i>',
+                    text: '<i class="ti ti-file-type-pdf"></i>',
                     className: 'btn btn-sm btn-danger me-1',
-                    title: 'Supplier Ledger',
+                    title: exportTitles.ledger,
                     footer: true,
                     exportOptions: {
                         columns: ':visible:not(.not-exported)'
@@ -222,7 +268,7 @@
                 },
                 {
                     extend: "csvHtml5",
-                    text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                     className: 'btn btn-sm btn-primary',
                     footer: true,
                     exportOptions: {
@@ -250,10 +296,10 @@
                         return `
                             <a href="javascript:void(0)" class="btn btn-sm btn-info view-purchase"
                             data-id="${data}" title="View">
-                                <i class="dripicons-preview"></i>
+                                <i class="ti ti-eye"></i>
                             </a>
-                            <a href="/purchases/${data}/edit" class="btn btn-sm btn-warning" title="Edit">
-                                <i class="dripicons-document-edit"></i>
+                            <a href="{{ url('purchases') }}/${data}/edit" class="btn btn-sm btn-warning" title="Edit">
+                                <i class="ti ti-edit"></i>
                             </a>
                         `;
                     },
@@ -268,9 +314,9 @@
             buttons: [
                 {
                     extend: "pdfHtml5",
-                    text: '<i class="fa fa-file-pdf-o"></i>',
+                    text: '<i class="ti ti-file-type-pdf"></i>',
                     className: 'btn btn-sm btn-danger me-1',
-                    title: 'Supplier Purchases',
+                    title: exportTitles.purchases,
                     footer: true,
                     exportOptions: {
                         columns: ':visible:not(.not-exported)'
@@ -283,7 +329,7 @@
                 },
                 {
                     extend: "csvHtml5",
-                    text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                     className: 'btn btn-sm btn-primary',
                     footer: true,
                     exportOptions: {
@@ -310,9 +356,9 @@
             buttons: [
                 {
                     extend: "pdfHtml5",
-                    text: '<i class="fa fa-file-pdf-o"></i>',
+                    text: '<i class="ti ti-file-type-pdf"></i>',
                     className: 'btn btn-sm btn-danger me-1',
-                    title: 'Supplier Payment',
+                    title: exportTitles.payments,
                     footer: true,
                     exportOptions: {
                         columns: ':visible:not(.not-exported)'
@@ -325,7 +371,7 @@
                 },
                 {
                     extend: "csvHtml5",
-                    text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                     className: 'btn btn-sm btn-primary',
                     footer: true,
                     exportOptions: {
@@ -333,6 +379,47 @@
                         rows: ':visible'
                     }
                 },
+            ]
+        });
+
+        $('#recent-purchase-return').DataTable({
+            ajax: "{{ route('suppliers.returns', $lims_supplier_data->id) }}",
+            columns: [
+                { data: 'date' },
+                { data: 'reference' },
+                { data: 'purchase_reference' },
+                { data: 'warehouse' },
+                { data: 'item' },
+                { data: 'total_qty' },
+                { data: 'grand_total' },
+                { data: 'return_note' },
+                { data: 'staff_note' }
+            ],
+            order: [[0, 'desc']],
+            autoWidth: false,
+            responsive: true,
+            dom: '<"row"lfB>rtip',
+            buttons: [
+                {
+                    extend: "pdfHtml5",
+                    text: '<i class="ti ti-file-type-pdf"></i>',
+                    className: 'btn btn-sm btn-danger me-1',
+                    title: exportTitles.returns,
+                    footer: true,
+                    exportOptions: {
+                        columns: ':visible:not(.not-exported)'
+                    }
+                },
+                {
+                    extend: "csvHtml5",
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
+                    className: 'btn btn-sm btn-primary',
+                    footer: true,
+                    exportOptions: {
+                        columns: ':visible:not(.not-exported)',
+                        rows: ':visible'
+                    }
+                }
             ]
         });
 
@@ -366,7 +453,7 @@
 
             var printWindow = window.open('', '', 'height=900,width=1400');
 
-            printWindow.document.write('<html><head><title>Supplier Ledger</title>');
+            printWindow.document.write('<html><head><title>' + exportTitles.print + '</title>');
 
             printWindow.document.write(`
                 <style>
@@ -531,7 +618,7 @@
         });
 
         $('#purchase-content').html(htmltext);
-        $('#purchase-footer').html(`<p>{{__("db.Note")}}: ${noteText}</p>`);
+        $('#purchase-footer').html(`<p>{{__("db.note")}}: ${noteText}</p>`);
         $('#purchase-details').modal('show');
     }
 

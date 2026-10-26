@@ -20,6 +20,7 @@ use App\Models\ProductVariant;
 use App\Models\Sale;
 use App\Models\Tax;
 use App\Models\Unit;
+use App\Services\AccountingService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -28,7 +29,15 @@ use Spatie\Permission\Models\Role;
 
 class ExchangeController extends Controller
 {
+    protected $exchangeDomainService;
+
+    public function __construct(?\App\Services\Domain\ExchangeDomainService $exchangeDomainService = null)
+    {
+        $this->exchangeDomainService = $exchangeDomainService ?? app(\App\Services\Domain\ExchangeDomainService::class);
+    }
+
     public function index(Request $request)
+
     {
         $role = Role::find(Auth::user()->role_id);
 
@@ -52,7 +61,7 @@ class ExchangeController extends Controller
             }
 
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
-            $general_setting = GeneralSetting::latest()->first();
+            $general_setting = cache()->get('general_setting');
 
             return view('backend.sale-exchange.index', compact(
                 'starting_date',
@@ -78,22 +87,23 @@ class ExchangeController extends Controller
         $query = SaleExchange::query();
 
         if (Auth::user()->role_id > 2 && config('staff_access') == 'own') {
-            $query->where('user_id', Auth::id());
+            $query->where('sale_exchanges.user_id', Auth::id());
         } elseif (Auth::user()->role_id > 2 && config('staff_access') == 'warehouse') {
-            $query->where('warehouse_id', Auth::user()->warehouse_id);
+            $query->where('sale_exchanges.warehouse_id', Auth::user()->warehouse_id);
         } elseif ($warehouse_id != 0) {
-            $query->where('warehouse_id', $warehouse_id);
+            $query->where('sale_exchanges.warehouse_id', $warehouse_id);
         }
 
-        $query->whereDate('created_at', '>=', $request->input('starting_date'))
-            ->whereDate('created_at', '<=', $request->input('ending_date'));
+        $query->whereDate('sale_exchanges.created_at', '>=', $request->input('starting_date'))
+            ->whereDate('sale_exchanges.created_at', '<=', $request->input('ending_date'));
 
         $totalData = $query->count();
         $totalFiltered = $totalData;
 
         $limit = $request->input('length') != -1 ? $request->input('length') : $totalData;
         $start = $request->input('start');
-        $order = 'sale_exchanges.' . $columns[$request->input('order.0.column')];
+        $colIndex = $request->input('order.0.column', 1);
+        $order = 'sale_exchanges.' . ($columns[$colIndex] ?? 'created_at');
         $dir = $request->input('order.0.dir');
 
         if (!empty($request->input('search.value'))) {
@@ -194,19 +204,19 @@ class ExchangeController extends Controller
             </button>
             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                 <li>
-                    <button type="button" class="btn btn-link view"><i class="fa fa-eye"></i> ' . __('db.View') . '</button>
+                    <button type="button" class="btn btn-link view"><i class="ti ti-eye"></i> ' . __('db.View') . '</button>
                 </li>';
 
         if (in_array("exchanges-edit", $permissions)) {
             $html .= '<li>
-                <a href="' . route('exchange.edit', $exchange->id) . '" class="btn btn-link"><i class="dripicons-document-edit"></i> ' . __('db.edit') . '</a>
+                <a href="' . route('exchange.edit', $exchange->id) . '" class="btn btn-link"><i class="ti ti-edit"></i> ' . __('db.edit') . '</a>
             </li>';
         }
 
         if (in_array("exchanges-delete", $permissions)) {
             $html .= '<form action="' . route("exchange.destroy", $exchange->id) . '" method="POST" class="delete-form">' . csrf_field() . method_field("DELETE") . '
                 <li>
-                  <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> ' . __("db.delete") . '</button>
+                  <button type="submit" class="btn btn-link" data-confirm-message="' . __('db.Are you sure want to delete?') . '"><i class="ti ti-trash"></i> ' . __("db.delete") . '</button>
                 </li></form>';
         }
 
@@ -267,6 +277,12 @@ class ExchangeController extends Controller
 
     public function create(Request $request)
     {
+        try {
+            app(\App\Services\ZatcaIntegrationService::class)->assertExchangeAvailable();
+        } catch (\App\Exceptions\ZatcaPhase2WorkflowUnavailable $exception) {
+            return redirect('exchange')->with('not_permitted', $exception->getMessage());
+        }
+
         // Get logged-in user's role
         $role = Role::find(Auth::user()->role_id);
 
@@ -334,22 +350,17 @@ class ExchangeController extends Controller
 
     public function store(Request $request)
     {
-        DB::beginTransaction();
+        try {
+            app(\App\Services\ZatcaIntegrationService::class)->assertExchangeAvailable();
+        } catch (\App\Exceptions\ZatcaPhase2WorkflowUnavailable $exception) {
+            return redirect()->back()->with('not_permitted', $exception->getMessage());
+        }
+
         try {
             $data = $request->except('document', 'total_sale_discount', 'type');
-            $data['reference_no'] = 'exc-' . date("Ymd") . '-' . date("his");
             $data['total_discount'] = $request->total_sale_discount ?? 0;
-            $data['user_id'] = Auth::id();
-
-            $lims_sale_data = null;
-
-            if (!empty($data['sale_id']) && is_numeric($data['sale_id'])) {
-                $lims_sale_data = Sale::whereNull('deleted_at')
-                    ->select('id', 'warehouse_id', 'customer_id', 'biller_id')
-                    ->find($data['sale_id']);
-            }
-
-            $data['sale_id'] = $lims_sale_data ? $lims_sale_data->id : 0;
+            $data['type'] = $request->type ?? [];
+            $data['is_exchange'] = $request->is_exchange ?? [];
 
             $validator = Validator::make($data, [
                 'customer_id' => 'required|exists:customers,id',
@@ -359,7 +370,6 @@ class ExchangeController extends Controller
             ]);
 
             if ($validator->fails()) {
-                DB::rollBack();
                 return redirect()->back()->withErrors($validator)->withInput();
             }
 
@@ -370,7 +380,6 @@ class ExchangeController extends Controller
                     ['extension' => 'in:jpg,jpeg,png,gif,pdf,csv,docx,xlsx,txt']
                 );
                 if ($v->fails()) {
-                    DB::rollBack();
                     return redirect()->back()->withErrors($v->errors());
                 }
                 $ext = pathinfo($document->getClientOriginalName(), PATHINFO_EXTENSION);
@@ -386,82 +395,14 @@ class ExchangeController extends Controller
                 $data['document'] = $documentName;
             }
 
-            $lims_exchange_data = SaleExchange::create($data);
+            $lims_exchange_data = $this->exchangeDomainService->createExchange($data, Auth::user());
 
-            $type_array = $request->type ?? [];
-            $product_id = $data['product_id'] ?? [];
-            $product_batch_id = $data['product_batch_id'] ?? [];
-            $imei_number = $data['imei_number'] ?? [];
-            $product_code = $data['product_code'] ?? [];
-            $qty = $data['qty'] ?? [];
-            $sale_unit = $data['sale_unit'] ?? [];
-            $net_unit_price = $data['net_unit_price'] ?? [];
-            $discount = $data['discount'] ?? [];
-            $tax_rate = $data['tax_rate'] ?? [];
-            $tax = $data['tax'] ?? [];
-            $total = $data['subtotal'] ?? [];
-            $product_sale_id = $data['product_sale_id'] ?? [];
-            $is_exchange = $request->is_exchange ?? [];
+            $newCount = $lims_exchange_data->products()->where('type', 'new')->count();
+            $returnedCount = $lims_exchange_data->products()->where('type', 'returned')->count();
 
-            $new_products_count = 0;
-            $returned_products_count = 0;
-
-            foreach ($product_id as $index => $id) {
-                $product_type = $type_array[$index] ?? 'new';
-
-                if ($product_type === 'return') {
-                    $product_code_value = $product_code[$index] ?? null;
-                    $should_return = $product_code_value && in_array($product_code_value, $is_exchange);
-
-                    if ($should_return) {
-                        $original_sale_id = $product_sale_id[$index] ?? null;
-                        $original_product_sale = $original_sale_id ? Product_Sale::find($original_sale_id) : null;
-
-                        $this->processReturnProduct(
-                            $id,
-                            $index,
-                            $lims_exchange_data->id,
-                            $data['warehouse_id'],
-                            $qty,
-                            $sale_unit,
-                            $net_unit_price,
-                            $discount,
-                            $tax_rate,
-                            $tax,
-                            $total,
-                            $product_code,
-                            $product_batch_id,
-                            $imei_number,
-                            $original_product_sale
-                        );
-                        $returned_products_count++;
-                    }
-                } elseif ($product_type === 'new') {
-                    $this->processNewProduct(
-                        $id,
-                        $index,
-                        $lims_exchange_data->id,
-                        $data['warehouse_id'],
-                        $qty,
-                        $sale_unit,
-                        $net_unit_price,
-                        $discount,
-                        $tax_rate,
-                        $tax,
-                        $total,
-                        $product_code,
-                        $product_batch_id,
-                        $imei_number
-                    );
-                    $new_products_count++;
-                }
-            }
-
-            DB::commit();
-            $message = "Exchange created successfully with {$new_products_count} new product(s) and {$returned_products_count} returned product(s)";
+            $message = "Exchange created successfully with {$newCount} new product(s) and {$returnedCount} returned product(s)";
             return redirect('exchange')->with('message', $message);
         } catch (\Throwable $e) {
-            DB::rollBack();
             Log::error('Exchange Store Error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
                 'data' => $request->all()
@@ -469,6 +410,7 @@ class ExchangeController extends Controller
             return redirect()->back()->with('not_permitted', 'Something went wrong: ' . $e->getMessage());
         }
     }
+
 
     private function sanitizeDecimal($value, $decimals = null): float
     {
@@ -524,12 +466,14 @@ class ExchangeController extends Controller
             }
         }
 
-        $lims_product_data->qty -= $quantity;
-        $lims_product_data->save();
-
         $lims_product_warehouse_data = null;
 
-        if ($lims_product_data->is_variant) {
+        if ($lims_product_data->type == 'combo') {
+            $this->moveComboComponents($lims_product_data, $warehouse_id, $quantity, -1);
+        } elseif ($lims_product_data->is_variant) {
+            $lims_product_data->qty -= $quantity;
+            $lims_product_data->save();
+
             $lims_product_variant_data = ProductVariant::select('id', 'variant_id', 'qty')
                 ->FindExactProductWithCode($product_id, $product_code[$index] ?? '')
                 ->first();
@@ -544,6 +488,9 @@ class ExchangeController extends Controller
                 )->first();
             }
         } elseif (!empty($product_batch_id[$index])) {
+            $lims_product_data->qty -= $quantity;
+            $lims_product_data->save();
+
             $lims_product_batch_data = ProductBatch::find($product_batch_id[$index]);
             if ($lims_product_batch_data) {
                 $lims_product_batch_data->qty -= $quantity;
@@ -554,6 +501,9 @@ class ExchangeController extends Controller
                 ['warehouse_id', $warehouse_id]
             ])->first();
         } else {
+            $lims_product_data->qty -= $quantity;
+            $lims_product_data->save();
+
             $lims_product_warehouse_data = Product_Warehouse::FindProductWithoutVariant(
                 $product_id,
                 $warehouse_id
@@ -561,6 +511,10 @@ class ExchangeController extends Controller
         }
 
         if ($lims_product_warehouse_data) {
+            if (gen_setting()->without_stock == 'no' && $lims_product_data->type != 'service' && $lims_product_warehouse_data->qty < $quantity) {
+                throw new \Exception(__('db.quantity_exceeds_available_stock'));
+            }
+
             $lims_product_warehouse_data->qty -= $quantity;
 
             if (!empty($imei_number[$index]) && !str_contains($imei_number[$index], "null")) {
@@ -574,6 +528,8 @@ class ExchangeController extends Controller
                 $lims_product_warehouse_data->imei_number = implode(",", array_filter($all_imei_numbers));
             }
             $lims_product_warehouse_data->save();
+        } elseif (gen_setting()->without_stock == 'no' && $lims_product_data->type != 'service' && $lims_product_data->type != 'combo') {
+            throw new \Exception(__('db.quantity_exceeds_available_stock'));
         }
 
         $netUnitPrice = $this->sanitizeDecimal($net_unit_price[$index] ?? 0);
@@ -634,15 +590,20 @@ class ExchangeController extends Controller
             }
         }
 
-        $lims_product_data->qty += $quantity;
-        $lims_product_data->save();
-
         $lims_product_warehouse_data = null;
         $variant_id = $original_product_sale->variant_id ?? null;
         $batch_id = $product_batch_id[$index] ?? ($original_product_sale->product_batch_id ?? null);
 
-        if ($lims_product_data->is_variant && $variant_id) {
-            $lims_product_variant_data = ProductVariant::find($variant_id);
+        if ($lims_product_data->type == 'combo') {
+            $this->moveComboComponents($lims_product_data, $warehouse_id, $quantity, 1);
+        } elseif ($lims_product_data->is_variant && $variant_id) {
+            $lims_product_data->qty += $quantity;
+            $lims_product_data->save();
+
+            $lims_product_variant_data = ProductVariant::where([
+                ['product_id', $product_id],
+                ['variant_id', $variant_id],
+            ])->first();
             if ($lims_product_variant_data) {
                 $lims_product_variant_data->qty += $quantity;
                 $lims_product_variant_data->save();
@@ -653,6 +614,9 @@ class ExchangeController extends Controller
                 $warehouse_id
             )->first();
         } elseif ($batch_id) {
+            $lims_product_data->qty += $quantity;
+            $lims_product_data->save();
+
             $lims_product_batch_data = ProductBatch::find($batch_id);
             if ($lims_product_batch_data) {
                 $lims_product_batch_data->qty += $quantity;
@@ -663,6 +627,9 @@ class ExchangeController extends Controller
                 ['warehouse_id', $warehouse_id]
             ])->first();
         } else {
+            $lims_product_data->qty += $quantity;
+            $lims_product_data->save();
+
             $lims_product_warehouse_data = Product_Warehouse::FindProductWithoutVariant(
                 $product_id,
                 $warehouse_id
@@ -702,6 +669,71 @@ class ExchangeController extends Controller
         ]);
     }
 
+    private function moveComboComponents(Product $comboProduct, int $warehouseId, float $comboQty, int $direction): void
+    {
+        $productList = explode(',', $comboProduct->product_list ?? '');
+        $variantList = $comboProduct->variant_list ? explode(',', $comboProduct->variant_list) : [];
+        $qtyList = explode(',', $comboProduct->qty_list ?? '');
+        $comboUnitIds = $comboProduct->combo_unit_id ? explode(',', $comboProduct->combo_unit_id) : [];
+
+        foreach ($productList as $index => $childId) {
+            if (!$childId) {
+                continue;
+            }
+
+            $child = Product::find($childId);
+            if (!$child) {
+                continue;
+            }
+
+            $required = (float) ($qtyList[$index] ?? 1);
+            if (isset($comboUnitIds[$index]) && $comboUnitIds[$index] && $comboUnitIds[$index] != $child->unit_id) {
+                $unit = Unit::find($comboUnitIds[$index]);
+                if ($unit) {
+                    if ($unit->operator == '*') {
+                        $required *= $unit->operation_value;
+                    } elseif ($unit->operator == '/') {
+                        $required /= $unit->operation_value;
+                    }
+                }
+            }
+
+            $componentQty = $comboQty * $required * $direction;
+            $variantId = $variantList[$index] ?? null;
+
+            if ($variantId) {
+                $childVariant = ProductVariant::where([
+                    ['product_id', $childId],
+                    ['variant_id', $variantId],
+                ])->first();
+
+                if ($childVariant) {
+                    $childVariant->qty += $componentQty;
+                    $childVariant->save();
+                }
+
+                $warehouseStock = Product_Warehouse::where([
+                    ['product_id', $childId],
+                    ['variant_id', $variantId],
+                    ['warehouse_id', $warehouseId],
+                ])->first();
+            } else {
+                $warehouseStock = Product_Warehouse::where([
+                    ['product_id', $childId],
+                    ['warehouse_id', $warehouseId],
+                ])->first();
+            }
+
+            $child->qty += $componentQty;
+            $child->save();
+
+            if ($warehouseStock) {
+                $warehouseStock->qty += $componentQty;
+                $warehouseStock->save();
+            }
+        }
+    }
+
     public function searchByReference(Request $request)
     {
         $role = Role::find(Auth::user()->role_id);
@@ -709,7 +741,7 @@ class ExchangeController extends Controller
         if (!$role->hasPermissionTo('exchange-add')) {
             return response()->json([
                 'status' => false,
-                'message' => __('db.Sorry! You are not allowed')
+                'message' => __('db.action_not_permitted')
             ]);
         }
 
@@ -724,7 +756,7 @@ class ExchangeController extends Controller
             }
 
             $lims_product_sale_data = Product_Sale::where('sale_id', $lims_sale_data->id)->get();
-            $general_setting = GeneralSetting::latest()->first();
+            $general_setting = cache()->get('general_setting');
 
             $html = view(
                 'backend.sale-exchange.partials.sale-products',

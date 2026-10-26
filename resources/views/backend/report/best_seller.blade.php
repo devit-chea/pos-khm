@@ -1,3 +1,6 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 @extends('backend.layout.main') @section('content')
 <div class="container-fluid">
 	<div class="row">
@@ -17,19 +20,19 @@
             <div class="card mt-3">
                 <div class="card-body">
                     @php
-                        if($general_setting->theme == 'default.css'){
+                        if(gen_setting()->theme == 'default.css'){
                             $color = '#733686';
                             $color_rgba = 'rgba(115, 54, 134, 0.8)';
                         }
-                        elseif($general_setting->theme == 'green.css'){
+                        elseif(gen_setting()->theme == 'green.css'){
                             $color = '#2ecc71';
                             $color_rgba = 'rgba(46, 204, 113, 0.8)';
                         }
-                        elseif($general_setting->theme == 'blue.css'){
+                        elseif(gen_setting()->theme == 'blue.css'){
                             $color = '#3498db';
                             $color_rgba = 'rgba(52, 152, 219, 0.8)';
                         }
-                        elseif($general_setting->theme == 'dark.css'){
+                        elseif(gen_setting()->theme == 'dark.css'){
                             $color = '#34495e';
                             $color_rgba = 'rgba(52, 73, 94, 0.8)';
                         }
@@ -43,12 +46,8 @@
 
 @endsection
 @push('scripts')
-    @if (!config('database.connections.saleprosaas_landlord'))
-    <script type="text/javascript" src="<?php echo asset('vendor/chart.js/Chart.min.js'); ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('js/charts-custom.js'); ?>"></script>
-    @else
-    <script type="text/javascript" src="<?php echo asset('../../vendor/chart.js/Chart.min.js'); ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('../../js/charts-custom.js'); ?>"></script>    
-    @endif
+
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/chart.js/Chart.min.js') }}"></script>
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'js/charts-custom.js') }}"></script>
 
 @endpush

@@ -6,9 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class Warehouse extends Model
 {
-    protected $fillable =[
+    use \App\Traits\WarehouseVisibilityScoped;
 
-        "name", "phone", "email", "address", "qr_code_id", "is_active"
+    protected $fillable = [
+        "name", "phone", "email", "address", "qr_code_id", "pos_type", "is_active"
     ];
 
     public function product()

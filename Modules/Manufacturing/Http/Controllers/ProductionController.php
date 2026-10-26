@@ -15,11 +15,13 @@ use Modules\Manufacturing\Entities\Production;
 use Modules\Manufacturing\Entities\ProductProduction;
 use App\Models\Tax;
 use App\Models\Account;
+use App\Services\PaymentAccountService;
 use App\Models\PosSetting;
 use Auth;
 use App\Traits\StaffAccess;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use App\Services\Domain\ProductionDomainService;
 
 class ProductionController extends Controller
 {
@@ -27,7 +29,6 @@ class ProductionController extends Controller
 
     public function index(Request $request)
     {
-        if (in_array('manufacturing', explode(',', config('addons')))) {
             if ($request->input('warehouse_id'))
                 $warehouse_id = $request->input('warehouse_id');
             else
@@ -48,16 +49,15 @@ class ProductionController extends Controller
 
             $lims_pos_setting_data = PosSetting::select('stripe_public_key')->latest()->first();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
-            $lims_account_list = Account::where('is_active', true)->get();
+            $lims_account_list = app(PaymentAccountService::class)->validOperationalAccounts();
             return view('manufacturing::production.index', compact('status', 'lims_account_list', 'lims_warehouse_list', 'lims_pos_setting_data', 'warehouse_id', 'starting_date', 'ending_date'));
-        } else
-            return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
+
     }
 
     public function productionData(Request $request)
     {
         $columns = array(
-            1 => 'created_at',
+            1 => 'id',
             2 => 'reference_no',
             4 => 'product_id',
             5 => 'warehouse_id',
@@ -143,7 +143,10 @@ class ProductionController extends Controller
                 $nestedData['reference_no'] = $production->reference_no;
                 if ($production->status == 1) {
                     $nestedData['status'] = '<div class="badge badge-success">' . __('db.Completed') . '</div>';
-                    $status = __('db.Recieved');
+                    $status = __('db.Completed');
+                } else {
+                    $nestedData['status'] = '<div class="badge badge-warning">' . __('db.Pending') . '</div>';
+                    $status = __('db.Pending');
                 }
 
                 $nestedData['total_cost'] = number_format($production->total_cost, config('decimal'));
@@ -162,16 +165,22 @@ class ProductionController extends Controller
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                                 <li>
-                                    <button type="button" class="btn btn-link view"><i class="fa fa-eye"></i> ' . __('db.View') . '</button>
+                                    <button type="button" class="btn btn-link view"><i class="ti ti-eye"></i> ' . __('db.View') . '</button>
                                 </li>';
-
-                $nestedData['options'] .= '<form method="POST" action="' . route('manufacturing.productions.destroy', $production->id) . '">
+                                
+                if ($production->status == 0) {
+                    $nestedData['options'] .= '<li>
+                        <a href="' . route('manufacturing.productions.edit', $production->id) . '" class="btn btn-link"><i class="ti ti-edit"></i> ' . __('db.edit') . '</a>
+                    </li>
+                    <form method="POST" action="' . route('manufacturing.productions.destroy', $production->id) . '">
                         ' . csrf_field() . '
                         ' . method_field("DELETE") . '
                         <li>
-                            <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> ' . __("db.delete") . '</button>
-                        </li></form>
-                    </ul>
+                            <button type="submit" class="btn btn-link" data-confirm-message="' . __('db.Are you sure want to delete?') . '"><i class="ti ti-trash"></i> ' . __("db.delete") . '</button>
+                        </li></form>';
+                }
+
+                $nestedData['options'] .= '</ul>
                 </div>';
 
                 // data for production details by one click
@@ -184,7 +193,7 @@ class ProductionController extends Controller
                     ' "' . $production->warehouse->name . '"',
                     ' "' . $production->total_tax . '"',
                     ' "' . $production->total_cost . '"',
-                    ' "' . $production->shipping_cost . '"',
+                    ' "' . $production->production_cost . '"',
                     ' "' . $production->shipping_cost . '"',
                     ' "' . $production->grand_total . '"',
                     ' "' . preg_replace('/\s+/S', " ", $production->note) . '"',
@@ -207,7 +216,7 @@ class ProductionController extends Controller
 
     public function create()
     {
-        if (Auth::user()->role_id > 2) {
+        if (app(\App\Services\WarehouseAccessService::class)->isRestricted(Auth::user())) {
             $lims_warehouse_list = Warehouse::where([
                 ['is_active', true],
                 ['id', Auth::user()->warehouse_id]
@@ -226,7 +235,24 @@ class ProductionController extends Controller
         return view('manufacturing::production.create', compact('lims_product_list_with_variant', 'lims_product_list_without_variant', 'lims_warehouse_list', 'lims_product_list', 'lims_tax_list'));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ProductionDomainService $productions)
+    {
+        $this->assertAllowedWarehouse((int) $request->warehouse_id);
+        $data = $request->except('document');
+        $data['document'] = $this->saveProductionDocument($request);
+        try {
+            $productions->create($data, (int) Auth::id());
+        } catch (\Throwable $exception) {
+            if ($data['document']) {
+                @unlink(public_path('documents/production/' . $data['document']));
+            }
+            throw $exception;
+        }
+
+        return redirect('manufacturing/productions')->with('message', __('db.production_created_successfully'));
+    }
+
+    private function storeLegacy(Request $request)
     {
         try {
             DB::beginTransaction();
@@ -264,10 +290,11 @@ class ProductionController extends Controller
                 $data['created_at'] = date("Y-m-d H:i:s");
             $data['item'] = count($request->product_qty);
             $data['total_qty'] = $request->total_qty ?? 1;
+            $data['status'] = $request->status ?? 0;
             $data['product_list'] = implode(",", $data['product_list']);
             $data['qty_list'] = implode(",", $data['product_qty']);
             $data['price_list'] = implode(",", $data['unit_price']);
-            $data['wastage_percent'] = implode(",", $data['wastage_percent']);
+            $data['wastage_percent'] = implode(",", $data['wastage_percent'] ?? []);
             $data['production_units_ids'] = implode(",", $data['production_unit_ids']);
             $data['total_tax'] = 0;
             $lims_production_data = Production::create($data);
@@ -310,10 +337,17 @@ class ProductionController extends Controller
             foreach ($product_id as $index => $child_id) {
                 $lims_purchase_unit_data  = Unit::where('id', $purchase_unit[$index])->first();
                 $child_data = Product::find($child_id);
+                $wastage_percent = $request->wastage_percent[$index] ?? 0;
+
                 if ($lims_purchase_unit_data->operator == '*') {
                     $reduced_qty = $qty[$index] * $lims_purchase_unit_data->operation_value;
                 } else {
                     $reduced_qty = $qty[$index] / $lims_purchase_unit_data->operation_value;
+                }
+                
+                // apply wastage percent
+                if ($wastage_percent > 0) {
+                    $reduced_qty += ($reduced_qty * $wastage_percent / 100);
                 }
                 if (count($child_variant_list) && isset($child_variant_list[$index]) && $child_variant_list[$index]) {
                     $child_product_variant_data = ProductVariant::where([
@@ -344,11 +378,11 @@ class ProductionController extends Controller
                 $child_data->save();
             }
             DB::commit();
-            return redirect('manufacturing/productions')->with('message', __('db.Production created successfully'));
+            return redirect('manufacturing/productions')->with('message', __('db.production_created_successfully'));
         } catch (\Throwable $e) {
             DB::rollBack();
             dd($e);
-            return redirect('manufacturing/productions')->with('not_permitted', __('db.Something error please try again'));
+            return redirect('manufacturing/productions')->with('not_permitted', __('db.generic_error_please_try_again'));
         }
     }
 
@@ -486,7 +520,7 @@ class ProductionController extends Controller
             $product_production['total'] = $total[$i];
             ProductProduction::create($product_production);
         }
-        return redirect('manufacturing/productions')->with('message', __('db.Production created successfully'));
+        return redirect('manufacturing/productions')->with('message', __('db.production_created_successfully'));
     }
 
     public function productProductionData($id)
@@ -522,13 +556,11 @@ class ProductionController extends Controller
                 $unit = Unit::query()
                     ->where('id', $proudction_units_ids[$key])
                     ->first();
-                if ($unit->operator == '*') {
-                    $subtotal = $price_list[$key] * ($unit->operation_value * $qty_list[$key] ?? 1);
-                } elseif ($unit->operator == '/') {
-                    $subtotal = $price_list[$key] / $unit->operation_value;
-                } else {
-                    $subtotal = $price_list[$key] * 1;
-                }
+                $convertedQty = $unit->operator == '/'
+                    ? (float) ($qty_list[$key] ?? 0) / (float) $unit->operation_value
+                    : (float) ($qty_list[$key] ?? 0) * (float) $unit->operation_value;
+                $subtotal = $convertedQty * (1 + (float) ($wastage_percent[$key] ?? 0) / 100)
+                    * (float) ($price_list[$key] ?? 0);
 
                 $product_production[] = [
                     'id'                => $product->id,
@@ -591,26 +623,102 @@ class ProductionController extends Controller
      */
     public function edit($id)
     {
-        return view('manufacturing::edit');
+        $lims_production_data = Production::find($id);
+
+        if (!$lims_production_data) {
+            return redirect('manufacturing/productions')->with('not_permitted', __('db.production_not_found'));
+        }
+        $this->assertAllowedWarehouse((int) $lims_production_data->warehouse_id);
+
+        if ($lims_production_data->status == 1) {
+            return redirect('manufacturing/productions')->with('not_permitted', __('db.finalized_production_cannot_be_edited'));
+        }
+
+        $lims_warehouse_list = Warehouse::where('is_active', true)
+            ->when(app(\App\Services\WarehouseAccessService::class)->isRestricted(Auth::user()),
+                fn ($query) => $query->whereKey(Auth::user()->warehouse_id))->get();
+        $lims_product_list = Product::where('is_recipe', 1)->where('is_active', true)->get();
+        $lims_tax_list = Tax::where('is_active', true)->get();
+        $lims_product_list_without_variant = $this->productWithoutVariant();
+        $lims_product_list_with_variant = $this->productWithVariant();
+        
+        return view('manufacturing::production.edit', compact('lims_production_data', 'lims_warehouse_list', 'lims_product_list', 'lims_tax_list', 'lims_product_list_without_variant', 'lims_product_list_with_variant'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     * @param Request $request
-     * @param int $id
-     * @return Renderable
-     */
-    public function update(Request $request, $id)
+    public function update(Request $request, $id, ProductionDomainService $productions)
     {
-        //
+        try {
+            $production = Production::query()->findOrFail($id);
+            $this->assertAllowedWarehouse((int) $production->warehouse_id);
+            $this->assertAllowedWarehouse((int) $request->warehouse_id);
+            $data = $request->except('document');
+            $newDocument = $this->saveProductionDocument($request);
+            if ($newDocument) {
+                $data['document'] = $newDocument;
+            }
+            try {
+                $productions->update($production, $data);
+            } catch (\Throwable $exception) {
+                if ($newDocument) {
+                    @unlink(public_path('documents/production/' . $newDocument));
+                }
+                throw $exception;
+            }
+            if ($newDocument && $production->document) {
+                @unlink(public_path('documents/production/' . $production->document));
+            }
+            return redirect('manufacturing/productions')->with('message', 'Production Updated Successfully');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            return redirect()->back()->withErrors($exception->errors())->withInput();
+        } catch (\RuntimeException $exception) {
+            return redirect()->back()->with('not_permitted', $exception->getMessage());
+        } catch (\Throwable $exception) {
+            report($exception);
+            return redirect()->back()->with('not_permitted', __('db.generic_error_please_try_again'));
+        }
+    }
+    public function destroy($id, ProductionDomainService $productions)
+    {
+        try {
+            $production = Production::query()->findOrFail($id);
+            $this->assertAllowedWarehouse((int) $production->warehouse_id);
+            $productions->delete($production);
+            return redirect('manufacturing/productions')->with('message', __('db.production_deleted_successfully'));
+        } catch (\Throwable $e) {
+            return redirect('manufacturing/productions')->with('not_permitted', $e->getMessage());
+        }
     }
 
-    /**
-     * Remove the specified resource from storage.
-     * @param int $id
-     * @return Renderable
-     */
-    public function destroy($id)
+    private function assertAllowedWarehouse(int $warehouseId): void
+    {
+        $access = app(\App\Services\WarehouseAccessService::class);
+        if (in_array($access->classification(Auth::user()), [
+                \App\Services\WarehouseAccessService::PORTAL_IDENTITY,
+                \App\Services\WarehouseAccessService::INVALID_OPERATIONAL,
+            ], true)
+            || !Warehouse::withoutGlobalScope('authorized_warehouse')->whereKey($warehouseId)->where('is_active', true)->exists()) {
+            abort(403, 'Warehouse access denied.');
+        }
+        $access->authorizeWarehouse($warehouseId, Auth::user());
+    }
+
+    private function saveProductionDocument(Request $request): ?string
+    {
+        if (!$request->hasFile('document')) {
+            return null;
+        }
+        $request->validate(['document' => 'file|mimes:jpg,jpeg,png,gif,pdf,csv,docx,xlsx,txt']);
+        $file = $request->file('document');
+        $name = (string) \Illuminate\Support\Str::uuid() . '.' . $file->getClientOriginalExtension();
+        $directory = public_path('documents/production');
+        if (!is_dir($directory)) {
+            mkdir($directory, 0775, true);
+        }
+        $file->move($directory, $name);
+        return $name;
+    }
+
+    private function destroyLegacy($id)
     {
         try {
             DB::beginTransaction();
@@ -618,7 +726,11 @@ class ProductionController extends Controller
             $lims_production_data = Production::find($id);
 
             if (!$lims_production_data) {
-                return redirect('manufacturing/productions')->with('not_permitted', __('db.Production not found'));
+                return redirect('manufacturing/productions')->with('not_permitted', __('db.production_not_found'));
+            }
+
+            if ($lims_production_data->status == 1) {
+                return redirect('manufacturing/productions')->with('not_permitted', __('db.finalized_production_cannot_be_deleted'));
             }
 
             // Get production data
@@ -628,11 +740,6 @@ class ProductionController extends Controller
 
             // FIRST: Deduct finished product stock (reverse of adding)
             $finished_product = Product::find($lims_production_data->product_id);
-
-            if ($finished_product->qty < $lims_production_data->total_qty) {
-                DB::rollBack();
-                return redirect('manufacturing/productions')->with('not_permitted', __('db.Insufficient finished product stock to delete this production'));
-            }
 
             $finished_product->qty -= $lims_production_data->total_qty;
             $finished_product->save();
@@ -644,10 +751,6 @@ class ProductionController extends Controller
             ])->first();
 
             if ($lims_product_warehouse) {
-                if ($lims_product_warehouse->qty < $lims_production_data->total_qty) {
-                    DB::rollBack();
-                    return redirect('manufacturing/productions')->with('not_permitted', __('db.Insufficient warehouse stock to delete this production'));
-                }
                 $lims_product_warehouse->qty -= $lims_production_data->total_qty;
                 $lims_product_warehouse->save();
             }
@@ -666,12 +769,20 @@ class ProductionController extends Controller
                     continue;
                 }
 
+                $wastage_percent_list = explode(",", $lims_production_data->wastage_percent ?? "");
+                $wastage_percent = floatval($wastage_percent_list[$index] ?? 0);
+
                 // Calculate the quantity to add back
                 if ($lims_production_unit_data->operator == '*') {
                     $add_back_qty = $qty_list[$index] * $lims_production_unit_data->operation_value;
                 } else {
                     $add_back_qty = $qty_list[$index] / $lims_production_unit_data->operation_value;
                 }
+
+                if ($wastage_percent > 0) {
+                    $add_back_qty += ($add_back_qty * $wastage_percent / 100);
+                }
+
 
                 // Handle variant stock
                 if (count($child_variant_list) && isset($child_variant_list[$index]) && $child_variant_list[$index]) {
@@ -727,11 +838,11 @@ class ProductionController extends Controller
             $lims_production_data->delete();
 
             DB::commit();
-            return redirect('manufacturing/productions')->with('message', __('db.Production deleted successfully'));
+            return redirect('manufacturing/productions')->with('message', __('db.production_deleted_successfully'));
         } catch (\Throwable $e) {
             DB::rollBack();
             \Log::error('Production deletion failed: ' . $e->getMessage());
-            return redirect('manufacturing/productions')->with('not_permitted', __('db.Something went wrong. Please try again'));
+            return redirect('manufacturing/productions')->with('not_permitted', __('db.generic_error_please_try_again'));
         }
     }
 

@@ -1,3 +1,6 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 @extends('backend.layout.main')
 @section('content')
 
@@ -15,16 +18,16 @@
     @php
         $color = '#733686';
         $color_rgba = 'rgba(115, 54, 134, 0.8)';
-        if ($general_setting->theme == 'default.css') {
+        if (gen_setting()->theme == 'default.css') {
             $color = '#733686';
             $color_rgba = 'rgba(115, 54, 134, 0.8)';
-        } elseif ($general_setting->theme == 'green.css') {
+        } elseif (gen_setting()->theme == 'green.css') {
             $color = '#2ecc71';
             $color_rgba = 'rgba(46, 204, 113, 0.8)';
-        } elseif ($general_setting->theme == 'blue.css') {
+        } elseif (gen_setting()->theme == 'blue.css') {
             $color = '#3498db';
             $color_rgba = 'rgba(52, 152, 219, 0.8)';
-        } elseif ($general_setting->theme == 'dark.css') {
+        } elseif (gen_setting()->theme == 'dark.css') {
             $color = '#34495e';
             $color_rgba = 'rgba(52, 73, 94, 0.8)';
         }
@@ -57,7 +60,7 @@
                 <div class="brand-text float-left mt-4">
                     <h3 style="font-size:1em">{{ __('db.welcome') }} <span>{{ Auth::user()->name }}</span></h3>
                 </div>
-                @if (in_array('restaurant', explode(',', cache()->get('general_setting')->modules)))
+                @module('restaurant')
                     @if (Auth::user()->role_id > 2 && isset(Auth::user()->service_staff))
                         @php
                             $cooked = DB::table('sales')
@@ -75,14 +78,16 @@
                                 ->count();
                         @endphp
                     @endif
-                @endif
-                @if (in_array('restaurant', explode(',', cache()->get('general_setting')->modules)))
-                    <a href="{{ route('kitchen.dashboard') }}">
+                @endmodule
+                @module('restaurant')
+                @if(isset($cooked) && $cooked > 0)
+                    <a href="{{ route('restaurant.kitchen.dashboard') }}">
                         <div class="alert alert-warning alert-dismissible text-center mb-2">
                             <strong>{{ $cooked }} {{ __('db.Orders to serve') }}</strong>
                         </div>
                     </a>
                 @endif
+                @endmodule
 
                 @php
                     $revenue_profit_summary = $role_has_permissions_list
@@ -94,12 +99,12 @@
                         <div class="dashboard-filters">
                             @if (\Auth::user()->role_id <= 2)
                             {{-- Warehouse --}}
-                            
+
                             <div class="filter-toggle btn-group mt-0" style=" border: 1px solid #7c5cc4; border-radius: 5px;">
                                 <select name="warehouse_id" class="selectpicker" id="warehouse_btn"
                                     data-live-search="true" data-live-search-style="begins">
-                                    <option value="0" data-content="<i class='dripicons-location mr-1'></i> {{ __('db.All Warehouse') }}">{{ __('db.All Warehouse') }}</option>
-                                    
+                                    <option value="0" data-content="<i class='ti ti-map-pin mr-1'></i> {{ __('db.All Warehouse') }}">{{ __('db.All Warehouse') }}</option>
+
                                     @foreach ($lims_warehouse_list as $warehouse)
                                         <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
                                     @endforeach
@@ -112,13 +117,13 @@
                                 <div class="input-group input-group-md">
                                     <div class="input-group-prepend">
                                         <span class="input-group-text">
-                                            <i class="dripicons-calendar text-primary"></i>
+                                            <i class="ti ti-calendar text-primary"></i>
                                         </span>
                                     </div>
 
                                     <input type="text"
                                         class="daterangepicker-field form-control border-left-0"
-                                        placeholder="Select Date" style="padding-left:0;min-width: 200px;"/>
+                                        placeholder="Select Date" style="padding-left:0;min-width: 200px;height:40px"/>
 
                                     <input type="hidden" name="start_date" value="" />
                                     <input type="hidden" name="end_date" value="" />
@@ -214,7 +219,7 @@
                         }
 
                         .widget-value {
-                            font-size: 1.1rem !important;
+                            font-size: 1rem !important;
                             font-weight: 600;
                             color: #1e293b;
                             display: block;
@@ -230,18 +235,32 @@
                         .dark-mode .widget-value {
                             color: #f0f0f0;
                         }
+                        .spin-loading {
+                            font-size: 16px !important;
+                            display: inline-block; /* Required for rotation to work correctly */
+                            animation: spin 1s linear infinite;
+                        }
+
+                        @keyframes spin {
+                            from {
+                                transform: rotate(0deg);
+                            }
+                            to {
+                                transform: rotate(360deg);
+                            }
+                        }
                     </style>
                     <div class="col-md-12 mt-3">
                         <div class="row">
                             <div class="col-6 col-lg-3">
                                 <a href="{{route('sales.index')}}" class="dashboard-widget">
                                     <div class="widget-icon-container bg-light-purple">
-                                        <i class="dripicons-graph-bar"></i>
+                                        <i class="ti ti-chart-bar"></i>
                                     </div>
                                     <div class="widget-content">
                                         <span class="widget-label">{{ __('db.Sale') }}</span>
                                         <span class="widget-value total_sale-data">
-                                            {{ number_format((float) 0.00, $general_setting->decimal, '.', '') }}
+                                            {{ number_format((float) 0.00, gen_setting()->decimal, '.', '') }} <i class="ti ti-reload spin-loading" style="font-size: 2rem; color: #3b82f6;"></i>
                                         </span>
                                     </div>
                                 </a>
@@ -250,12 +269,12 @@
                             <div class="col-6 col-lg-3">
                                 <div class="dashboard-widget">
                                     <div class="widget-icon-container bg-light-cyan">
-                                        <i class="dripicons-document"></i>
+                                        <i class="ti ti-invoice"></i>
                                     </div>
                                     <div class="widget-content">
                                         <span class="widget-label">{{ __('db.sale_due') }}</span>
                                         <span class="widget-value invoice-due-data">
-                                            {{ number_format((float) 0.00, $general_setting->decimal, '.', '') }}
+                                            {{ number_format((float) 0.00, gen_setting()->decimal, '.', '') }} <i class="ti ti-reload spin-loading" style="font-size: 2rem; color: #3b82f6;"></i>
                                         </span>
                                     </div>
                                 </div>
@@ -264,12 +283,12 @@
                             <div class="col-6 col-lg-3">
                                 <a href="{{route('return-sale.index')}}" class="dashboard-widget">
                                     <div class="widget-icon-container bg-light-orange">
-                                        <i class="dripicons-return"></i>
+                                        <i class="ti ti-arrow-back"></i>
                                     </div>
                                     <div class="widget-content">
                                         <span class="widget-label">{{ __('db.Sale Return') }}</span>
                                         <span class="widget-value return-data">
-                                            {{ number_format((float) 0.00, $general_setting->decimal, '.', '') }}
+                                            {{ number_format((float) 0.00, gen_setting()->decimal, '.', '') }} <i class="ti ti-reload spin-loading" style="font-size: 2rem; color: #3b82f6;"></i>
                                         </span>
                                     </div>
                                 </a>
@@ -278,12 +297,12 @@
                             <div class="col-6 col-lg-3">
                                 <div class="dashboard-widget">
                                     <div class="widget-icon-container bg-light-red">
-                                        <i class="dripicons-wallet"></i>
+                                        <i class="ti ti-wallet"></i>
                                     </div>
                                     <div class="widget-content">
                                         <span class="widget-label">{{ __('db.Expense') }}</span>
                                         <span class="widget-value expense-data">
-                                            {{ number_format((float) 0.00, $general_setting->decimal, '.', '') }}
+                                            {{ number_format((float) 0.00, gen_setting()->decimal, '.', '') }} <i class="ti ti-reload spin-loading" style="font-size: 2rem; color: #3b82f6;"></i>
                                         </span>
                                     </div>
                                 </div>
@@ -292,12 +311,12 @@
                             <div class="col-6 col-lg-3">
                                 <a href="{{route('purchases.index')}}" class="dashboard-widget">
                                     <div class="widget-icon-container bg-light-gold">
-                                        <i class="dripicons-download"></i>
+                                        <i class="ti ti-download"></i>
                                     </div>
                                     <div class="widget-content">
                                         <span class="widget-label">{{ __('db.Purchase') }}</span>
                                         <span class="widget-value total_purchase-data">
-                                            {{ number_format((float) 0.00, $general_setting->decimal, '.', '') }}
+                                            {{ number_format((float) 0.00, gen_setting()->decimal, '.', '') }} <i class="ti ti-reload spin-loading" style="font-size: 2rem; color: #3b82f6;"></i>
                                         </span>
                                     </div>
                                 </a>
@@ -307,12 +326,12 @@
                             <div class="col-6 col-lg-3">
                                 <div class="dashboard-widget">
                                     <div class="widget-icon-container bg-light-yellow">
-                                        <i class="dripicons-warning"></i>
+                                        <i class="ti ti-credit-card-refund"></i>
                                     </div>
                                     <div class="widget-content">
                                         <span class="widget-label">{{ __('db.purchase_due') }}</span>
                                         <span class="widget-value purchase_due-data">
-                                            {{ number_format((float) 0.00, $general_setting->decimal, '.', '') }}
+                                            {{ number_format((float) 0.00, gen_setting()->decimal, '.', '') }} <i class="ti ti-reload spin-loading" style="font-size: 2rem; color: #3b82f6;"></i>
                                         </span>
                                     </div>
                                 </div>
@@ -322,12 +341,12 @@
                             <div class="col-6 col-lg-3">
                                 <a href="{{route('return-purchase.index')}}"  class="dashboard-widget">
                                     <div class="widget-icon-container bg-light-green">
-                                        <i class="dripicons-return"></i>
+                                        <i class="ti ti-arrow-forward-up"></i>
                                     </div>
                                     <div class="widget-content">
                                         <span class="widget-label">{{ __('db.Purchase Return') }}</span>
                                         <span class="widget-value purchase_return-data">
-                                            {{ number_format((float) 0.00, $general_setting->decimal, '.', '') }}
+                                            {{ number_format((float) 0.00, gen_setting()->decimal, '.', '') }} <i class="ti ti-reload spin-loading" style="font-size: 2rem; color: #3b82f6;"></i>
                                         </span>
                                     </div>
                                 </a>
@@ -336,12 +355,12 @@
                             <div class="col-6 col-lg-3">
                                 <div class="dashboard-widget">
                                     <div class="widget-icon-container bg-light-blue">
-                                        <i class="dripicons-trophy"></i>
+                                        <i class="ti ti-trophy"></i>
                                     </div>
                                     <div class="widget-content">
                                         <span class="widget-label">{{ __('db.profit') }}</span>
                                         <span class="widget-value profit-data">
-                                            {{ number_format((float) 0.00, $general_setting->decimal, '.', '') }}
+                                            {{ number_format((float) 0.00, gen_setting()->decimal, '.', '') }} <i class="ti ti-reload spin-loading" style="font-size: 2rem; color: #3b82f6;"></i>
                                         </span>
                                     </div>
                                 </div>
@@ -349,7 +368,7 @@
                         </div>
                     </div>
                 @endif
-                
+
                 @php
                     $cash_flow = $role_has_permissions_list->where('name', 'cash_flow')->first();
                 @endphp
@@ -442,7 +461,7 @@
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="#quotation-latest" role="tab"
-                                    data-toggle="tab">{{ __('db.Quotation') }}</a>
+                                    data-toggle="tab">{{ __('db.quotation') }}</a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="#payment-latest" role="tab"
@@ -600,13 +619,9 @@
 @endsection
 
 @push('scripts')
-    @if (!config('database.connections.saleprosaas_landlord'))
-    <script type="text/javascript" src="<?php echo asset('vendor/chart.js/Chart.min.js'); ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('js/charts-custom.js'); ?>"></script>
-    @else
-    <script type="text/javascript" src="<?php echo asset('../../vendor/chart.js/Chart.min.js'); ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('../../js/charts-custom.js'); ?>"></script>    
-    @endif
+
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/chart.js/Chart.min.js'); }}"></script>
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'js/charts-custom.js'); }}"></script>
 
     <script type="text/javascript">
         let staff_warehouse_id = @json(auth()->user()->warehouse_id);
@@ -689,13 +704,19 @@
                 success: function(data) {
                     data.forEach(function(item) {
                         var sale_date = dateFormat(item.created_at.split('T')[0],
-                            '{{ $general_setting->date_format }}')
+                            '{{ gen_setting()->date_format }}')
                         if (item.sale_status == 1) {
                             var status =
                                 '<div class="badge badge-success">{{ __('db.Completed') }}</div>';
                         } else if (item.sale_status == 2) {
                             var status =
                                 '<div class="badge badge-danger">{{ __('db.Pending') }}</div>';
+                        } else if (item.sale_status == 5) {
+                            var status =
+                                '<div class="badge badge-primary">{{ __('db.Processing') }}</div>';
+                        } else if (item.sale_status == 6) {
+                            var status =
+                                '<div class="badge badge-info">{{ __('db.cooked') }}</div>';
                         } else {
                             var status =
                                 '<div class="badge badge-warning">{{ __('db.Draft') }}</div>';
@@ -717,7 +738,7 @@
                 success: function(data) {
                     data.forEach(function(item) {
                         var payment_date = dateFormat(item.created_at.split('T')[0],
-                            '{{ $general_setting->date_format }}')
+                            '{{ gen_setting()->date_format }}')
                         if (item.status == 1) {
                             var status =
                                 '<div class="badge badge-success">{{ __('db.Recieved') }}</div>';
@@ -748,7 +769,7 @@
                 success: function(data) {
                     data.forEach(function(item) {
                         var quotation_date = dateFormat(item.created_at.split('T')[0],
-                            '{{ $general_setting->date_format }}')
+                            '{{ gen_setting()->date_format }}')
                         if (item.quotation_status == 1) {
                             var status =
                                 '<div class="badge badge-success">{{ __('db.Pending') }}</div>';
@@ -774,7 +795,7 @@
                 success: function(data) {
                     data.forEach(function(item) {
                         var payment_date = dateFormat(item.created_at.split('T')[0],
-                            '{{ $general_setting->date_format }}')
+                            '{{ gen_setting()->date_format }}')
                         $('#recent-payment').find('tbody').append('<tr><td>' + payment_date +
                             '</td><td>' + item.payment_reference + '</td><td>' + formatCurrency(item.amount/item.exchange_rate)
                             .toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") +

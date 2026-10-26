@@ -22,9 +22,16 @@ use App\Models\Sale;
 use App\Models\Warehouse;
 use Illuminate\Support\Carbon;
 
+use App\Services\AccountingService;
+use App\Http\Controllers\Concerns\AuthorizesHrmWarehouse;
+
 class PayrollController extends Controller
 {
-    use \App\Traits\MailInfo;
+    use \App\Traits\MailInfo, AuthorizesHrmWarehouse;
+
+    public function __construct(public AccountingService $accountingService)
+    {
+    }
 
     public function index()
     {
@@ -33,15 +40,19 @@ class PayrollController extends Controller
             return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
         }
 
-        $lims_account_list = Account::where('is_active', true)->get();
+        $lims_account_list = app(\App\Services\PaymentAccountService::class)->validOperationalAccounts();
         $lims_employee_list = Employee::where('is_active', true)->get();
         $lims_warehouse_list = Warehouse::where('is_active', true)->get();
         $general_setting = DB::table('general_settings')->latest()->first();
 
         // Fetch payrolls with employee info, leaves, attendance, and work duration
-        $lims_payroll_all = Payroll::with('employee')
-            ->orderBy('id', 'desc')
-            ->when(Auth::user()->role_id > 2 && $general_setting->staff_access == 'own', function ($query) {
+        $payrollQuery = Payroll::with('employee')->orderBy('id', 'desc');
+        if (request()->filled('warehouse_id')) {
+            $warehouseId = $this->authorizedWarehouseId(request());
+            $payrollQuery->whereHas('employee', fn ($query) => $query->where('warehouse_id', $warehouseId));
+        }
+        $lims_payroll_all = $payrollQuery
+            ->when($this->warehouseAccess()->isRestricted(Auth::user()) && $general_setting?->staff_access == 'own', function ($query) {
                 $query->where('user_id', Auth::id());
             })
             ->get()
@@ -83,14 +94,34 @@ class PayrollController extends Controller
 
     public function store(Request $request)
     {
+        try {
+        DB::beginTransaction();
         $data = $request->all();
+        $this->authorizedEmployee((int) ($data['employee_id'] ?? 0));
         if (isset($data['created_at']))
             $data['created_at'] = date("Y-m-d", strtotime(str_replace("/", "-", $data['created_at'])));
         else
             $data['created_at'] = date("Y-m-d");
         $data['reference_no'] = 'payroll-' . date("Ymd") . '-' . date("his");
         $data['user_id'] = Auth::id();
-        Payroll::create($data);
+        $payroll = Payroll::create($data);
+
+        $accountingResult = $this->accountingService->recordPayroll($payroll);
+        if (!$accountingResult->isSuccess()) {
+            \Log::error('Payroll Accounting failed: ' . $accountingResult->getMessage());
+            throw new \RuntimeException($accountingResult->getMessage() ?: 'Payroll accounting posting failed.');
+        } elseif ($accountingResult->isPosted()) {
+            $payroll->update(['accounting_status' => 'posted']);
+        }
+
+        DB::commit();
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Payroll creation failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Payroll creation failed: ' . $e->getMessage());
+        }
+
         $message = 'Payroll creared succesfully';
         //collecting mail data
         $lims_employee_data = Employee::find($data['employee_id']);
@@ -119,17 +150,17 @@ class PayrollController extends Controller
     public function update(Request $request, $id)
     {
         try {
+            DB::beginTransaction();
             $data = $request->all();
+            $payroll = Payroll::findOrFail($request->payroll_id ?? $id);
+            $this->authorizedEmployee((int) ($data['employee_id'] ?? $payroll->employee_id));
 
             // Format date
             if (isset($data['created_at']) && !empty($data['created_at'])) {
                 $data['created_at'] = date("Y-m-d", strtotime(str_replace("/", "-", $data['created_at'])));
             } else {
-                $data['created_at'] = date("Y-m-d");
+                $data['created_at'] = $payroll->created_at;
             }
-
-            // Find payroll
-            $payroll = Payroll::findOrFail($request->payroll_id);
 
             // Get input values
             $salary = floatval($data['salary_amount'] ?? 0);
@@ -152,8 +183,20 @@ class PayrollController extends Controller
                 'salary' => $salary,
                 'commission' => $commission,
                 'previous' => $previous,
+                'advance_recovery' => $previous,
                 'total' => $request->amount,
             ];
+
+            $outstandingAdvance = app(\App\Services\EmployeeAdvanceService::class)
+                ->outstandingForEmployee((int) ($data['employee_id'] ?? $payroll->employee_id), $payroll->id);
+            if ($previous - $outstandingAdvance > 0.0001) {
+                throw new \RuntimeException(__('db.employee_advance_over_recovery'));
+            }
+
+            $reversal = $this->accountingService->reverseTransaction(get_class($payroll), $payroll->id);
+            if (!$reversal->isSuccess()) {
+                throw new \RuntimeException($reversal->getMessage() ?: 'Payroll accounting reversal failed.');
+            }
 
             // Update payroll
             $payroll->update([
@@ -170,29 +213,62 @@ class PayrollController extends Controller
                 'amount_array' => json_encode($amountArray),
             ]);
 
-            return redirect()->route('payroll.index')->with('message', __('db.Payroll updated successfully'));
+            $accountingResult = $this->accountingService->recordPayroll($payroll, 'payroll_updated');
+            if (!$accountingResult->isSuccess()) {
+                \Log::error('Payroll Accounting failed on update: ' . $accountingResult->getMessage());
+                throw new \RuntimeException($accountingResult->getMessage() ?: 'Payroll accounting posting failed.');
+            } elseif ($accountingResult->isPosted()) {
+                $payroll->update(['accounting_status' => 'posted']);
+            }
+
+            DB::commit();
+            return redirect()->route('payroll.index')->with('message', __('db.payroll_updated_successfully'));
         } catch (\Exception $e) {
+            DB::rollBack();
             \Log::error('Payroll update error: ' . $e->getMessage());
-            return redirect()->back()->with('error', __('db.Something went wrong while updating payroll'));
+            return redirect()->back()->with('error', __('db.payroll_update_error'));
         }
     }
 
 
     public function deleteBySelection(Request $request)
     {
-        $payroll_id = $request['payrollIdArray'];
-        foreach ($payroll_id as $id) {
-            $lims_payroll_data = Payroll::find($id);
-            $lims_payroll_data->delete();
+        try {
+            DB::beginTransaction();
+            $payroll_id = $request['payrollIdArray'];
+            foreach (Payroll::whereIn('id', $payroll_id)->get() as $payroll) {
+                $reversal = $this->accountingService->reverseTransaction(get_class($payroll), $payroll->id);
+                if (!$reversal->isSuccess()) {
+                    throw new \RuntimeException($reversal->getMessage() ?: 'Payroll accounting reversal failed.');
+                }
+                $payroll->delete();
+            }
+            DB::commit();
+            return 'Payroll deleted successfully!';
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Payroll bulk deletion failed: ' . $e->getMessage());
+            return 'Payroll bulk deletion failed: ' . $e->getMessage();
         }
-        return 'Payroll deleted successfully!';
     }
 
     public function destroy($id)
     {
-        $lims_payroll_data = Payroll::find($id);
-        $lims_payroll_data->delete();
-        return redirect('payroll')->with('not_permitted', __('db.Payroll deleted succesfully'));
+        try {
+            DB::beginTransaction();
+            $payroll = Payroll::findOrFail($id);
+            $reversal = $this->accountingService->reverseTransaction(get_class($payroll), $payroll->id);
+            if (!$reversal->isSuccess()) {
+                throw new \RuntimeException($reversal->getMessage() ?: 'Payroll accounting reversal failed.');
+            }
+            $payroll->delete();
+            DB::commit();
+            return redirect('payroll')->with('not_permitted', __('db.Payroll deleted succesfully'));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Payroll deletion failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Payroll deletion failed: ' . $e->getMessage());
+        }
     }
 
     public function monthlyData(Request $request)
@@ -229,12 +305,11 @@ class PayrollController extends Controller
         $query = Employee::where('is_active', true);
 
         if ($warehouse_id != 0) {
-            $query->whereHas('user', function ($q) use ($warehouse_id) {
-                $q->where('warehouse_id', $warehouse_id);
-            });
+            $this->warehouseAccess()->authorizeWarehouse((int) $warehouse_id);
+            $query->where('warehouse_id', (int) $warehouse_id);
         }
 
-        $employees = $query->orWhere('warehouse_id',$warehouse_id)->get(['id', 'name']);
+        $employees = $query->get(['id', 'name']);
 
         return response()->json($employees);
     }
@@ -249,11 +324,14 @@ class PayrollController extends Controller
         }
 
         try {
+            DB::beginTransaction();
+            $mail_queue = [];
             foreach ($payrolls as $empId => $payrollData) {
 
                 if (!isset($payrollData['employee_id']) || !isset($payrollData['amount'])) {
                     continue;
                 }
+                $this->authorizedEmployee((int) $payrollData['employee_id']);
 
                 // Reference No
                 $reference_no = 'payroll-' . date("Ymd") . '-' . date("His") . '-' . $empId;
@@ -269,6 +347,7 @@ class PayrollController extends Controller
                     'salary' => $salary,
                     'commission' => $commission,
                     'expense' => $expense,
+                    'advance_recovery' => $expense,
                     'overtime' => $overtime,
                     'total' => $total,
                 ];
@@ -279,7 +358,22 @@ class PayrollController extends Controller
                     ->where('month', $request->month)
                     ->first();
 
+                $outstandingAdvance = app(\App\Services\EmployeeAdvanceService::class)
+                    ->outstandingForEmployee((int) $payrollData['employee_id'], $existingPayroll?->id);
+                if ($expense - $outstandingAdvance > 0.0001) {
+                    throw new \RuntimeException(__('db.employee_advance_over_recovery'));
+                }
+
                 if ($existingPayroll) {
+                    $reversal = $this->accountingService->reverseTransaction(
+                        get_class($existingPayroll),
+                        $existingPayroll->id,
+                        '_updated_reversal'
+                    );
+                    if (!$reversal->isSuccess()) {
+                        throw new \RuntimeException($reversal->getMessage() ?? 'Payroll accounting reversal failed.');
+                    }
+
                     // Update existing payroll
                     $existingPayroll->update([
                         'reference_no' => $reference_no,
@@ -308,32 +402,50 @@ class PayrollController extends Controller
                     ]);
                 }
 
-                // Send email
+                $accountingResult = $this->accountingService->recordPayroll(
+                    $payroll,
+                    $existingPayroll ? 'payroll_updated' : 'payroll_paid'
+                );
+                if (!$accountingResult->isSuccess()) {
+                    $payroll->accounting_status = 'failed';
+                    $payroll->saveQuietly();
+                    throw new \RuntimeException($accountingResult->getMessage() ?? 'Payroll accounting failed.');
+                }
+                if ($accountingResult->isPosted()) {
+                    $payroll->accounting_status = 'posted';
+                    $payroll->saveQuietly();
+                }
+
+                // Queue email
                 $employee = Employee::find($payrollData['employee_id']);
                 if ($employee) {
-                    $mail_data = [
+                    $mail_queue[] = [
                         'reference_no' => $reference_no,
                         'amount' => $total,
                         'name' => $employee->name,
                         'email' => $employee->email,
                         'currency' => config('currency'),
                     ];
+                }
+            }
 
-                    $mail_setting = MailSetting::latest()->first();
-                    if ($mail_setting) {
-                        $this->setMailInfo($mail_setting);
+            DB::commit();
 
-                        try {
-                            Mail::to($mail_data['email'])->send(new PayrollDetails($mail_data));
-                        } catch (\Exception $e) {
-                            \Log::error('Mail send failed: ' . $e->getMessage());
-                        }
+            $mail_setting = MailSetting::latest()->first();
+            if ($mail_setting) {
+                $this->setMailInfo($mail_setting);
+                foreach ($mail_queue as $mail_data) {
+                    try {
+                        Mail::to($mail_data['email'])->send(new PayrollDetails($mail_data));
+                    } catch (\Exception $e) {
+                        \Log::error('Mail send failed: ' . $e->getMessage());
                     }
                 }
             }
 
             return redirect()->route('payroll.index')->with('message', 'All payrolls processed successfully!');
         } catch (\Exception $e) {
+            DB::rollBack();
             \Log::error('Payroll store error: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Something went wrong while generating payrolls.');
         }
@@ -350,16 +462,21 @@ class PayrollController extends Controller
         $monthEnd = Carbon::createFromFormat('Y-m', $month)->endOfMonth()->toDateString();
 
         // Get employees (all active or filtered)
+        $employeeQuery = Employee::where('is_active', true);
+        if ($warehouse_id) {
+            $this->warehouseAccess()->authorizeWarehouse((int) $warehouse_id);
+            $employeeQuery->where('warehouse_id', (int) $warehouse_id);
+        }
         if (!$employee_ids || count($employee_ids) == 0) {
-            $employees = Employee::where('is_active', true)->get();
+            $employees = $employeeQuery->get();
         } else {
-            $employees = Employee::whereIn('id', $employee_ids)
-                ->where('is_active', true)->get();
+            $employees = $employeeQuery->whereIn('id', $employee_ids)->get();
+            abort_if($employees->count() !== count(array_unique(array_map('intval', $employee_ids))), 403, 'Employee access denied.');
         }
 
         $warehouse = $warehouse_id ? Warehouse::find($warehouse_id) : null;
         $lims_warehouse_list = Warehouse::where('is_active', true)->get();
-        $lims_account_list = Account::where('is_active', true)->get();
+        $lims_account_list = app(\App\Services\PaymentAccountService::class)->validOperationalAccounts();
 
         foreach ($employees as $employee) {
 
@@ -421,11 +538,14 @@ class PayrollController extends Controller
             }
             $employee->total_work_hours = number_format($totalHours, 2);
 
-            // Total sales for sale agents
+            // F-020: sales/service staff totals are based on the explicit Employee
+            // assignment on the sale, not on the login user who created/collected it.
             if ($employee->is_sale_agent) {
-                $employee->total_sales = Payment::where('user_id', $employee->user_id)
-                    ->whereBetween('payment_at', [$monthStart, $monthEnd])
-                    ->sum('amount');
+                $employee->total_sales = Sale::where('sales_agent_id', $employee->id)
+                    ->whereNull('deleted_at')
+                    ->whereIn('sale_status', [1, 5, 6])
+                    ->whereBetween('created_at', [$monthStart, $monthEnd])
+                    ->sum('grand_total');
             } else {
                 $employee->total_sales = 0;
             }
@@ -433,12 +553,9 @@ class PayrollController extends Controller
             // ===== Commission Calculation (Sales Target Based - Max Commission) =====
             $employee->commission = 0;
 
-            if ($employee->is_sale_agent == 1 && $employee->user_id) {
+            if ($employee->is_sale_agent == 1) {
 
-                // মোট sales amount
-                $totalSales = Sale::where('user_id', $employee->user_id)
-                    ->whereBetween('created_at', [$monthStart, $monthEnd])
-                    ->sum('grand_total');
+                $totalSales = (float) $employee->total_sales;
                 $targets = $employee->sales_target;
 
                 if (is_array($targets)) {
@@ -469,8 +586,10 @@ class PayrollController extends Controller
             // Employee Expenses
             $employee->expenses = Expense::where('employee_id', $employee->id)
                 ->where('expense_category_id', 0)
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
+                ->where('type', 'advance')
                 ->sum('amount');
+            $employee->expenses = app(\App\Services\EmployeeAdvanceService::class)
+                ->outstandingForEmployee($employee->id, $existingPayroll?->id);
 
             // Overtime: approved hours & amount
             $employee->overtime_hours = Overtime::where('employee_id', $employee->id)

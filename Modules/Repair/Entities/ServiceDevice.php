@@ -25,4 +25,9 @@ class ServiceDevice extends Model
     {
         return $this->belongsTo(ServiceJob::class, 'service_job_id');
     }
+
+    public function deviceTypeInfo()
+    {
+        return $this->belongsTo(DeviceType::class, 'device_type', 'id');
+    }
 }

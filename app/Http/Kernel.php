@@ -68,7 +68,8 @@ class Kernel extends HttpKernel
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'active' => \App\Http\Middleware\Active::class,
         'common' => \App\Http\Middleware\Common::class,
-        'superadminauth' => \App\Http\Middleware\SuperAdminAuth::class,
+        'superadminauth'  => \App\Http\Middleware\SuperAdminAuth::class,
+        'affiliateauth'   => \App\Http\Middleware\AffiliateAuth::class,
         'customerauth' => \Modules\Ecommerce\Http\Middleware\CustomerAuth::class,
         'customerauth0' => \Modules\Restaurant\Http\Middleware\CustomerAuth::class,
         'cors' => \App\Http\Middleware\Cors::class,
@@ -76,6 +77,11 @@ class Kernel extends HttpKernel
         'validate_mobile_token' => \App\Http\Middleware\ValidateMobileToken::class,
         'hasPermanentDeletePermission' => \App\Http\Middleware\HasPermanentDeletePermission::class,
         'permission' => \App\Http\Middleware\PermissionMiddleware::class,
+        'import.permission' => \App\Http\Middleware\ImportBatchPermission::class,
+        'accounting.activated' => \App\Http\Middleware\EnsureAccountingActivated::class,
+        'warehouse.access' => \App\Http\Middleware\EnforceWarehouseAccess::class,
+        'module.access' => \App\Http\Middleware\EnsureModuleAccess::class,
+        'module.enabled' => \App\Http\Middleware\EnsureBusinessModuleEnabled::class,
     ];
 
     /**

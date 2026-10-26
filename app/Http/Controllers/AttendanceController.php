@@ -12,10 +12,13 @@ use Auth;
 use DB;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use App\Http\Controllers\Concerns\AuthorizesHrmWarehouse;
 
 class AttendanceController extends Controller
 {
-    public function index()
+    use AuthorizesHrmWarehouse;
+
+    public function index(Request $request)
     {
         $role = Role::find(Auth::user()->role_id);
         if($role->hasPermissionTo('attendance')) {
@@ -23,19 +26,17 @@ class AttendanceController extends Controller
             $lims_hrm_setting_data = HrmSetting::latest()->first();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $general_setting = DB::table('general_settings')->latest()->first();
-            if(Auth::user()->role_id > 2 && $general_setting->staff_access == 'own')
-            $lims_attendance_data = Attendance::leftJoin('employees', 'employees.id', '=', 'attendances.employee_id')
+            $attendanceQuery = Attendance::leftJoin('employees', 'employees.id', '=', 'attendances.employee_id')
                 ->leftJoin('users', 'users.id', '=', 'attendances.user_id')
-                ->orderBy('attendances.date', 'desc')
-                ->where('attendances.user_id', Auth::id())
-                ->select(['attendances.*', 'employees.name as employee_name', 'users.name as user_name','users.warehouse_id as warehouse_id'])
-                ->get()
-                ->groupBy(['date','employee_id']);
-            else
-            $lims_attendance_data = Attendance::leftJoin('employees', 'employees.id', '=', 'attendances.employee_id')
-                ->leftJoin('users', 'users.id', '=', 'attendances.user_id')
-                ->orderBy('attendances.date', 'desc')
-                ->select(['attendances.*', 'employees.name as employee_name', 'users.name as user_name','users.warehouse_id as warehouse_id'])
+                ->orderBy('attendances.date', 'desc');
+            if ($request->filled('warehouse_id')) {
+                $attendanceQuery->where('employees.warehouse_id', $this->authorizedWarehouseId($request));
+            }
+            if($this->warehouseAccess()->isRestricted(Auth::user()) && $general_setting?->staff_access == 'own') {
+                $attendanceQuery->where('attendances.user_id', Auth::id());
+            }
+            $lims_attendance_data = $attendanceQuery
+                ->select(['attendances.*', 'employees.name as employee_name', 'users.name as user_name','employees.warehouse_id as warehouse_id'])
                 ->get()
                 ->groupBy(['date','employee_id']);
 
@@ -79,6 +80,7 @@ class AttendanceController extends Controller
     public function store(Request $request)
     {
         $data = $request->all();
+        $request->validate(['employee_id' => 'required|array|min:1']);
         $employee_ids = $data['employee_id'];
         $lims_hrm_setting_data = HrmSetting::latest()->first();
         if($request->checkin){
@@ -88,6 +90,7 @@ class AttendanceController extends Controller
         }
 
         foreach ($employee_ids as $id) {
+            $this->authorizedEmployee((int) $id);
             $data['date'] = date('Y-m-d', strtotime(str_replace('/', '-', $data['date'])));
             $data['user_id'] = Auth::id();
             $data['employee_id'] = $id;
@@ -142,7 +145,7 @@ class AttendanceController extends Controller
         $file=fopen($filePath, 'r');
         $exclude_header= fgetcsv($file);
 
-        $employee_all = Employee::all();
+        $employee_all = Employee::where('is_active', true)->get();
         $lims_hrm_setting_data = HrmSetting::latest()->first();
         $checkin = $lims_hrm_setting_data->checkin;
         $data = [];

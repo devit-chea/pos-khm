@@ -5,7 +5,7 @@
 @endphp
 
 <head>
-    <link rel="icon" type="image/png" href="{{ url('logo', $general_setting->site_logo) }}" />
+    <link rel="icon" type="image/png" href="{{ url('logo', gen_setting()->site_logo) }}" />
     <title>{{ $lims_sale_data->customer->name . '_Sale_' . $lims_sale_data->reference_no }}</title>
     @php
         $primary_color =
@@ -57,10 +57,10 @@
     <div class="hidden-print">
         <table>
             <tr>
-                <td><a href="{{ $url }}" class="btn btn-info"><i class="fa fa-arrow-left"></i>
+                <td><a href="{{ $url }}" class="btn btn-info"><i class="ti ti-arrow-left"></i>
                         {{ __('db.Back') }}</a> </td>
-                <td><button onclick="window.print();" class="btn btn-primary"><i class="dripicons-print"></i>
-                        {{ __('db.Print') }}</button></td>
+                <td><button onclick="window.print();" class="btn btn-primary"><i class="ti ti-printer"></i>
+                        {{ __('db.print') }}</button></td>
             </tr>
         </table>
         <br>
@@ -68,27 +68,33 @@
     <table style="width: 100%;border-collapse: collapse;">
         <tr>
             <td colspan="2" style="padding:9px 0;width:40%">
-                @if (isset($show->show_warehouse_info) && $show->show_warehouse_info == 1)
-                    <h1 style="margin:0">{{ $general_setting->company_name ?? $lims_biller_data->company_name }}</h1>
+                @if (!empty($zatcaInvoice))
+                    @include('backend.setting.invoice_setting.zatca_seller')
+                @elseif (isset($show->show_warehouse_info) && $show->show_warehouse_info == 1)
+                    <h1 style="margin:0">{{ gen_setting()->company_name ?? $lims_biller_data->company_name }}</h1>
                     <div>
                         <span>{{ __('db.Address') }}:</span>&nbsp;&nbsp;<span>{{ $lims_warehouse_data->address }}</span>
                     </div>
                     <div>
                         <span>{{ __('db.Phone') }}:</span>&nbsp;&nbsp;<span>{{ $lims_warehouse_data->phone }}</span>
                     </div>
-                    @if ($general_setting->vat_registration_number && isset($show->show_vat_registration_number) && $show->show_vat_registration_number == 1)
+                    @if (gen_setting()->vat_registration_number && isset($show->show_vat_registration_number) && $show->show_vat_registration_number == 1)
                         <div>
-                            <span>{{ __('db.VAT Number') }}:</span>&nbsp;&nbsp;<span>{{ $general_setting->vat_registration_number }}</span>
+                            <span>{{ __('db.VAT Number') }}:</span>&nbsp;&nbsp;<span>{{ gen_setting()->vat_registration_number }}</span>
                         </div>
                     @endif
 
                 @endif
+
+                @if (empty($zatcaInvoice) && isset($invoice_settings->header_text))
+                    {!! $invoice_settings->header_text !!}
+                @endif
             </td>
             <td style="width:30%; text-align: middle; vertical-align: top;">
-                @if ($general_setting->site_logo || $invoice_settings->company_logo)
-                    <img src="{{ $invoice_settings->company_logo ? url('invoices', $invoice_settings->company_logo) : url('logo', $general_setting->site_logo) }}"
-                        height="{{ $invoice_settings->logo_height ?? auto }}"
-                        width="{{ $invoice_settings->logo_width ?? auto }}" style="margin:5px 0;">
+                @if (gen_setting()->site_logo || $invoice_settings->company_logo)
+                    <img src="{{ $invoice_settings->company_logo ? url('invoices', $invoice_settings->company_logo) : url('logo', gen_setting()->site_logo) }}"
+                        height="{{ $invoice_settings->logo_height ?? 'auto' }}"
+                        width="{{ $invoice_settings->logo_width ?? 'auto' }}" style="margin:5px 0;">
                 @endif
             </td>
             <td style="padding:5px -19px;width:30%;text-align:right;">
@@ -130,7 +136,11 @@
     </table>
     <table style="width: 100%;border-collapse: collapse; margin-top: 4px;">
         <tr>
-            @if (isset($show->show_bill_to_info) && $show->show_bill_to_info == 1)
+            @if (!empty($zatcaInvoice))
+                <td colspan="3" style="padding:4px 10px;vertical-align:top">
+                    @include('backend.setting.invoice_setting.zatca_buyer')
+                </td>
+            @elseif (isset($show->show_bill_to_info) && $show->show_bill_to_info == 1)
                 <td colspan="3" style="padding:4px 0;width:30%;vertical-align:top">
                     <h2
                         style="background-color: {{ isset($show->active_primary_color) &&
@@ -138,14 +148,14 @@
                         !empty($invoice_settings->primary_color)
                             ? $invoice_settings->primary_color
                             : '#014b94' }}; color: white; padding: 3px 10px; margin-bottom: 0;">
-                        Bill To
+                        {{ __('db.Bill To') }}
                     </h2>
                     <div style="margin-top: 10px;margin-left: 10px">
                         <span>{{ __('db.customer') }}: {{ $lims_customer_data->name }}</span>
                     </div>
-                    {{-- <div style="margin-left: 10px">
-                        <span>VAT Number:</span>&nbsp;&nbsp;<span>{{$lims_customer_data->tax_no}}</span>
-                    </div> --}}
+                    <div style="margin-left: 10px">
+                        <span>{{__('Tax Number')}}:</span>&nbsp;&nbsp;<span>{{$lims_customer_data->tax_no}}</span>
+                    </div>
                     <div style="margin-left: 10px">
 
                         <span>{{ __('db.Address') }}:</span>&nbsp;&nbsp;
@@ -172,7 +182,7 @@
 
         </tr>
     </table>
-    <table dir="@if (Config::get('app.locale') == 'ar' || $general_setting->is_rtl) {{ 'rtl' }} @endif"
+    <table dir="@if (Config::get('app.locale') == 'ar' || gen_setting()->is_rtl) {{ 'rtl' }} @endif"
         style="width: 100%;border-collapse: collapse;">
         <tr class="table-header"
             style="background-color: {{ isset($show->active_primary_color) &&
@@ -186,123 +196,100 @@
             </td>
             <td style="border:1px solid #222;padding:1px 3px;width:6%;text-align:center">{{ __('db.qty') }}</td>
             <td style="border:1px solid #222;padding:1px 3px;width:9%;text-align:center">{{ __('db.Unit Price') }}</td>
-            <td style="border:1px solid #222;padding:1px 3px;width:7%;text-align:center">{{ __('db.Total') }}</td>
+            <td style="border:1px solid #222;padding:1px 3px;width:7%;text-align:center">{{ __('db.Subtotal') }}</td>
             <td style="border:1px solid #222;padding:1px 3px;width:7%;text-align:center">{{ __('db.Tax') }}</td>
-            <td style="border:1px solid #222;padding:1px 2px;width:13%;text-align:center;">{{ __('db.Subtotal') }}</td>
+            <td style="border:1px solid #222;padding:1px 2px;width:13%;text-align:center;">{{ __('db.Total') }}</td>
         </tr>
-        <?php
-        $total_product_tax = 0;
-        $totalPrice = 0;
-        ?>
-
-        @foreach ($lims_product_sale_data as $key => $product_sale_data)
-            <?php
-            $lims_product_data = \App\Models\Product::find($product_sale_data->product_id);
-            if ($product_sale_data->sale_unit_id) {
-                $unit = \App\Models\Unit::select('unit_code')->find($product_sale_data->sale_unit_id);
-                $unit_code = $unit->unit_code;
-            } else {
-                $unit_code = '';
-            }
-
-            if ($product_sale_data->variant_id) {
-                $variant = \App\Models\Variant::select('name')->find($product_sale_data->variant_id);
-                $variant_name = $variant->name;
-            } else {
-                $variant_name = '';
-            }
-            $totalPrice += $product_sale_data->net_unit_price * $product_sale_data->qty;
-
-            $topping_names = [];
-            $topping_prices = [];
-            $topping_price_sum = 0;
-
-            if ($product_sale_data->topping_id) {
-                $decoded_topping_id = is_string($product_sale_data->topping_id) ? json_decode($product_sale_data->topping_id, true) : $product_sale_data->topping_id;
-                //dd(json_decode($product_sale_data->topping_id));
-                if (is_array($decoded_topping_id)) {
-                    foreach ($decoded_topping_id as $topping) {
-                        $topping_names[] = $topping['name']; // Extract name
-                        $topping_prices[] = $topping['price']; // Extract price
-                        $topping_price_sum += $topping['price']; // Sum up prices
-                    }
-                }
-            }
-
-            $net_price_with_toppings = $product_sale_data->net_unit_price + $topping_price_sum;
-            $total = ($product_sale_data->net_unit_price + $topping_price_sum) * $product_sale_data->qty;
-
-            $subtotal = $product_sale_data->total + $topping_price_sum;
-            ?>
+        @foreach ($line_items as $key => $item)
             <tr>
                 <td
-                    style="@if (Config::get('app.locale') == 'ar' || $general_setting->is_rtl) {{ 'border-right:1px solid #222;' }} @endif border:1px solid #222;padding:1px 3px;text-align: center;">
+                    style="@if (Config::get('app.locale') == 'ar' || gen_setting()->is_rtl) {{ 'border-right:1px solid #222;' }} @endif border:1px solid #222;padding:1px 3px;text-align: center;">
                     {{ $key + 1 }}</td>
                 <td style="border:1px solid #222;padding:1px 3px;font-size: 15px;line-height: 1.2;">
 
-                    {!! $lims_product_data->name !!}
-
-                    @if (!empty($topping_names))
-                        <br><small>({{ implode(', ', $topping_names) }})</small>
+                    {!! $item->product_name !!}
+                    @if (!empty($item->variant_name))
+                        <br><small style="font-weight: bold;">Variant: {{ $item->variant_name }}</small>
                     @endif
 
-                    @foreach ($product_custom_fields as $index => $fieldName)
-                        <?php $field_name = str_replace(' ', '_', strtolower($fieldName)); ?>
-                        @if ($lims_product_data->$field_name)
-                            @if (!$index)
-                                <br>
-                                <span style="font-weight: bold;">{{ $fieldName }}</span>
-                                {{ ': ' . $lims_product_data->$field_name }}
-                            @else
-                                <br>
-                                <span style="font-weight: bold;">{{ $fieldName }}</span>
-                                {{ ': ' . $lims_product_data->$field_name }}
-                            @endif
+                    @if (!empty($item->topping_names))
+                        <br><small>({{ implode(', ', $item->topping_names) }})</small>
+                    @endif
+
+                    @foreach ($item->custom_fields as $fieldName => $fieldValue)
+                        @if ($fieldValue)
+                            <br>
+                            <span style="font-weight: bold;">{{ $fieldName }}</span>
+                            {{ ': ' . $fieldValue }}
                         @endif
                     @endforeach
-                    @if ($product_sale_data->imei_number && !str_contains($product_sale_data->imei_number, 'null'))
-                        <br><small>IMEI or Serial: {{ $product_sale_data->imei_number }}</small>
+                    @if ($item->imei_number && !str_contains($item->imei_number, 'null'))
+                        <br><small>IMEI or Serial: {{ $item->imei_number }}</small>
                     @endif
                     <!-- warranty -->
-                    @if (isset($product_sale_data->warranty_duration))
+                    @if (isset($item->warranty_duration))
                         <br>
                         <span
-                            style="font-weight: bold;">Warranty</span>{{ ': ' . $product_sale_data->warranty_duration }}
+                            style="font-weight: bold;">Warranty</span>{{ ': ' . $item->warranty_duration }}
                         <br>
-                        <span style="font-weight: bold;">Expire At</span>{{ ': ' . $product_sale_data->warranty_end }}
+                        <span style="font-weight: bold;">Expire At</span>{{ ': ' . $item->warranty_end }}
                     @endif
                     <!-- guarantee -->
-                    @if (isset($product_sale_data->guarantee_duration))
+                    @if (isset($item->guarantee_duration))
                         <br>
                         <span
-                            style="font-weight: bold;">Guarantee</span>{{ ': ' . $product_sale_data->guarantee_duration }}
+                            style="font-weight: bold;">Guarantee</span>{{ ': ' . $item->guarantee_duration }}
                         <br>
-                        <span style="font-weight: bold;">Expire At</span>{{ ': ' . $product_sale_data->guarantee_end }}
+                        <span style="font-weight: bold;">Expire At</span>{{ ': ' . $item->guarantee_end }}
                     @endif
                 </td>
                 <td style="border:1px solid #222;padding:1px 3px;text-align:center">
-                    {{ $product_sale_data->qty . ' ' . $unit_code . ' ' . $variant_name }}</td>
+                    {{ $item->qty . ' ' . $item->unit_code }}</td>
                 <td style="border:1px solid #222;padding:1px 3px;text-align:center">
-                    {{format_currency($product_sale_data->net_unit_price, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
-                    @if (!empty($topping_prices))
-                        <br><small>+
-                            {{ implode(' + ', array_map(fn($price) => number_format($price, $general_setting->decimal, '.', ','), $topping_prices)) }}</small>
-                    @endif
+                    {{format_currency($item->net_unit_price, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
                 </td>
                 <td style="border:1px solid #222;padding:1px 3px;text-align:center">
-                    {{format_currency($total, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
+                    {{format_currency(!empty($zatcaInvoice) ? $item->subtotal - $item->tax : $item->line_total, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
                 </td>
                 <td style="border:1px solid #222;padding:1px 3px;text-align:center">
-                    {{format_currency($product_sale_data->tax, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
+                    {{format_currency($item->tax, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
                 </td>
                 <td
                     style="border:1px solid #222;border-right:1px solid #222;padding:1px 3px;text-align:center;font-size: 15px;">
-                    {{format_currency($subtotal, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
+                    {{format_currency($item->subtotal, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
                 </td>
             </tr>
         @endforeach
+        @if (!empty($return_summary['has_returns']))
+            <tr style="background-color: #fce8e8; font-weight: bold;">
+                <td colspan="7" style="border: 1px solid #222; padding: 3px 6px; color: #a94442;">
+                    {{ __('db.Linked Returns') }}
+                </td>
+            </tr>
+            @foreach($return_summary['returns'] as $rKey => $ret)
+                <tr style="background-color: #fff9f9;">
+                    <td style="border: 1px solid #222; padding: 2px 4px; text-align: center;">{{ $rKey + 1 }}</td>
+                    <td style="border: 1px solid #222; padding: 2px 4px;" colspan="2">
+                        <strong>{{ $ret['reference_no'] }}</strong> ({{ $ret['date'] }})
+                        @if(!empty($ret['items']))
+                            <div style="font-size: 11px; color: #555;">
+                                @foreach($ret['items'] as $item)
+                                    <span>• {{ $item['product_name'] }} (x{{ $item['qty'] }} {{ $item['unit_code'] }}) </span>
+                                @endforeach
+                            </div>
+                        @endif
+                    </td>
+                    <td style="border: 1px solid #222; padding: 2px 4px; text-align: center;" colspan="2">
+                        <span style="font-size: 11px;">{{ __('db.Refunded') }}: {{ $ret['refunded_amount'] > 0 ? format_currency($ret['refunded_amount'], $lims_sale_data->currency->symbol ?? '$') : '—' }}</span>
+                    </td>
+                    <td style="border: 1px solid #222; padding: 2px 4px; text-align: center; color: #a94442;" colspan="2">
+                        <strong>- {{ format_currency($ret['returned_amount'], $lims_sale_data->currency->symbol ?? '$') }}</strong>
+                    </td>
+                </tr>
+            @endforeach
+        @endif
         <tr>
-            <td colspan="3" rowspan="@if ($general_setting->invoice_format == 'gst' && $general_setting->state == 2) 6 @else 5 @endif"
+            <td colspan="3" rowspan="@if (gen_setting()->invoice_format == 'gst' && gen_setting()->state == 2) 6 @else 5 @endif"
                 style="border:1px solid #222;padding:1px 3px;text-align: center; vertical-align: top;">
                 @if (isset($show->show_payment_note) && $show->show_payment_note == 1 && $lims_sale_data->payment_note)
                     <p class="">
@@ -312,28 +299,16 @@
                     <p class=""> <strong>{{ __('db.Sale Note') }}:</strong>{{ $lims_sale_data->sale_note }}</p>
                 @endif
 
-                @php
-                    $lims_installment_plan_data = DB::table('installment_plans')->where([
-                        ['reference_type', 'sale'],
-                        ['reference_id', $lims_sale_data->id]
-                    ])->first();
-                @endphp
-                @if($lims_installment_plan_data)
-                    @php
-                        $inst_all   = DB::table('installments')->where('installment_plan_id', $lims_installment_plan_data->id)->get();
-                        $inst_total = $inst_all->count();
-                        $inst_paid  = $inst_all->where('status', 'completed')->count();
-                        $inst_next  = $inst_all->where('status', 'pending')->sortBy('payment_date')->first();
-                    @endphp
+                @if($installment_info)
                     <div style="border: 1px solid #222; padding: 5px; margin-top: 5px; text-align: left;">
                         <h4 style="margin: 0; text-align: center; border-bottom: 1px solid #222;">INSTALMENT SALE</h4>
-                        <p style="margin: 5px 0;"><strong>Plan:</strong> {{$lims_installment_plan_data->name}}</p>
-                        <p style="margin: 5px 0;"><strong>Duration:</strong> {{$lims_installment_plan_data->months}} Months</p>
-                        <p style="margin: 5px 0;"><strong>Additional Amount:</strong> {{format_currency($lims_installment_plan_data->additional_amount, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$')}}</p>
-                        <p style="margin: 5px 0;"><strong>Down Payment:</strong> {{format_currency($lims_installment_plan_data->down_payment, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$')}}</p>
-                        <p style="margin: 5px 0;"><strong>Instalments Paid:</strong> {{$inst_paid}}/{{$inst_total}}</p>
-                        @if($inst_next)
-                        <p style="margin: 5px 0;"><strong>Next Due:</strong> {{\Carbon\Carbon::parse($inst_next->payment_date)->format('d M Y')}}</p>
+                        <p style="margin: 5px 0;"><strong>Plan:</strong> {{$installment_info->plan->name}}</p>
+                        <p style="margin: 5px 0;"><strong>Duration:</strong> {{$installment_info->plan->months}} Months</p>
+                        <p style="margin: 5px 0;"><strong>Additional Amount:</strong> {{format_currency($installment_info->plan->additional_amount, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$')}}</p>
+                        <p style="margin: 5px 0;"><strong>Down Payment:</strong> {{format_currency($installment_info->plan->down_payment, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$')}}</p>
+                        <p style="margin: 5px 0;"><strong>Instalments Paid:</strong> {{$installment_info->paid}}/{{$installment_info->total}}</p>
+                        @if($installment_info->next)
+                        <p style="margin: 5px 0;"><strong>Next Due:</strong> {{\Carbon\Carbon::parse($installment_info->next->payment_date)->format('d M Y')}}</p>
                         @endif
                     </div>
                 @endif
@@ -347,7 +322,7 @@
                 {{ format_currency($lims_sale_data->total_price - ($lims_sale_data->total_tax + $lims_sale_data->order_tax), $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
             </td>
         </tr>
-        @if ($general_setting->invoice_format == 'gst' && $general_setting->state == 1)
+        @if (gen_setting()->invoice_format == 'gst' && gen_setting()->state == 1)
             <tr>
                 <td class="td-text" colspan="3"
                     style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);">
@@ -358,7 +333,7 @@
                     {{ format_currency($lims_sale_data->total_tax + $lims_sale_data->order_tax, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
                 </td>
             </tr>
-        @elseif($general_setting->invoice_format == 'gst' && $general_setting->state == 2)
+        @elseif(gen_setting()->invoice_format == 'gst' && gen_setting()->state == 2)
             <tr>
                 <td class="td-text" colspan="3"
                     style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);">
@@ -396,7 +371,7 @@
         <tr>
             <td class="td-text" colspan="3"
                 style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);">
-                {{ __('db.Discount') }}
+                {{ !empty($zatcaInvoice) ? 'Line discount (already included)' : __('db.Discount') }}
             </td>
             <td class="td-text"
                 style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">
@@ -417,7 +392,7 @@
         <tr>
             <td class="td-text" colspan="3"
                 style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);">
-                {{ __('db.grand total') }}</td>
+                {{ !empty($return_summary['has_returns']) ? __('db.Original Total') : __('db.grand total') }}</td>
             <td class="td-text"
                 style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">
                 {{ format_currency($lims_sale_data->grand_total, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
@@ -436,9 +411,31 @@
             </td>
         </tr>
         @endforeach
+        @if (!empty($return_summary['has_returns']))
+            <tr>
+                <td class="td-text" colspan="3"
+                    style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);color:#a94442;">
+                    {{ __('db.Less: Returns') }}
+                </td>
+                <td class="td-text"
+                    style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;color:#a94442;">
+                    - {{ format_currency($return_summary['total_returned_amount'], $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
+                </td>
+            </tr>
+            <tr>
+                <td class="td-text" colspan="3"
+                    style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);font-weight: bold;">
+                    {{ __('db.Net Total') }}
+                </td>
+                <td class="td-text"
+                    style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;font-weight: bold;">
+                    {{ format_currency($return_summary['net_grand_total'], $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
+                </td>
+            </tr>
+        @endif
         <tr>
-            @if ($general_setting->currency_position == 'prefix')
-                <td class="td-text" colspan="3" rowspan="4"
+            @if (gen_setting()->currency_position == 'prefix')
+                <td class="td-text" colspan="3" rowspan="6"
                     style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;vertical-align: bottom;font-size: 15px; vertical-align: top;">
                     @if (isset($show->show_in_words) && $show->show_in_words == 1)
                         {{ __('db.In Words') }}<br>{{ $currency_code }} <span
@@ -447,7 +444,7 @@
                     @endif
                 </td>
             @else
-                <td class="td-text" colspan="3" rowspan="4"
+                <td class="td-text" colspan="3" rowspan="6"
                     style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;vertical-align: bottom;font-size: 15px; vertical-align: top;">
                     {{ __('db.In Words') }}:<br><span
                         style="text-transform:capitalize;font-size: 15px;">{{ str_replace('-', ' ', $numberInWords) }}</span>
@@ -459,13 +456,35 @@
         <tr>
             <td class="td-text" colspan="3"
                 style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);">
-                {{ __('db.Paid') }}
+                {{ !empty($return_summary['total_refunded_amount']) ? __('db.Gross Paid') : __('db.Paid') }}
             </td>
             <td class="td-text"
                 style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">
                 {{ format_currency($lims_sale_data->paid_amount, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
             </td>
         </tr>
+        @if (!empty($return_summary['total_refunded_amount']))
+            <tr>
+                <td class="td-text" colspan="3"
+                    style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);color:#a94442;">
+                    {{ __('db.Less: Refunded') }}
+                </td>
+                <td class="td-text"
+                    style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;color:#a94442;">
+                    - {{ format_currency($return_summary['total_refunded_amount'], $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
+                </td>
+            </tr>
+            <tr>
+                <td class="td-text" colspan="3"
+                    style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);font-weight: bold;">
+                    {{ __('db.Net Paid') }}
+                </td>
+                <td class="td-text"
+                    style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;font-weight: bold;">
+                    {{ format_currency($return_summary['net_paid_amount'], $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
+                </td>
+            </tr>
+        @endif
         <tr>
             @if ($change_amount > 0)
                 <td class="td-text" colspan="3"
@@ -478,17 +497,17 @@
                 </td>
             @else
                 <td class="td-text" colspan="3"
-                    style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);">
+                    style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);font-weight: bold;">
                     {{ __('db.Due') }}
                 </td>
                 <td class="td-text"
-                    style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">
-                    {{ format_currency($lims_sale_data->grand_total - $lims_sale_data->paid_amount, $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
+                    style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;font-weight: bold;">
+                    {{ format_currency($return_summary['remaining_due'] ?? max(0, $lims_sale_data->grand_total - $lims_sale_data->paid_amount), $lims_sale_data->currency->symbol ?? $lims_sale_data->currency->code ?? '$') }}
                 </td>
             @endif
         </tr>
 
-        @if ($totalDue && isset($show->hide_total_due))
+        @if ($totalDue && isset($show->hide_total_due) && $lims_customer_data->type != 'walkin')
             <tr>
                 @if (!$show->hide_total_due)
                     <td class="td-text" colspan="3"
@@ -503,8 +522,21 @@
             </tr>
         @endif
     </table>
-    <table style="width: 100%; border-collapse: collapse;margin-top:-9px;">
 
+    @include('backend.setting.invoice_setting.partials.signature', [
+        'invoice_settings' => $invoice_settings,
+        'lims_sale_data' => $lims_sale_data,
+        'layout' => 'a4'
+    ])
+
+    <table style="width: 100%; border-collapse: collapse;margin-top:-9px;">
+        <tr>
+            <td>
+                @if (isset($show->show_footer_text) && $show->show_footer_text == 1)
+                    {!! $invoice_settings->footer_text ?? __('db.Thank you for shopping with us Please come again') !!}
+                @endif
+            </td>
+        </tr>
         <tr>
             <td style="width: 100%; text-align: center">
                 <br>
@@ -513,17 +545,10 @@
                     <?php echo '<img style="max-width:100%" src="data:image/png;base64,' . DNS1D::getBarcodePNG($lims_sale_data->reference_no, 'C128') . '" alt="barcode"   />'; ?>
                 @endif
                 <br><br>
-                @if (isset($show->show_qr_code) && $show->show_qr_code == 1)
-                    <?php echo '<img style="width:5%" src="data:image/png;base64,' . DNS2D::getBarcodePNG($qrText, 'QRCODE') . '" alt="barcode"   />'; ?>
+                @if (!empty($zatcaInvoice) || (isset($show->show_qr_code) && $show->show_qr_code == 1))
+                    <?php echo '<img style="width:10%" src="data:image/png;base64,' . DNS2D::getBarcodePNG($qrText, 'QRCODE') . '" alt="barcode"   />'; ?>
                 @endif
                 <br>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                @if (isset($show->show_footer_text) && $show->show_footer_text == 1)
-                    {!! $invoice_settings->footer_text ?? __('db.Thank you for shopping with us Please come again') !!}
-                @endif
             </td>
         </tr>
     </table>

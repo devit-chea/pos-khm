@@ -26,8 +26,10 @@
                                         <label>{{ __('db.Invoice Type') }}</label>
                                         <select name="size" id="" class="form-control">
                                             <option value="a4">A4</option>
+                                            <option value="a4_bilingual">A4 (Bilingual / ثنائي اللغة)</option>
                                             <option value="58mm">58mm(Thermal receipt)</option>
                                             <option value="80mm">80mm(Thermal receipt)</option>
+                                            <option value="80mm_bilingual">80mm (Bilingual / ثنائي اللغة)</option>
                                         </select>
                                         {{-- <input type="text" name="size" class="form-control"> --}}
                                     </div>
@@ -74,7 +76,7 @@
                                 </div>
                                 <div class="col-md-4 digit_number">
                                     <div class="form-group">
-                                        <label>{{ __('db.Number Of Digit (min-6, max-12)') }}*</label>
+                                        <label>{{ __('db.validation_digit_range', ['min' => 6, 'max' => 12]) }}*</label>
                                         <input type="number" name="number_of_digit" placeholder="6" required min="6"
                                             value="6" max="12" class="form-control">
 
@@ -111,7 +113,7 @@
 
                                 {{-- <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>{{ __('db.Footer Title') }}</label>
+                                        <label>{{ __('db.footer_title') }}</label>
                                         <input type="text" name="footer_title" class="form-control">
                                     </div>
                                 </div> --}}
@@ -159,7 +161,7 @@
 
                                 {{-- <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>{{ __('db.Preview Image') }}</label>
+                                        <label>{{ __('db.preview_image') }}</label>
                                         <input type="file" name="preview_invoice" class="form-control">
                                     </div>
                                 </div> --}}
@@ -227,9 +229,51 @@
                                     @endforeach
                                 </div>
 
+                                <hr>
+                                <div class="row">
+                                    <div class="col-md-12 mb-2">
+                                        <h4>{{ __('db.Invoice Signatures') }}</h4>
+                                    </div>
+                                    <div class="col-md-12 mb-3">
+                                        <label class="custom-checkbox">
+                                            <input type="checkbox" name="enable_invoice_signatures" value="1" id="enable_invoice_signatures">
+                                            <strong>{{ __('db.Enable Invoice Signatures') }}</strong>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="row" id="signature_options_section" style="display:none;">
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label class="custom-checkbox">
+                                                <input type="checkbox" name="show_prepared_by" value="1" checked>
+                                                {{ __('db.Show Prepared By') }}
+                                            </label>
+                                            <input type="text" name="prepared_by_label" class="form-control" placeholder="{{ __('db.Prepared By') }}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label class="custom-checkbox">
+                                                <input type="checkbox" name="show_authorized_by" value="1" checked>
+                                                {{ __('db.Show Authorized By') }}
+                                            </label>
+                                            <input type="text" name="authorized_by_label" class="form-control" placeholder="{{ __('db.Authorized By') }}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label class="custom-checkbox">
+                                                <input type="checkbox" name="show_customer_signature" value="1" checked>
+                                                {{ __('db.Show Customer Signature') }}
+                                            </label>
+                                            <input type="text" name="customer_signature_label" class="form-control" placeholder="{{ __('db.Customer Signature') }}">
+                                        </div>
+                                    </div>
+                                </div>
+
                             </div>
 
-                            <div class="form-group">
+                            <div class="form-group mt-3">
                                 <input type="submit" value="{{ __('db.submit') }}" class="btn btn-primary">
                             </div>
                             </form>
@@ -323,6 +367,14 @@
             }
 
             $(target).text(message).css('color', color);
+        });
+
+        $('#enable_invoice_signatures').on('change', function() {
+            if ($(this).is(':checked')) {
+                $('#signature_options_section').slideDown();
+            } else {
+                $('#signature_options_section').slideUp();
+            }
         });
     </script>
 @endpush

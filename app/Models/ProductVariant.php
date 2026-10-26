@@ -10,10 +10,11 @@ class ProductVariant extends Model
 
     public function scopeFindExactProduct($query, $product_id, $variant_id)
     {
-    	return $query->where([
-            ['product_id', $product_id],
-            ['variant_id', $variant_id]
-        ]);
+        return $query->where('product_id', $product_id)
+            ->where(function ($q) use ($variant_id) {
+                $q->where('variant_id', $variant_id)
+                  ->orWhere('id', $variant_id);
+            });
     }
 
     public function scopeFindExactProductWithCode($query, $product_id, $item_code)

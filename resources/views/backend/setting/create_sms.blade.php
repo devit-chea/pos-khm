@@ -38,7 +38,7 @@
                                         <textarea name="message" class="form-control message" rows="3" required></textarea>
                                     </div>
                                     <div class="form-group">
-                                        <button type="submit" class="btn btn-primary"><i class="fa fa-paper-plane"></i> {{__('db.Send SMS')}}</button>
+                                        <button type="submit" class="btn btn-primary"><i class="ti ti-paper-plane"></i> {{__('db.Send SMS')}}</button>
                                     </div>
                                 </div>
                             </div>

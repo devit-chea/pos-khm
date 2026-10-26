@@ -2,47 +2,37 @@
 
 namespace App\SMSProviders;
 
-use App\Models\ExternalService;
+use Illuminate\Support\Facades\Http;
 
 class ReveSms
 {
     public function send($data)
     {
-        $data['details'] = json_decode($data['details']);
-        $data['apikey'] = $data['details']->apikey;
-        $data['secretkey'] = $data['details']->secretkey;
-        $data['callerID'] = $data['details']->callerID;
-        $data['recipent'] = $data['recipent'];
-        $data['message'] = $data['message'];
+        $details = is_string($data['details'] ?? null)
+            ? json_decode($data['details'], true)
+            : (array) ($data['details'] ?? []);
 
-        $url = "http://smpp.revesms.com:7788/sendtext";
+        $apikey = $details['apikey'] ?? '';
+        $secretkey = $details['secretkey'] ?? '';
+        $callerID = $details['callerID'] ?? '';
+        $recipient = $data['recipent'] ?? ($data['numbers'][0] ?? '');
+        $message = $data['message'] ?? '';
+
+        $url = 'http://smpp.revesms.com:7788/sendtext';
 
         $params = [
-            'apikey' => $data['apikey'],
-            'secretkey' =>  $data['secretkey'],
-            'callerID' =>  $data['callerID'],
-            'toUser' => $data['recipent'],
-            'messageContent' => $data['message']
+            'apikey'         => $apikey,
+            'secretkey'      => $secretkey,
+            'callerID'       => $callerID,
+            'toUser'         => $recipient,
+            'messageContent' => $message,
         ];
 
-        $url .= '?' . http_build_query($params);
+        $response = Http::timeout(15)->get($url, $params);
 
-        $ch = curl_init();
-
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-        $response = curl_exec($ch);
-
-        if (curl_errno($ch)) {
-            $error_msg = curl_error($ch);
-            curl_close($ch);
-            return ['error' => $error_msg];
-        }
-
-        curl_close($ch);
-        
-        // dd($response);
-        return json_decode($response, true); 
+        return $response->json() ?? [
+            'status' => $response->successful() ? '0' : '-1',
+            'body'   => $response->body(),
+        ];
     }
 }

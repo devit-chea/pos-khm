@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
     
     <x-error-message key="name" />
     <x-error-message key="image" />
@@ -9,10 +13,11 @@
     <section>
         @if (in_array('employees-add', $all_permission))
             <div class="container-fluid">
-                <a href="{{ route('employees.create') }}" class="btn btn-info"><i class="dripicons-plus"></i>
+                <a href="{{ route('employees.create') }}" class="btn btn-info"><i class="ti ti-plus"></i>
                     {{ __('db.Add Employee') }}</a>
             </div>
         @endif
+        @include('backend.hrm.partials.warehouse_filter')
         <div class="table-responsive">
             <table id="employee-table" class="table">
                 <thead>
@@ -20,20 +25,18 @@
                         <th class="not-exported"></th>
                         <th>{{ __('db.Image') }}</th>
                         <th>{{ __('db.name') }}</th>
-                        <th>{{ __('db.Email') }}</th>
+                        <th>{{ __('db.email') }}</th>
                         <th>{{ __('db.Phone Number') }}</th>
+                        <th>{{ __('db.Warehouse') }}</th>
                         <th>{{ __('db.Department') }}</th>
                         <th>{{ __('db.Address') }}</th>
                         <th>{{ __('db.Staff Id') }}</th>
-                        @if (in_array('project', explode(',', $general_setting->modules)))
-                            <th>{{ __('db.Company') }}</th>
-                        @endif
+                        <th>{{ __('db.Active') }}</th>
                         <th class="not-exported">{{ __('db.action') }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($lims_employee_all as $key => $employee)
-                        @php $department = \App\Models\Department::find($employee->department_id); @endphp
                         <tr data-id="{{ $employee->id }}">
                             <td>{{ $key }}</td>
                             @if ($employee->image)
@@ -46,7 +49,8 @@
                             <td>{{ $employee->name }}</td>
                             <td>{{ $employee->email }}</td>
                             <td>{{ $employee->phone_number }}</td>
-                            <td>{{ @$department->name }}</td>
+                            <td>{{ $employee->warehouse?->name }}</td>
+                            <td>{{ $employee->department?->name }}</td>
                             <td>
                                 {{ $employee->address }}
                                 @if ($employee->city) {{ ', ' . $employee->city }} @endif
@@ -55,10 +59,13 @@
                                 @if ($employee->country) {{ ', ' . $employee->country }} @endif
                             </td>
                             <td>{{ $employee->staff_id }}</td>
-
-                            @if (in_array('project', explode(',', $general_setting->modules)))
-                                <td>{{ $employee->user->company_name }}</td>
-                            @endif
+                            <td>
+                                @if($employee->is_active)
+                                    <div class="badge badge-success">{{trans('db.Active')}}</div>
+                                @else
+                                    <div class="badge badge-danger">{{trans('db.Inactive')}}</div>
+                                @endif
+                            </td>
 
                             <td>
                                 <div class="btn-group">
@@ -89,8 +96,9 @@
                                                     data-biller_id="{{ $employee->biller_id }}"
                                                     data-user="{{ $employee->user ? 1 : 0 }}"
                                                     data-username="{{ $employee->user ? $employee->user->name : '' }}"
+                                                    data-is_active="{{ $employee->is_active }}"
                                                     data-toggle="modal" data-target="#editModal">
-                                                    <i class="dripicons-document-edit"></i> {{ __('db.edit') }}
+                                                    <i class="ti ti-edit"></i> {{ __('db.edit') }}
                                                 </button>
                                             </li>
                                         @endif
@@ -100,8 +108,8 @@
                                                 @csrf
                                                 @method('DELETE')
                                                 <li>
-                                                    <button type="submit" class="btn btn-link" onclick="return confirmDelete()">
-                                                        <i class="dripicons-trash"></i> {{ __('db.delete') }}
+                                                    <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}">
+                                                        <i class="ti ti-trash"></i> {{ __('db.delete') }}
                                                     </button>
                                                 </li>
                                             </form>
@@ -124,7 +132,7 @@
                 <div class="modal-header">
                     <h5 id="editEmployeeLabel" class="modal-title">{{ __('db.Update Employee') }}</h5>
                     <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                        <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                        <span aria-hidden="true"><i class="ti ti-x"></i></span>
                     </button>
                 </div>
                 <div class="modal-body">
@@ -147,7 +155,7 @@
 
                             <!-- Email -->
                             <div class="col-md-4 form-group">
-                                <label>{{ __('db.Email') }} *</label>
+                                <label>{{ __('db.email') }} *</label>
                                 <input type="email" name="email" required class="form-control">
                             </div>
 
@@ -199,7 +207,7 @@
                                 <label>{{ __('db.Department') }} *</label>
                                 <select class="form-control selectpicker" name="department_id" required>
                                     @foreach ($lims_department_list as $department)
-                                        <option value="{{ $department->id }}">{{ $department->name }}</option>
+                                        <option value="{{ $department->id }}" data-warehouse-id="{{ $department->warehouse_id }}">{{ $department->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -225,7 +233,7 @@
                                 <select class="form-control selectpicker" name="designation_id">
                                     <option value="" disabled selected>{{ __('db.Select Designation') }}</option>
                                     @foreach ($lims_designation_list as $designation)
-                                        <option value="{{ $designation->id }}">{{ $designation->name }}</option>
+                                        <option value="{{ $designation->id }}" data-warehouse-id="{{ $designation->warehouse_id }}">{{ $designation->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -234,11 +242,20 @@
                             <div class="col-md-4 form-group">
                                 <label>{{ __('db.Warehouse') }}</label>
                                 <select name="warehouse_id" class="form-control selectpicker"
-                                    data-live-search="true" title="{{ __('db.Select Warehouse') }}">
-                                    <option value="">{{ __('db.Select Warehouse') }}</option>
+                                    data-live-search="true" title="{{ __('db.select_warehouse') }}">
+                                    <option value="">{{ __('db.select_warehouse') }}</option>
                                     @foreach ($lims_warehouse_list as $warehouse)
                                         <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
                                     @endforeach
+                                </select>
+                            </div>
+
+                            <!-- Active Status -->
+                            <div class="col-md-4 form-group">
+                                <label>{{ __('db.Active') }} *</label>
+                                <select name="is_active" class="form-control selectpicker" required>
+                                    <option value="1">{{ __('db.Active') }}</option>
+                                    <option value="0">{{ __('db.Inactive') }}</option>
                                 </select>
                             </div>
 
@@ -257,11 +274,12 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
     <script type="text/javascript">
 
         @if (config('database.connections.saleprosaas_landlord'))
             if (localStorage.getItem("message")) {
-                alert(localStorage.getItem("message"));
+                SaleProToast.show(localStorage.getItem("message"));
                 localStorage.removeItem("message");
             }
 
@@ -269,7 +287,7 @@
             $.ajax({
                 type: 'GET',
                 async: false,
-                url: '{{ route('package.fetchData', $general_setting->package_id) }}',
+                url: '{{ route('package.fetchData', gen_setting()->package_id) }}',
                 success: function(data) {
                     if (data['number_of_employee'] > 0 && data['number_of_product'] <= numberOfEmployee) {
                         $("a.add-employee-btn").addClass('d-none');
@@ -279,7 +297,7 @@
         @endif
 
         var employee_id = [];
-        var user_verified = <?php echo json_encode(env('USER_VERIFIED')); ?>;
+        var user_verified = <?php echo json_encode(config('app.user_verified')); ?>;
 
         $.ajaxSetup({
             headers: {
@@ -287,12 +305,26 @@
             }
         });
 
-        function confirmDelete() {
-            if (confirm("Are you sure want to delete?")) {
-                return true;
-            }
-            return false;
+        function confirmDelete() { return true; }
+
+        function filterEditHrmChoicesByWarehouse() {
+            const warehouseId = $("#editModal select[name='warehouse_id']").val();
+            ['department_id', 'designation_id'].forEach(function(field) {
+                const $select = $("#editModal select[name='" + field + "']");
+                $select.find('option').each(function() {
+                    const optionWarehouse = $(this).data('warehouse-id');
+                    if (optionWarehouse !== undefined) {
+                        $(this).prop('disabled', String(optionWarehouse) !== String(warehouseId));
+                    }
+                });
+                if ($select.find('option:selected').prop('disabled')) {
+                    $select.val('');
+                }
+                $select.selectpicker('refresh');
+            });
         }
+
+        $("#editModal select[name='warehouse_id']").on('change', filterEditHrmChoicesByWarehouse);
 
         $(document).on('click', '.edit-btn', function() {
             var employee = $(this);
@@ -309,10 +341,12 @@
             $("#editModal input[name='basic_salary']").val(employee.data('basic_salary'));
 
             // Select fields
-            $("#editModal select[name='department_id']").val(employee.data('department_id'));
             $("#editModal select[name='shift_id']").val(employee.data('shift_id'));
+            $("#editModal select[name='warehouse_id']").val(employee.data('warehouse_id'));
+            filterEditHrmChoicesByWarehouse();
+            $("#editModal select[name='department_id']").val(employee.data('department_id'));
             $("#editModal select[name='designation_id']").val(employee.data('designation_id'));
-            $("#editModal select[name='warehouse_id']").val(employee.data('warehouse_id')); // ← warehouse
+            $("#editModal select[name='is_active']").val(employee.data('is_active'));
 
             // Refresh selectpickers
             $('.selectpicker').selectpicker('refresh');
@@ -325,14 +359,14 @@
                 "info": '<small>{{ __('db.Showing') }} _START_ - _END_ (_TOTAL_)</small>',
                 "search": '{{ __('db.Search') }}',
                 'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
                 }
             },
             'columnDefs': [
                 {
                     "orderable": false,
-                    'targets': [0, 1, 8]
+                    'targets': [0, 1, 9]
                 },
                 {
                     'render': function(data, type, row, meta) {
@@ -360,7 +394,7 @@
             buttons: [
                 {
                     extend: 'pdf',
-                    text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                    text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
@@ -389,7 +423,7 @@
                 },
                 {
                     extend: 'excel',
-                    text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                    text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
@@ -406,7 +440,7 @@
                 },
                 {
                     extend: 'csv',
-                    text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
@@ -423,10 +457,10 @@
                 },
                 {
                     extend: 'csv',
-                    text: '<i title="export for device" class="fa fa-tablet"></i>',
+                    text: '<i title="export for device" class="ti ti-tablet"></i>',
                     className: 'export-for-device',
                     exportOptions: {
-                        columns: [7, 2],
+                        columns: [8, 2],
                         rows: ':visible',
                         format: {
                             body: function(data, row, column, node) {
@@ -437,7 +471,7 @@
                 },
                 {
                     extend: 'print',
-                    text: '<i title="print" class="fa fa-print"></i>',
+                    text: '<i title="print" class="ti ti-printer"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
@@ -445,7 +479,7 @@
                     },
                 },
                 {
-                    text: '<i title="delete" class="dripicons-cross"></i>',
+                    text: '<i title="delete" class="ti ti-x"></i>',
                     className: 'buttons-delete',
                     action: function(e, dt, node, config) {
                         if (user_verified == '1') {
@@ -455,7 +489,7 @@
                                     employee_id[i - 1] = $(this).closest('tr').data('id');
                                 }
                             });
-                            if (employee_id.length && confirm("Are you sure want to delete?")) {
+                            if (employee_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                                 $.ajax({
                                     type: 'POST',
                                     url: 'employees/deletebyselection',
@@ -466,20 +500,22 @@
                                                 dt.row($(this).closest('tr')).remove().draw(false);
                                             }
                                         });
-                                        alert(data);
+                                        SaleProToast.show(data);
                                     }
                                 });
+                            }
+                            });
                             } else if (!employee_id.length) {
-                                alert('No employee is selected!');
+                                SaleProToast.show('No employee is selected!');
                             }
                         } else {
-                            alert('This feature is disable for demo!');
+                            SaleProToast.show('This feature is disable for demo!');
                         }
                     }
                 },
                 {
                     extend: 'colvis',
-                    text: '<i title="column visibility" class="fa fa-eye"></i>',
+                    text: '<i title="column visibility" class="ti ti-eye"></i>',
                     columns: ':gt(0)'
                 },
             ],

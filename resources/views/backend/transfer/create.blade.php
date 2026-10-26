@@ -21,7 +21,7 @@
                                     <div class="col-md-4">
                                         <div class="form-group">
                                             <label>{{__('db.date')}}</label>
-                                            <input type="text" name="created_at" class="form-control date" placeholder="{{ __('db.Choose date') }}" value="{{date($general_setting->date_format,strtotime('now'))}}"/>
+                                            <input type="text" name="created_at" class="form-control date" placeholder="{{ __('db.Choose date') }}" value="{{date(gen_setting()->date_format,strtotime('now'))}}"/>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
@@ -75,7 +75,7 @@
                                     <div class="col-md-12">
                                         <label>{{__('db.Select Product')}}</label>
                                         <div class="search-box input-group">
-                                            <button type="button" class="btn btn-secondary btn-lg"><i class="fa fa-barcode"></i></button>
+                                            <button type="button" class="btn btn-secondary btn-lg"><i class="ti ti-barcode"></i></button>
                                             <input type="text" name="product_code_name" id="lims_productcodeSearch" placeholder="{{ __('db.Please type product code and select') }}" class="form-control" />
                                         </div>
                                     </div>
@@ -94,7 +94,7 @@
                                                         <th>{{__('db.Net Unit Cost')}}</th>
                                                         <th>{{__('db.Tax')}}</th>
                                                         <th>{{__('db.Subtotal')}}</th>
-                                                        <th><i class="dripicons-trash"></i></th>
+                                                        <th><i class="ti ti-trash"></i></th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -103,9 +103,9 @@
                                                     <th colspan="2">{{__('db.Total')}}</th>
                                                     <th id="total-qty">0</th>
                                                     <th></th>
-                                                    <th id="total-tax">{{number_format(0, $general_setting->decimal, '.', '')}}</th>
-                                                    <th id="total">{{number_format(0, $general_setting->decimal, '.', '')}}</th>
-                                                    <th><i class="dripicons-trash"></i></th>
+                                                    <th id="total-tax">{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
+                                                    <th id="total">{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
+                                                    <th><i class="ti ti-trash"></i></th>
                                                 </tfoot>
                                             </table>
                                         </div>
@@ -141,7 +141,7 @@
                                     <div class="col-md-2">
                                         <div class="form-group">
                                             <input type="hidden" name="grand_total" />
-                                            <input type="hidden" name="paid_amount" value="{{number_format(0, $general_setting->decimal, '.', '')}}" />
+                                            <input type="hidden" name="paid_amount" value="{{number_format(0, gen_setting()->decimal, '.', '')}}" />
                                             <input type="hidden" name="payment_status" value="1" />
                                         </div>
                                     </div>
@@ -156,7 +156,7 @@
                                     <div class="col-md-4">
                                         <div class="form-group">
                                             <label>{{__('db.Attach Document')}}</label>
-                                            <i class="dripicons-question" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
+                                            <i class="ti ti-info-circle" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
                                             <input type="file" name="document" class="form-control" />
                                             @if($errors->has('extension'))
                                                 <span>
@@ -169,7 +169,7 @@
                                 <div class="row">
                                     <div class="col-md-12">
                                         <div class="form-group">
-                                            <label>{{__('db.Note')}}</label>
+                                            <label>{{__('db.note')}}</label>
                                             <textarea rows="5" class="form-control" name="note"></textarea>
                                         </div>
                                     </div>
@@ -188,16 +188,16 @@
     <div class="container-fluid">
         <table class="table table-bordered table-condensed totals">
             <td><strong>{{__('db.Items')}}</strong>
-                <span class="pull-right" id="item">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="item">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
             <td><strong>{{__('db.Total')}}</strong>
-                <span class="pull-right" id="subtotal">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="subtotal">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
             <td><strong>{{__('db.Shipping Cost')}}</strong>
-                <span class="pull-right" id="shipping_cost">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="shipping_cost">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
             <td><strong>{{__('db.grand total')}}</strong>
-                <span class="pull-right" id="grand_total">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="grand_total">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
         </table>
     </div>
@@ -206,7 +206,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="modal_header" class="modal-title"></h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                     <form>
@@ -314,7 +314,7 @@ $('#lims_productcodeSearch').on('input', function(){
 
     if(!warehouse_id){
         $('#lims_productcodeSearch').val(temp_data.substring(0, temp_data.length - 1));
-        alert('Please select Warehouse!');
+        SaleProToast.show('Please select Warehouse!');
     }
 });
 
@@ -352,7 +352,7 @@ $("#myTable").on("change", ".batch-no", function () {
     var warehouse_id = $('#from-warehouse-id').val();
     $.get('../check-batch-availability/' + product_id + '/' + $(this).val() + '/' + warehouse_id, function(data) {
         if(data['message'] != 'ok') {
-            alert(data['message']);
+            SaleProToast.show(data['message']);
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.batch-no').val('');
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product-batch-id').val('');
         }
@@ -448,7 +448,7 @@ function productSearch(data){
                 // console.log('arra '+ rowindex);
 
                 if(imeiNumbersArray.includes(product_info[2])) {
-                    alert('Same imei or serial number is not allowed!');
+                    SaleProToast.show('Same imei or serial number is not allowed!');
                     flag = false;
                     $('#lims_productcodeSearch').val('');
                 }
@@ -466,7 +466,7 @@ function productSearch(data){
         //     imeiNumbersArray = imeiNumbers.split(",");
 
         //     if(imeiNumbersArray.includes(product_info[2])) {
-        //         alert('Same imei or serial number is not allowed!');
+        //         SaleProToast.show('Same imei or serial number is not allowed!');
         //         flag = 0;
         //         $('#lims_productcodeSearch').val('');
         //     } else {
@@ -510,18 +510,18 @@ function productSearch(data){
                         batch = '';
                     temp_unit_name = (data[6]).split(',');
                     if(data[15])
-                        cols += '<td>' + data[0] + '<button type="button" class="edit-product btn btn-link" data-toggle="modal" data-target="#editModal"> <i class="dripicons-document-edit"></i></button><br>{{__("db.qty")}}: '+data[15]+'<br>'+batch+'</td>';
+                        cols += '<td>' + data[0] + '<button type="button" class="edit-product btn btn-link" data-toggle="modal" data-target="#editModal"> <i class="ti ti-edit"></i></button><br>{{__("db.qty")}}: '+data[15]+'<br>'+batch+'</td>';
                     else
-                        cols += '<td>' + data[0] + '<button type="button" class="edit-product btn btn-link" data-toggle="modal" data-target="#editModal"> <i class="dripicons-document-edit"></i></button></td>';
+                        cols += '<td>' + data[0] + '<button type="button" class="edit-product btn btn-link" data-toggle="modal" data-target="#editModal"> <i class="ti ti-edit"></i></button></td>';
                     cols += '<td>' + data[1] + '</td>';
                     if(data[15])
-                        cols += '<td><input type="number" class="form-control qty" name="qty[]" value="1" max="'+data[15]+'" step="any" required style="max-width: 70px"/></td>';
+                        cols += '<td><input type="number" class="form-control qty" name="qty[]" value="1" max="'+data[15]+'" step="any" min="0.000001" required style="max-width: 70px"/></td>';
                     else
-                        cols += '<td><input type="number" class="form-control qty" name="qty[]" value="1" max="'+data[15]+'" step="any" required style="max-width: 70px"/></td>';
+                        cols += '<td><input type="number" class="form-control qty" name="qty[]" value="1" max="'+data[15]+'" step="any" min="0.000001" required style="max-width: 70px"/></td>';
                     cols += '<td class="net_unit_cost"></td>';
                     cols += '<td class="tax"></td>';
                     cols += '<td class="sub-total"></td>';
-                    cols += '<td><button type="button" class="ibtnDel btn btn-md btn-danger"><i class="dripicons-trash"></i></button></td>';
+                    cols += '<td><button type="button" class="ibtnDel btn btn-md btn-danger"><i class="ti ti-trash"></i></button></td>';
                     cols += '<input type="hidden" class="product-code" name="product_code[]" value="' + data[1] + '"/>';
                     cols += '<input type="hidden" class="product-id" name="product_id[]" value="' + data[9] + '"/>';
                     cols += '<input type="hidden" class="purchase-unit" name="purchase_unit[]" value="' + temp_unit_name[0] + '"/>';
@@ -538,7 +538,7 @@ function productSearch(data){
                     if(data[15] >= 1){
                         newRow.append(cols);
                     }else{
-                        alert('Quantity not available');
+                        SaleProToast.show('Quantity not available');
                     }
                     $("table.order-list tbody").prepend(newRow);
                     rowindex = newRow.index();
@@ -604,7 +604,7 @@ function edit() {
     $('input[name="edit_qty"]').val(qty);
 
     unitConversion();
-    $('input[name="edit_unit_cost"]').val(row_product_cost.toFixed({{$general_setting->decimal}}));
+    $('input[name="edit_unit_cost"]').val(row_product_cost.toFixed({{gen_setting()->decimal}}));
 
     temp_unit_name = (unit_name[rowindex]).split(',');
     temp_unit_name.pop();
@@ -638,7 +638,7 @@ function checkQuantity(purchase_qty, flag) {
         total_qty = purchase_qty / operation_value[0];
 
     if (total_qty > parseFloat(product_qty[pos])) {
-        alert('Quantity exceeds stock quantity!');
+        SaleProToast.show('Quantity exceeds stock quantity!');
         if (flag) {
             purchase_qty = purchase_qty.substring(0, purchase_qty.length - 1);
             //$('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val(purchase_qty);
@@ -657,19 +657,19 @@ function checkQuantity(purchase_qty, flag) {
 
 function calculateRowProductData(quantity) {
     unitConversion();
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val(tax_rate[rowindex].toFixed({{$general_setting->decimal}}));
+    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val(tax_rate[rowindex].toFixed({{gen_setting()->decimal}}));
 
     if (tax_method[rowindex] == 1) {
         var net_unit_cost = row_product_cost;
         var tax = net_unit_cost * quantity * (tax_rate[rowindex] / 100);
         var sub_total = (net_unit_cost * quantity) + tax;
 
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').text(net_unit_cost.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax').text(tax.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text(sub_total.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total.toFixed({{$general_setting->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').text(net_unit_cost.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax').text(tax.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text(sub_total.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total.toFixed({{gen_setting()->decimal}}));
     } else {
 
         var sub_total_unit = row_product_cost;
@@ -677,12 +677,12 @@ function calculateRowProductData(quantity) {
         var tax = (sub_total_unit - net_unit_cost) * quantity;
         var sub_total = sub_total_unit * quantity;
 
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').text(net_unit_cost.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax').text(tax.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text(sub_total.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total.toFixed({{$general_setting->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').text(net_unit_cost.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax').text(tax.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text(sub_total.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total.toFixed({{gen_setting()->decimal}}));
     }
 
     calculateTotal();
@@ -723,8 +723,8 @@ function calculateTotal() {
             }
     });
 
-    $("#total-tax").text(total_tax.toFixed({{$general_setting->decimal}}));
-    $('input[name="total_tax"]').val(total_tax.toFixed({{$general_setting->decimal}}));
+    $("#total-tax").text(total_tax.toFixed({{gen_setting()->decimal}}));
+    $('input[name="total_tax"]').val(total_tax.toFixed({{gen_setting()->decimal}}));
 
     //Sum of subtotal
     var total = 0;
@@ -736,8 +736,8 @@ function calculateTotal() {
                 }
         // total += parseFloat($(this).text());
     });
-    $("#total").text(total.toFixed({{$general_setting->decimal}}));
-    $('input[name="total_cost"]').val(total.toFixed({{$general_setting->decimal}}));
+    $("#total").text(total.toFixed({{gen_setting()->decimal}}));
+    $('input[name="total_cost"]').val(total.toFixed({{gen_setting()->decimal}}));
 
     calculateGrandTotal();
 }
@@ -751,7 +751,7 @@ function calculateGrandTotal() {
     var shipping_cost = parseFloat($('input[name="shipping_cost"]').val());
 
     if (!shipping_cost)
-        shipping_cost = {{number_format(0, $general_setting->decimal, '.', '')}};
+        shipping_cost = {{number_format(0, gen_setting()->decimal, '.', '')}};
 
     item = ++item + '(' + total_qty + ')';
 
@@ -759,10 +759,10 @@ function calculateGrandTotal() {
 
     $('#item').text(item);
     $('input[name="item"]').val($('table.order-list tbody tr:last').index() + 1);
-    $('#subtotal').text(subtotal.toFixed({{$general_setting->decimal}}));
-    $('#shipping_cost').text(shipping_cost.toFixed({{$general_setting->decimal}}));
-    $('#grand_total').text(grand_total.toFixed({{$general_setting->decimal}}));
-    $('input[name="grand_total"]').val(grand_total.toFixed({{$general_setting->decimal}}));
+    $('#subtotal').text(subtotal.toFixed({{gen_setting()->decimal}}));
+    $('#shipping_cost').text(shipping_cost.toFixed({{gen_setting()->decimal}}));
+    $('#grand_total').text(grand_total.toFixed({{gen_setting()->decimal}}));
+    $('input[name="grand_total"]').val(grand_total.toFixed({{gen_setting()->decimal}}));
 }
 
 $('input[name="shipping_cost"]').on("input", function() {
@@ -791,15 +791,44 @@ $(window).keydown(function(e){
 $('#transfer-form').on('submit',function(e){
     var rownumber = $('table.order-list tbody tr:last').index();
     if (rownumber < 0) {
-        alert("Please insert product to order table!")
+        SaleProToast.show("Please insert product to order table!");
         e.preventDefault();
+        return false;
     }
     else if($('select[name="from_warehouse_id"]').val() == $('select[name="to_warehouse_id"]').val()){
-        alert('Both Warehouse can not be same!');
+        SaleProToast.show('Both Warehouse can not be same!');
         e.preventDefault();
+        return false;
     }
-    else {
-        $("#submit-button").prop('disabled', true);
+
+    var invalidInput = null;
+    $('table.order-list tbody tr').each(function() {
+        var $qtyInput = $(this).find('input.qty');
+        var rawVal = String($qtyInput.val() === null ? '' : $qtyInput.val()).trim();
+        var numVal = Number(rawVal);
+        $qtyInput.removeClass('is-invalid');
+
+        if (rawVal === '' || !Number.isFinite(numVal) || numVal <= 0) {
+            invalidInput = $qtyInput;
+            return false;
+        }
+    });
+
+    if (invalidInput) {
+        invalidInput.addClass('is-invalid').focus();
+        SaleProToast.show("Quantity must be greater than zero.");
+        e.preventDefault();
+        return false;
+    }
+
+    $("#submit-button").prop('disabled', true);
+});
+
+$(document).on('input change', '#transfer-form input.qty', function() {
+    var rawVal = String($(this).val() === null ? '' : $(this).val()).trim();
+    var numVal = Number(rawVal);
+    if (rawVal !== '' && Number.isFinite(numVal) && numVal > 0) {
+        $(this).removeClass('is-invalid');
     }
 });
 </script>

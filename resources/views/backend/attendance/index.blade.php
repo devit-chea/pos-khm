@@ -1,42 +1,41 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 @extends('backend.layout.main')
 @section('content')
 
 @push('css')
-    @if (!config('database.connections.saleprosaas_landlord'))
-        <link rel="preload" href="<?php echo asset('vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" rel="stylesheet">
-        </noscript>
-    @else
-        <link rel="preload" href="<?php echo asset('../../vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" as="style"
-            onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('../../vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" rel="stylesheet">
-        </noscript>
-    @endif
+    @include('backend.layout.partials.datatable_css')
+
+    <link rel="preload" href="{{ asset($asset_prefix . 'vendor/jquery-timepicker/jquery.timepicker.min.css') }}" as="style"
+        onload="this.onload=null;this.rel='stylesheet'">
+    <noscript>
+        <link href="{{ asset($asset_prefix . 'vendor/jquery-timepicker/jquery.timepicker.min.css') }}" rel="stylesheet">
+    </noscript>
 @endpush
 
 <x-success-message key="message" />
 <x-error-message key="not_permitted" />
 
 <section>
+    @include('backend.hrm.partials.warehouse_filter')
     <div class="container-fluid mt-4">
 
         <!-- Buttons -->
         <div class="mb-3 d-flex">
             <button class="btn btn-info mr-2" data-toggle="modal" data-target="#createModal">
-                <i class="dripicons-plus"></i> {{ __('db.Add Attendance') }}
+                <i class="ti ti-plus"></i> {{ __('db.Add Attendance') }}
             </button>
 
             <button class="btn btn-secondary mr-2" type="button" data-toggle="collapse" data-target="#importCsv"
                 aria-expanded="false" aria-controls="importCsv">
-                <i class="fa fa-upload"></i> {{ __('db.Import CSV') }}
+                <i class="ti ti-upload"></i> {{ __('db.Import CSV') }}
             </button>
 
             <!-- Filter Button -->
             <button class="btn btn-warning" type="button" data-toggle="collapse" data-target="#filterSection"
                 aria-expanded="false" aria-controls="filterSection">
-                <i class="fa fa-filter"></i> {{ __('db.Filter') }}
+                <i class="ti ti-filter"></i> {{ __('db.Filter') }}
             </button>
         </div>
 
@@ -69,8 +68,8 @@
                                 <select name="status" class="form-control" id="filterStatus">
                                     <option value="">All</option>
                                     <option value="Present">{{ __('db.Present') }}</option>
-                                    <option value="Absent">{{ __('db.Absent') }}</option>
-                                    <option value="Leave">{{ __('db.Leave') }}</option>
+                                    <option value="Absent">{{ __('db.absent') }}</option>
+                                    <option value="Leave">{{ __('db.leave') }}</option>
                                 </select>
                             </div>
 
@@ -113,7 +112,7 @@
                             </div>
                             <div class="col-md-4 mb-3 d-flex align-items-end">
                                 <button type="submit" class="btn btn-primary mr-2">
-                                    <i class="fa fa-check-square-o"></i> {{ __('db.Save') }}
+                                    <i class="ti ti-check-square-o"></i> {{ __('db.Save') }}
                                 </button>
                                 <button type="reset" class="btn btn-secondary">Reset</button>
                             </div>
@@ -148,7 +147,7 @@
                     data-employee_id="{{ $attendance['employee_id'] }}"
                     data-warehouse="{{ $attendance['warehouse_id'] ?? '' }}">
                     <td>{{ $key }}</td>
-                    <td>{{ date($general_setting->date_format, strtotime($attendance['date'])) }}</td>
+                    <td>{{ date(gen_setting()->date_format, strtotime($attendance['date'])) }}</td>
                     <td>{{ $attendance['employee_name'] }}</td>
                     <td>{!! $attendance['checkin_checkout'] !!}</td>
                     <td>
@@ -164,8 +163,8 @@
                             <form action="{{ route('attendances.delete', [$attendance['date'], $attendance['employee_id']]) }}" method="post">
                                 @csrf
                                 @method('delete')
-                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirmDelete()">
-                                    <i class="dripicons-trash"></i>
+                                <button type="submit" class="btn btn-sm btn-danger" data-confirm-message="{{ __('db.Are you sure want to delete?') }}">
+                                    <i class="ti ti-trash"></i>
                                 </button>
                             </form>
                         </div>
@@ -183,7 +182,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Attendance')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
               <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -200,7 +199,7 @@
                     </div>
                     <div class="col-md-6 form-group">
                         <label>{{__('db.date')}} *</label>
-                        <input type="text" name="date" class="form-control date" value="{{date($general_setting->date_format)}}" required>
+                        <input type="text" name="date" class="form-control date" value="{{date(gen_setting()->date_format)}}" required>
                     </div>
                     <div class="col-md-6 form-group">
                         <label>{{__('db.CheckIn')}} *</label>
@@ -211,7 +210,7 @@
                         <input type="text" id="checkout" name="checkout" class="form-control" value="@if($lims_hrm_setting_data){{$lims_hrm_setting_data->checkout}}@endif" required>
                     </div>
                     <div class="col-md-12 form-group">
-                        <label>{{__('db.Note')}}</label>
+                        <label>{{__('db.note')}}</label>
                         <textarea name="note" rows="3" class="form-control"></textarea>
                     </div>
                 </div>
@@ -227,20 +226,15 @@
 @endsection
 
 @push('scripts')
-    @if (!config('database.connections.saleprosaas_landlord'))
-        <script type="text/javascript" src="<?php echo asset('vendor/jquery/jquery.timepicker.min.js'); ?>"></script>
-    @else
-        <script type="text/javascript" src="<?php echo asset('../../vendor/jquery/jquery.timepicker.min.js'); ?>"></script>
-    @endif
+    @include('backend.layout.partials.datatable_js')
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/jquery/jquery.timepicker.min.js') }}"></script>
     <script type="text/javascript">
 
         $("ul#hrm").siblings('a').attr('aria-expanded','true');
         $("ul#hrm").addClass("show");
         $("ul#hrm #attendance-menu").addClass("active");
 
-        function confirmDelete() {
-            return confirm("Are you sure want to delete?");
-        }
+        function confirmDelete() { return true; }
 
         var date = $('.date');
         date.datepicker({
@@ -260,8 +254,8 @@
                 "info": '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
                 "search": '{{__("db.Search")}}',
                 'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
                 }
             },
             'columnDefs': [
@@ -289,7 +283,7 @@
             buttons: [
                 {
                     extend: 'pdf',
-                    text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                    text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
@@ -297,7 +291,7 @@
                 },
                 {
                     extend: 'excel',
-                    text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                    text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
@@ -305,7 +299,7 @@
                 },
                 {
                     extend: 'csv',
-                    text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
@@ -313,18 +307,18 @@
                 },
                 {
                     extend: 'print',
-                    text: '<i title="print" class="fa fa-print"></i>',
+                    text: '<i title="print" class="ti ti-printer"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
                     },
                 },
                 {
-                    text: '<i title="delete" class="dripicons-cross"></i>',
+                    text: '<i title="delete" class="ti ti-x"></i>',
                     className: 'buttons-delete',
                     action: function ( e, dt, node, config ) {
                         var attendance_selected = [];
-                        var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+                        var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
                         if(user_verified == '1') {
                             var rows_selected = dt.column(0).checkboxes.selected();
                             $.each(rows_selected, function(index, rowId){
@@ -333,26 +327,28 @@
                                                         $(row_single).data('employee_id')];
                             });
 
-                            if(attendance_selected.length && confirm("Are you sure want to delete?")) {
+                            if (attendance_selected.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                                 $.ajax({
                                     type:'POST',
                                     url:'attendance/deletebyselection',
                                     data:{ attendanceSelectedArray: attendance_selected },
                                     success:function(data){
-                                        alert(data);
+                                        SaleProToast.show(data);
                                         dt.rows(rows_selected).remove().draw();
                                     }
                                 });
+                            }
+                            });
                             } else if(!attendance_selected.length)
-                                alert('Nothing is selected!');
+                                SaleProToast.show('Nothing is selected!');
                         } else {
-                            alert('This feature is disable for demo!');
+                            SaleProToast.show('This feature is disable for demo!');
                         }
                     }
                 },
                 {
                     extend: 'colvis',
-                    text: '<i title="column visibility" class="fa fa-eye"></i>',
+                    text: '<i title="column visibility" class="ti ti-eye"></i>',
                     columns: ':gt(0)'
                 },
             ],
@@ -375,8 +371,8 @@
                 if(status) {
                     var statusText = $(data).find('td:eq(4)').text().trim();
                     show = show && ((status === 'Present' && statusText === '{{ __("db.Present") }}') ||
-                                    (status === 'Absent' && statusText === '{{ __("db.Absent") }}') ||
-                                    (status === 'Leave' && statusText === '{{ __("db.Leave") }}'));
+                                    (status === 'Absent' && statusText === '{{ __("db.absent") }}') ||
+                                    (status === 'Leave' && statusText === '{{ __("db.leave") }}'));
                 }
 
                 if(warehouse) show = show && ($(data).data('warehouse').toString() === warehouse);

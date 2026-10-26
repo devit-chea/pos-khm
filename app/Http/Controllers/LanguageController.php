@@ -30,7 +30,7 @@ class LanguageController extends Controller
 
     public function store(Request $request)
     {
-        if(env('USER_VERIFIED')) {
+        if(config('app.user_verified')) {
             $request->validate([
                 'language' => 'required|unique:languages,language',
                 'name' => 'required|string|max:255',
@@ -54,7 +54,7 @@ class LanguageController extends Controller
 
     public function update(Request $request, $id)
     {
-        if(env('USER_VERIFIED')) {
+        if(config('app.user_verified')) {
             $request->validate([
                 'name' => 'required|string',
                 'language' => 'required|string',
@@ -79,7 +79,7 @@ class LanguageController extends Controller
 
     public function switchLanguage($id)
     {
-        if (env('USER_VERIFIED')) {
+        if (config('app.user_verified')) {
             Language::setDefaultLanguage($id);
         } else {
             $language = Language::findOrFail($id);
@@ -91,7 +91,7 @@ class LanguageController extends Controller
 
     public function setDefault($id)
     {
-        if(env('USER_VERIFIED')) {        
+        if(config('app.user_verified')) {        
             Language::setDefaultLanguage($id);
             return response()->json(['success' => 'Default language updated.']);
         }
@@ -99,7 +99,7 @@ class LanguageController extends Controller
 
     public function destroy($id)
     {
-        if(env('USER_VERIFIED')) {
+        if(config('app.user_verified')) {
             $language = Language::findOrFail($id);
             if (!isset($language)) {
                 return response()->json(['error' => 'Language not found!']);

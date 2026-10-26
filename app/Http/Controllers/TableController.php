@@ -4,24 +4,32 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Table;
+use App\Models\Warehouse;
 use App\Models\GeneralSetting;
+use Illuminate\Support\Facades\Schema;
 use DB;
 
 class TableController extends Controller
 {
     use \App\Traits\CacheForget;
+
+    private function restaurantModuleAvailable(): bool
+    {
+        return is_dir(base_path('Modules/Restaurant')) && Schema::hasTable('floors');
+    }
+
     public function index()
     {
         $lims_table_all = Table::where('is_active', true)->get();
+        $lims_warehouse_list = Warehouse::where('is_active', true)->get();
 
-        $general_setting = GeneralSetting::latest()->first();
-        if(in_array('restaurant',explode(',',$general_setting->modules))){
+        if($this->restaurantModuleAvailable()){
             $floors = DB::table('floors')->get();
 
-            return view('backend.table.index', compact('lims_table_all','floors'));
+            return view('backend.table.index', compact('lims_table_all','floors','lims_warehouse_list')); 
         }
 
-        return view('backend.table.index', compact('lims_table_all'));
+        return view('backend.table.index', compact('lims_table_all','lims_warehouse_list'));
     }
 
     public function create()
@@ -35,8 +43,7 @@ class TableController extends Controller
         $data['is_active'] = true;
         $new = Table::create($data);
 
-        $general_setting = GeneralSetting::latest()->first();
-        if(in_array('restaurant',explode(',',$general_setting->modules))){
+        if($this->restaurantModuleAvailable()){
             $floor = DB::table('floors')->where('id',$request->floor_id)->first();
             $newTable = [
                 'id' => $new->id, // Unique ID for the new table
@@ -78,8 +85,7 @@ class TableController extends Controller
         $floor_prev_id = $table->floor_id;
         $table->update($request->all());
 
-        $general_setting = GeneralSetting::latest()->first();
-        if(in_array('restaurant',explode(',',$general_setting->modules))){
+        if($this->restaurantModuleAvailable()){
 
             if($floor_prev_id != $request->floor_id){
                 $floor_prev = DB::table('floors')->where('id',$floor_prev_id)->first();
@@ -157,8 +163,7 @@ class TableController extends Controller
         $table = Table::find($id);
         $table->update(['is_active'=>false]);
 
-        $general_setting = GeneralSetting::latest()->first();
-        if(in_array('restaurant',explode(',',$general_setting->modules))){
+        if($this->restaurantModuleAvailable()){
             $floor = DB::table('floors')->where('id',$table->floor_id)->first();
             $floorplan = json_decode($floor->floorplan, true);
 
@@ -169,6 +174,8 @@ class TableController extends Controller
                 return $item['id'] != $table_id;
             });
 
+
+
             // Save the updated floorplan back to the database
             DB::table('floors')
                 ->where('id', $table->floor_id)
@@ -177,5 +184,63 @@ class TableController extends Controller
 
         $this->cacheForget('table_list');
         return redirect()->back()->with('message', __('db.Table deleted successfully'));
+    }
+
+    public function floorplanStatus(Request $request)
+    {
+        $warehouse_id = $request->input('warehouse_id') ? (int)$request->input('warehouse_id') : null;
+        
+        $floors = [];
+        $tableStatus = [];
+
+        if ($this->restaurantModuleAvailable()) {
+            $floors = DB::table('floors')
+                ->when($warehouse_id, function($query, $warehouse_id) {
+                    return $query->where('warehouse_id', $warehouse_id);
+                })
+                ->get()
+                ->map(function($floor) {
+                    $floor->floorplan = json_decode($floor->floorplan, true);
+                    return $floor;
+                });
+
+            if (class_exists(\Modules\Restaurant\Services\TableOccupancyService::class)) {
+                $tableStatus = \Modules\Restaurant\Services\TableOccupancyService::getTableStatusMap($warehouse_id);
+            }
+        }
+        
+        if (empty($tableStatus)) {
+            // Keep the fallback scoped to the selected warehouse. Returning all
+            // active tables can expose IDs that do not exist in the current POS
+            // table selector, which makes table selection silently fail.
+            $tables = \App\Models\Table::query()
+                ->join('floors', 'tables.floor_id', '=', 'floors.id')
+                ->where('tables.is_active', true)
+                ->when($warehouse_id, function ($query, $warehouse_id) {
+                    $query->where('floors.warehouse_id', $warehouse_id);
+                })
+                ->select('tables.id', 'tables.name')
+                ->get();
+            foreach ($tables as $table) {
+                $tableStatus[$table->id] = [
+                    'id'               => $table->id,
+                    'name'             => $table->name,
+                    'status'           => 'available',
+                    'readiness'        => null,
+                    'open_order_count' => 0,
+                    'sale_id'          => null,
+                    'item_count'       => null,
+                    'total'            => null,
+                    'waiter_id'        => null,
+                    'waiter_name'      => null,
+                    'opened_at'        => null,
+                ];
+            }
+        }
+        
+        return response()->json([
+            'floors' => $floors,
+            'tables' => $tableStatus
+        ]);
     }
 }

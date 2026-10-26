@@ -19,9 +19,7 @@ class Common
     {
 
         //get general setting value
-        $general_setting =  Cache::remember('general_setting', 60*60*24*365, function () {
-            return DB::table('general_settings')->latest()->first();
-        });
+        $general_setting = gen_setting();
 
         // ✅ Timezone setup
         $timezone = $general_setting->timezone ?? config('app.timezone');
@@ -43,7 +41,7 @@ class Common
                 if (!request()->is('login')) {
                     return redirect('/login')->with('not_permitted', __('db.account_inactive'));
                 }
-            } elseif ($general_setting->expiry_date) {
+            } elseif ($tenant?->subscription_type !== 'profit_commission' && $general_setting->expiry_date) {
                 $expiry_date = date("Y-m-d", strtotime($general_setting->expiry_date));
                 if($todayDate > $expiry_date) {
                     auth()->logout();
@@ -53,6 +51,17 @@ class Common
             View::share('subdomain', $subdomain);
         }
         //setting language
+        $currentLocale = app()->getLocale();
+        $translations = Cache::rememberForever("translations_{$currentLocale}", function () use ($currentLocale) {
+            if (!Schema::hasTable('translations')) {
+                return [];
+            }
+            return \App\Models\Translation::getTrnaslactionsByLocale($currentLocale);
+        });
+        if (!empty($translations)) {
+            app('translator')->addLines($translations, $currentLocale);
+        }
+
         View::composer(['backend.layout.0main_rtl', 'backend.layout.main'], function ($view) {
             $languages = Cache::rememberForever('languages_list', function () {
                 if (Schema::hasTable('languages')) {
@@ -66,75 +75,75 @@ class Common
             $view->with('languages', $languages);
         });
 
-        //setting theme
-        if(isset($_COOKIE['theme'])) {
-            View::share('theme', $_COOKIE['theme']);
-        }
-        else {
-            View::share('theme', 'light');
-        }
-        $currency = Cache::remember('currency', 60*60*24*365, function () {
-            $settingData = DB::table('general_settings')->select('currency')->latest()->first();
-            return \App\Models\Currency::find($settingData->currency);
-        });
+        //setting theme customizer properties
+        View::share('theme', $_COOKIE['theme'] ?? 'light');
+        View::share('theme_color', $_COOKIE['theme_color'] ?? '#7c5cc4');
+        View::share('theme_font', $_COOKIE['theme_font'] ?? 'inter');
 
-        $currency_list = Cache::remember('currency_list', 60*60*24*365, function () {
-            return \App\Models\Currency::where('is_active', true)->get();
-        });
+        // Currency data is small and is configuration-sensitive. Read the current rows so
+        // edited/deactivated currencies can never remain visible from a year-long stale cache.
+        $currency_list = \App\Models\Currency::where('is_active', true)->get();
+        $currency = $currency_list->find($general_setting->currency) ?? $currency_list->first();
+
+        // Keep legacy controller cache lookups in sync with the database for this request.
+        Cache::put('currency_list', $currency_list, 60 * 60 * 24);
+        Cache::put('currency', $currency, 60 * 60 * 24);
 
         View::share('general_setting', $general_setting);
         View::share('currency', $currency);
         View::share('currency_list', $currency_list);
-        config(['staff_access' => $general_setting->staff_access, 'is_packing_slip' => $general_setting->is_packing_slip, 'date_format' => $general_setting->date_format, 'currency' => $currency->symbol ?? $currency->code, 'currency_position' => $general_setting->currency_position ?? 'prefix', 'decimal' => $general_setting->decimal ?? 2, 'is_zatca' => $general_setting->is_zatca, 'company_name' => $general_setting->company_name, 'vat_registration_number' => $general_setting->vat_registration_number, 'without_stock' => $general_setting->without_stock, 'addons' => $general_setting->modules]);
-
-        $alert_product = DB::table('products')->where('is_active', true)->whereColumn('alert_quantity', '>', 'qty')->count();
-        $dso_alert_product = DB::table('dso_alerts')->select('number_of_products')->whereDate('created_at', date("Y-m-d"))->first();
-        if($dso_alert_product)
-            $dso_alert_product_no = $dso_alert_product->number_of_products;
-        else
-            $dso_alert_product_no = 0;
-
-        // Dynamic days from settings
-        $days = $general_setting->expiry_alert_days ?? 0;
-        // dd($days);
-
-        $expire_alert_products = DB::table('product_batches')
-            ->join('products', 'products.id', '=', 'product_batches.product_id')
-            ->where('products.is_active', true)
-            ->where('product_batches.qty', '>', 0)
-            ->whereDate('product_batches.expired_date', '<=', now()->addDays((int) $days)->format('Y-m-d'))
-            ->count();
-
-        // View share (exact same style)
-        View::share([
-            'alert_product'          => $alert_product,
-            'dso_alert_product_no'   => $dso_alert_product_no,
-            'expire_alert_products'  => $expire_alert_products,
+        config([
+            'staff_access' => $general_setting->staff_access,
+            'is_packing_slip' => $general_setting->is_packing_slip,
+            'date_format' => $general_setting->date_format,
+            'currency' => $currency->symbol ?? $currency->code ?? '',
+            'currency_position' => $general_setting->currency_position ?? 'prefix',
+            'decimal' => $general_setting->decimal ?? 2,
+            'is_zatca' => $general_setting->is_zatca,
+            'zatca_mode' => $general_setting->zatca_mode ?? ($general_setting->is_zatca ? 'phase1' : 'disabled'),
+            'company_name' => $general_setting->company_name,
+            'vat_registration_number' => $general_setting->vat_registration_number,
+            'without_stock' => $general_setting->without_stock,
+            'addons' => $general_setting->modules,
         ]);
 
+        // Alert queries and view share moved to AppServiceProvider View Composer
 
-        $role = Cache::remember('user_role', 60*60*24*365, function () {
-            return DB::table('roles')->find(Auth::user()->role_id);
-        });
-        View::share('role', $role);
-        $permission_list = Cache::remember('permissions', 60*60*24*365, function () {
-            return DB::table('permissions')->get();
-        });
-        View::share('permission_list', $permission_list);
-        $role_has_permissions = Cache::remember('role_has_permissions', 60*60*24*365, function () {
-            return DB::table('role_has_permissions')->where('role_id', Auth::user()->role_id)->get();
-        });
-        View::share('role_has_permissions', $role_has_permissions);
+        if (Auth::check()) {
+            $roleId = Auth::user()->role_id;
 
-        $role_has_permissions_list = Cache::remember('role_has_permissions_list'.Auth::user()->role_id, 60*60*24*365, function () {
-            return DB::table('permissions')->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')->where('role_id', Auth::user()->role_id)->select('permissions.name')->get();
-        });
-        View::share('role_has_permissions_list', $role_has_permissions_list);
+            $role = Cache::remember("user_role_{$roleId}", 60*60*24*365, function () use ($roleId) {
+                return DB::table('roles')->find($roleId);
+            });
+            View::share('role', $role);
 
-        $categories_list = Cache::remember('category_list', 60*60*24*365, function () {
-            return DB::table('categories')->where('is_active', true)->get();
-        });
-        View::share('categories_list', $categories_list);
+            $permission_list = Cache::remember('permission_list', 60*60*24*365, function () {
+                return DB::table('permissions')->get();
+            });
+            View::share('permission_list', $permission_list);
+
+            $role_has_permissions = Cache::remember("role_has_permissions_{$roleId}", 60*60*24*365, function () use ($roleId) {
+                return DB::table('role_has_permissions')
+                    ->where('role_id', $roleId)
+                    ->get();
+            });
+            View::share('role_has_permissions', $role_has_permissions);
+
+            $role_has_permissions_list = Cache::remember("role_has_permissions_list{$roleId}", 60*60*24*365, function () use ($roleId) {
+                return DB::table('permissions')
+                    ->join('role_has_permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
+                    ->where('role_id', $roleId)
+                    ->select('permissions.name')
+                    ->get();
+            });
+            View::share('role_has_permissions_list', $role_has_permissions_list);
+        }
+
+        // categories_list moved to helpers.php as get_active_categories()
+
+        if (config('database.connections.saleprosaas_landlord')) {
+            return app(EnsureCommissionSubscriptionAccess::class)->handle($request, $next);
+        }
 
         return $next($request);
     }

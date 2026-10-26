@@ -42,13 +42,14 @@ class ShiftController extends Controller
         $data = $request->all();
         $data['start_time'] = Carbon::parse($request->start_time)->format('H:i:s');
         $data['end_time']   = Carbon::parse($request->end_time)->format('H:i:s');
-        $data['is_active'] = true;
+        $data['grace_in'] = $request->grace_in ?? 0;
+        $data['grace_out'] = $request->grace_out ?? 0;
         $shift = Shift::create($data);
         if($request->ajax()){
              return response()->json($shift);
         }
 
-        return redirect('shift')->with('message', __('db.Shift created successfully'));
+        return redirect('shift')->with('message', __('db.shift_created_successfully'));
     }
 
     public function update(Request $request, $id)
@@ -66,11 +67,13 @@ class ShiftController extends Controller
         $data = $request->all();
         $data['start_time'] = Carbon::parse($request->start_time)->format('H:i:s');
         $data['end_time']   = Carbon::parse($request->end_time)->format('H:i:s');
+        $data['grace_in'] = $request->grace_in ?? 0;
+        $data['grace_out'] = $request->grace_out ?? 0;
         $data['is_active'] = true;
         $lims_shift_data = Shift::find($data['shift_id']);
         $lims_shift_data->update($data);
 
-        return redirect('shift')->with('message', __('db.Shift updated successfully'));
+        return redirect('shift')->with('message', __('db.shift_updated_successfully'));
     }
 
     public function deleteBySelection(Request $request)
@@ -89,6 +92,6 @@ class ShiftController extends Controller
         $lims_shift_data = Shift::find($id);
         $lims_shift_data->is_active = false;
         $lims_shift_data->save();
-        return redirect('shift')->with('message', __('db.Shift deleted successfully'));
+        return redirect('shift')->with('message', __('db.shift_deleted_successfully'));
     }
 }

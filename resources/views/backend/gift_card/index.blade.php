@@ -1,4 +1,11 @@
-@extends('backend.layout.main') @section('content')
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+@section('content')
 
 <x-error-message key="card_no" />
 <x-success-message key="message" />
@@ -6,7 +13,7 @@
 
 <section>
     <div class="container-fluid">
-        <button class="btn btn-info" data-toggle="modal" data-target="#gift_card-modal"><i class="dripicons-plus"></i> {{__('db.Add Gift Card')}}</button>
+        <button class="btn btn-info" data-toggle="modal" data-target="#gift_card-modal"><i class="ti ti-plus"></i> {{__('db.Add Gift Card')}}</button>
     </div>
     <div class="table-responsive">
         <table id="gift_card-table" class="table">
@@ -58,15 +65,15 @@
                                 <span class="sr-only">Toggle Dropdown</span>
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
-                                <li><button type="button" data-client="{{$client}}" data-card_no="{{$gift_card->card_no}}" data-amount="{{$gift_card->amount}}" data-expense="{{$gift_card->expense}}" data-expired_date="{{date('d-m-Y', strtotime($gift_card->expired_date))}}" class="view-btn btn btn-link" data-toggle="modal" data-target="#viewModal"><i class="fa fa-eye"></i> {{__('db.View')}}</button></li>
-                                <li><button type="button" data-id="{{$gift_card->id}}" class="open-Edit_gift_card_Dialog btn btn-link" data-toggle="modal" data-target="#editModal"><i class="dripicons-document-edit"></i> {{__('db.edit')}}</button></li>
-                                <li><button type="button" data-id="{{$gift_card->id}}" class="recharge btn btn-link" data-toggle="modal" data-target="#rechargeModal"><i class="fa fa-money"></i> {{__('db.Recharge')}}</button></li>
+                                <li><button type="button" data-client="{{$client}}" data-card_no="{{$gift_card->card_no}}" data-amount="{{$gift_card->amount}}" data-expense="{{$gift_card->expense}}" data-expired_date="{{date('d-m-Y', strtotime($gift_card->expired_date))}}" class="view-btn btn btn-link" data-toggle="modal" data-target="#viewModal"><i class="ti ti-eye"></i> {{__('db.View')}}</button></li>
+                                <li><button type="button" data-id="{{$gift_card->id}}" class="open-Edit_gift_card_Dialog btn btn-link" data-toggle="modal" data-target="#editModal"><i class="ti ti-edit"></i> {{__('db.edit')}}</button></li>
+                                <li><button type="button" data-id="{{$gift_card->id}}" class="recharge btn btn-link" data-toggle="modal" data-target="#rechargeModal"><i class="ti ti-cash-banknote"></i> {{__('db.Recharge')}}</button></li>
                                 <li class="divider"></li>
                                 <form action="{{ route('gift_cards.destroy', $gift_card->id) }}" method="POST">
                                     @csrf
                                     @method('DELETE')
                                     <li>
-                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> {{__('db.delete')}}</button>
+                                        <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> {{__('db.delete')}}</button>
                                     </li>
                                 </form>
                             </ul>
@@ -95,8 +102,8 @@
       <div class="modal-content">
           <div class="modal-header">
               <h5 id="exampleModalLabel" class="modal-title d-print-none"> {{__('db.Card Details')}} &nbsp;&nbsp;</h5>
-              <button id="print-btn" type="button" class="btn btn-default btn-sm d-print-none"><i class="dripicons-print"></i> {{__('db.Print')}}</button>
-              <button type="button" data-dismiss="modal" aria-label="Close" class="close d-print-none" id="close-btn"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+              <button id="print-btn" type="button" class="btn btn-default btn-sm d-print-none"><i class="ti ti-printer"></i> {{__('db.print')}}</button>
+              <button type="button" data-dismiss="modal" aria-label="Close" class="close d-print-none" id="close-btn"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
           </div>
           <div class="modal-body">
               <div class="gift-card" style="margin: 0 auto; max-width: 350px; position: relative; color:#fff;"><img src="{{url('images/gift_card/front.jpg')}}" width="350" height="200">
@@ -111,9 +118,9 @@
               <br>
               <div class="gift-card" style="margin: 0 auto; max-width: 350px; position: relative; color:#fff;">
                 <img src="{{url('images/gift_card/back.png')}}" width="350" height="200">
-                <div class="site-title" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">@if($general_setting->site_logo)
-                  <img src="{{url('logo', $general_setting->site_logo)}}" height="38px" width="38px">&nbsp;
-                  <span style="font-size: 25px;">@endif{{$general_setting->site_title}}</span>
+                <div class="site-title" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">@if(gen_setting()->site_logo)
+                  <img src="{{url('logo', gen_setting()->site_logo)}}" height="38px" width="38px">&nbsp;
+                  <span style="font-size: 25px;">@endif{{gen_setting()->site_title}}</span>
                 </div>
               </div>
           </div>
@@ -126,7 +133,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Gift Card')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
               <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -186,7 +193,7 @@
       <div class="modal-content">
           <div class="modal-header">
               <h5 id="exampleModalLabel" class="modal-title">{{__('db.Update Gift Card')}}</h5>
-              <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+              <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
           </div>
           <div class="modal-body">
             <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -248,7 +255,7 @@
       <div class="modal-content">
           <div class="modal-header">
               <h5 id="exampleModalLabel" class="modal-title"> {{__('db.Card No')}}: <span id="card-no"></span></h5>
-              <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+              <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
           </div>
           <div class="modal-body">
             <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -272,6 +279,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $("ul#sale").siblings('a').attr('aria-expanded','true');
@@ -279,7 +287,7 @@
     $("ul#sale #gift-card-menu").addClass("active");
 
     var gift_card_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
     $.ajaxSetup({
         headers: {
@@ -348,7 +356,7 @@
           var divToPrint=document.getElementById('viewModal');
           var newWin=window.open('','Print-Window');
           newWin.document.open();
-          newWin.document.write('<link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css"><style type="text/css">@media print {.modal-dialog { max-width: 1000px;} }</style><body onload="window.print()">'+divToPrint.innerHTML+'</body>');
+          newWin.document.write('<link rel="stylesheet" href="{{ asset($asset_prefix . 'vendor/bootstrap/css/bootstrap.min.css') }}" type="text/css"><style type="text/css">@media print {.modal-dialog { max-width: 1000px;} }</style><body onload="window.print()">'+divToPrint.innerHTML+'</body>');
           newWin.document.close();
           setTimeout(function(){newWin.close();},10);
     });
@@ -408,12 +416,7 @@
         });
     })
 
-    function confirmDelete() {
-    if (confirm("Are you sure want to delete?")) {
-        return true;
-    }
-    return false;
-    }
+    function confirmDelete() { return true; }
 
     $('#gift_card-table').DataTable( {
         "order": [],
@@ -422,8 +425,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -452,7 +455,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -466,7 +469,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -480,7 +483,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -494,7 +497,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -507,7 +510,7 @@
                 footer:true
             },
             {
-                text: '<i title="delete" class="dripicons-cross"></i>',
+                text: '<i title="delete" class="ti ti-x"></i>',
                 className: 'buttons-delete',
                 action: function ( e, dt, node, config ) {
                     if(user_verified == '1') {
@@ -517,7 +520,7 @@
                                 gift_card_id[i-1] = $(this).closest('tr').data('id');
                             }
                         });
-                        if(gift_card_id.length && confirm("Are you sure want to delete?")) {
+                        if (gift_card_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                             $.ajax({
                                 type:'POST',
                                 url:'gift_cards/deletebyselection',
@@ -525,21 +528,23 @@
                                     gift_cardIdArray: gift_card_id
                                 },
                                 success:function(data){
-                                    alert(data);
+                                    SaleProToast.show(data);
                                 }
                             });
                             dt.rows({ page: 'current', selected: true }).remove().draw(false);
                         }
+                        });
+                        }
                         else if(!gift_card_id.length)
-                            alert('No gift card is selected!');
+                            SaleProToast.show('No gift card is selected!');
                     }
                     else
-                        alert('This feature is disable for demo!');
+                        SaleProToast.show('This feature is disable for demo!');
                 }
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],
@@ -552,14 +557,14 @@
     function datatable_sum(dt_selector, is_calling_first) {
         if (dt_selector.rows( '.selected' ).any() && is_calling_first) {
             var rows = dt_selector.rows( '.selected' ).indexes();
-            $( dt_selector.column( 4 ).footer() ).html(dt_selector.cells( rows, 4, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 5 ).footer() ).html(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 3 ).footer() ).html(dt_selector.cells( rows, 3, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 4 ).footer() ).html(dt_selector.cells( rows, 4, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
+            $( dt_selector.column( 5 ).footer() ).html(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
+            $( dt_selector.column( 3 ).footer() ).html(dt_selector.cells( rows, 3, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
         else {
-            $( dt_selector.column( 4 ).footer() ).html(dt_selector.cells( rows, 4, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 5 ).footer() ).html(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 3 ).footer() ).html(dt_selector.cells( rows, 3, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 4 ).footer() ).html(dt_selector.cells( rows, 4, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
+            $( dt_selector.column( 5 ).footer() ).html(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
+            $( dt_selector.column( 3 ).footer() ).html(dt_selector.cells( rows, 3, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
     }
 

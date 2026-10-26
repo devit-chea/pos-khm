@@ -1,19 +1,16 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 @extends('backend.layout.main')
 @section('content')
 
 @push('css')
-    @if (!config('database.connections.saleprosaas_landlord'))
-        <link rel="preload" href="<?php echo asset('vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" rel="stylesheet">
-        </noscript>
-    @else
-        <link rel="preload" href="<?php echo asset('../../vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" as="style"
-            onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('../../vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" rel="stylesheet">
-        </noscript>
-    @endif
+
+    <link rel="preload" href="{{ asset($asset_prefix . 'vendor/jquery-timepicker/jquery.timepicker.min.css') }}" as="style"
+        onload="this.onload=null;this.rel='stylesheet'">
+    <noscript>
+        <link href="{{ asset($asset_prefix . 'vendor/jquery-timepicker/jquery.timepicker.min.css') }}" rel="stylesheet">
+    </noscript>
 @endpush
 
 
@@ -60,11 +57,7 @@
 @endsection
 
 @push('scripts')
-    @if (!config('database.connections.saleprosaas_landlord'))
-        <script type="text/javascript" src="<?php echo asset('vendor/jquery/jquery.timepicker.min.js'); ?>"></script>
-    @else
-        <script type="text/javascript" src="<?php echo asset('../../vendor/jquery/jquery.timepicker.min.js'); ?>"></script>
-    @endif
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/jquery/jquery.timepicker.min.js') }}"></script>
     <script type="text/javascript">
         $("ul#setting").siblings('a').attr('aria-expanded','true');
         $("ul#setting").addClass("show");

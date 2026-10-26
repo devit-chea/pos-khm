@@ -35,7 +35,7 @@
 
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>{{ __('db.Email') }} *</label>
+                                        <label>{{ __('db.email') }} *</label>
                                         <input type="email" name="email" required class="form-control">
                                     </div>
                                 </div>
@@ -132,7 +132,7 @@
 
                                 <div class="col-md-3 user-input">
                                     <div class="form-group">
-                                        <label>{{ __('db.UserName') }} *</label>
+                                        <label>{{ __('db.username') }} *</label>
                                         <input type="text" name="username" class="form-control">
                                     </div>
                                 </div>
@@ -294,7 +294,7 @@
             }
         });
 
-        @if (!in_array('project', explode(',', $general_setting->modules)))
+        @if (!in_array('project', explode(',', gen_setting()->modules)))
             $('select[name="role_id"]').on('change', function() {
                 if ($(this).val() > 2) {
                     $('#warehouse').show(400);

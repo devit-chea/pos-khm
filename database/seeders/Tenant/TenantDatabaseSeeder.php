@@ -2,15 +2,17 @@
 
 namespace Database\Seeders\Tenant;
 
-use Database\Seeders\Tenant\BarcodeSeeder;
-use Database\Seeders\Tenant\ExternalServicesSeeder;
-use Database\Seeders\Tenant\LanguagesTableSeeder;
-use Database\Seeders\Tenant\TranslationsTableSeeder;
-use Database\Seeders\Tenant\ThemeSettingSeeder;
 use Illuminate\Database\Seeder;
 use App\Traits\TenantInfo;
 
 use Illuminate\Support\Facades\DB;
+use App\Support\TranslationLocaleRegistry;
+use App\Models\Account;
+use App\Services\AccountingModeService;
+use App\Services\PaymentAccountService;
+use App\Services\CleanInstallationAccountingInitializer;
+use App\Services\ModuleRegistry;
+use App\Services\ModuleAccessService;
 
 class TenantDatabaseSeeder extends Seeder
 {
@@ -24,21 +26,753 @@ class TenantDatabaseSeeder extends Seeder
 
     public function run()
     {
-        $this->call(BarcodeSeeder::class);
-        $this->call(ExternalServicesSeeder::class);
-        $this->call(LanguagesTableSeeder::class);
-        $this->call(TranslationsTableSeeder::class);
+        $this->seedBeforeCanonicalPermissions();
+        $this->seedCanonicalPermissions();
+        $this->seedAfterCanonicalPermissions();
+
+        // Tenant provisioning supplies tenantData; ordinary upgrade seeding does
+        // not. This keeps automatic activation out of upgrade paths.
+        if (!empty(self::$tenantData) && config('database.connections.saleprosaas_landlord')) {
+            app(CleanInstallationAccountingInitializer::class)->initialize();
+        }
+    }
+
+    private function seedBeforeCanonicalPermissions(): void
+    {
+        if (!DB::table('barcodes')->count()) {
+            DB::table('barcodes')->insert([
+                [
+                    'name' => '20 Labels per Sheet',
+                    'description' => 'Sheet Size: 8.5" x 11", Label Size: 4" x 1", Labels per sheet: 20',
+                    'width' => 4.0000,
+                    'height' => 1.0000,
+                    'paper_width' => 8.5000,
+                    'paper_height' => 11.0000,
+                    'top_margin' => 0.5000,
+                    'left_margin' => 0.1250,
+                    'row_distance' => 0.0000,
+                    'col_distance' => 0.1875,
+                    'stickers_in_one_row' => 2,
+                    'is_default' => 0,
+                    'is_continuous' => 0,
+                    'layout_type' => 'sheet',
+                    'stickers_in_one_sheet' => 20,
+                    'is_custom' => null
+                ],
+                [
+                    'name' => '30 Labels per sheet',
+                    'description' => 'Sheet Size: 8.5" x 11", Label Size: 2.625" x 1", Labels per sheet: 30',
+                    'width' => 2.6250,
+                    'height' => 1.0000,
+                    'paper_width' => 8.5000,
+                    'paper_height' => 11.0000,
+                    'top_margin' => 0.5000,
+                    'left_margin' => 0.1880,
+                    'row_distance' => 0.0000,
+                    'col_distance' => 0.1250,
+                    'stickers_in_one_row' => 3,
+                    'is_default' => 0,
+                    'is_continuous' => 0,
+                    'layout_type' => 'sheet',
+                    'stickers_in_one_sheet' => 30,
+                    'is_custom' => null
+                ],
+                [
+                    'name' => '32 Labels per sheet',
+                    'description' => 'Sheet Size: 8.5" x 11", Label Size: 2" x 1.25", Labels per sheet: 32',
+                    'width' => 2.0000,
+                    'height' => 1.2500,
+                    'paper_width' => 8.5000,
+                    'paper_height' => 11.0000,
+                    'top_margin' => 0.5000,
+                    'left_margin' => 0.2500,
+                    'row_distance' => 0.0000,
+                    'col_distance' => 0.0000,
+                    'stickers_in_one_row' => 4,
+                    'is_default' => 0,
+                    'is_continuous' => 0,
+                    'layout_type' => 'sheet',
+                    'stickers_in_one_sheet' => 32,
+                    'is_custom' => null
+                ],
+                [
+                    'name' => '40 Labels per sheet',
+                    'description' => 'Sheet Size: 8.5" x 11", Label Size: 2" x 1", Labels per sheet: 40',
+                    'width' => 2.0000,
+                    'height' => 1.0000,
+                    'paper_width' => 8.5000,
+                    'paper_height' => 11.0000,
+                    'top_margin' => 0.5000,
+                    'left_margin' => 0.2500,
+                    'row_distance' => 0.0000,
+                    'col_distance' => 0.0000,
+                    'stickers_in_one_row' => 4,
+                    'is_default' => 0,
+                    'is_continuous' => 0,
+                    'layout_type' => 'sheet',
+                    'stickers_in_one_sheet' => 40,
+                    'is_custom' => null
+                ],
+                [
+                    'name' => '50 Labels per Sheet',
+                    'description' => 'Sheet Size: 8.5" x 11", Label Size: 1.5" x 1", Labels per sheet: 50',
+                    'width' => 1.5000,
+                    'height' => 1.0000,
+                    'paper_width' => 8.5000,
+                    'paper_height' => 11.0000,
+                    'top_margin' => 0.5000,
+                    'left_margin' => 0.5000,
+                    'row_distance' => 0.0000,
+                    'col_distance' => 0.0000,
+                    'stickers_in_one_row' => 5,
+                    'is_default' => 0,
+                    'is_continuous' => 0,
+                    'layout_type' => 'sheet',
+                    'stickers_in_one_sheet' => 50,
+                    'is_custom' => null
+                ],
+                [
+                    'name' => 'Continuous Rolls - 31.75mm x 25.4mm',
+                    'description' => 'Label Size: 31.75mm x 25.4mm, Gap: 3.18mm',
+                    'width' => 1.2500,
+                    'height' => 1.0000,
+                    'paper_width' => 1.2500,
+                    'paper_height' => 0.0000,
+                    'top_margin' => 0.1250,
+                    'left_margin' => 0.0000,
+                    'row_distance' => 0.1250,
+                    'col_distance' => 0.0000,
+                    'stickers_in_one_row' => 1,
+                    'is_default' => 0,
+                    'is_continuous' => 1,
+                    'layout_type' => 'continuous',
+                    'stickers_in_one_sheet' => null,
+                    'is_custom' => null
+                ],
+                [
+                    'name' => 'Dumbbell Label',
+                    'description' => '50mm × 25mm Dumbbell Label',
+                    'width' => 1.9685,
+                    'height' => 0.9843,
+                    'paper_width' => 1.9685,
+                    'paper_height' => 0,
+                    'top_margin' => 0,
+                    'left_margin' => 0,
+                    'row_distance' => 0.1181,
+                    'col_distance' => 0,
+                    'stickers_in_one_row' => 1,
+                    'is_default' => 0,
+                    'is_continuous' => 0,
+                    'layout_type' => 'dumbbell',
+                    'stickers_in_one_sheet' => null,
+                    'is_custom' => null,
+                ],
+            ]);
+        }
+
+        //External Services Seeder started
+        $newAddons = ['ecommerce']; // Future add-ons
+
+        // Fetch all rows
+        $gateways = DB::table('external_services')->where('type', 'payment')->get();
+
+        foreach ($gateways as $gateway) {
+            // Decode existing module_status, or initialize as empty
+            $moduleStatus = json_decode($gateway->module_status, true) ?? [];
+
+            // Ensure all add-ons are present in module_status with a default of false
+            foreach ($newAddons as $addon) {
+                if (!isset($moduleStatus[$addon])) {
+                    $moduleStatus[$addon] = false;
+                }
+            }
+
+            // Update the row
+            DB::table('external_services')
+                ->where('id', $gateway->id)
+                ->update(['module_status' => json_encode($moduleStatus)]);
+        }
+
+        // Add a new gateway if needed
+        $newGateway = DB::table('external_services')
+            ->where('name', 'PayPal') // Replace with the actual name
+            ->first();
+
+        if (!$newGateway) {
+            DB::table('external_services')->insert([
+                'name' => 'PayPal',
+                'type' => 'payment',
+                'details' => 'Client ID,Client Secret;abcd1234,wxyz5678', // Dummy values; users will update
+                'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
+                'active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Add a new gateway if needed
+        $newGateway = DB::table('external_services')
+            ->where('name', 'Stripe') // Replace with the actual name
+            ->first();
+
+        if (!$newGateway) {
+            DB::table('external_services')->insert([
+                'name' => 'Stripe',
+                'type' => 'payment',
+                'details' => 'Public Key,Private Key;efgh1234,stuv5678', // Dummy values; users will update
+                'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
+                'active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Add a new gateway if needed
+        $newGateway = DB::table('external_services')
+            ->where('name', 'Razorpay') // Replace with the actual name
+            ->first();
+
+        if (!$newGateway) {
+            DB::table('external_services')->insert([
+                'name' => 'Razorpay',
+                'type' => 'payment',
+                'details' => 'Key,Secret;rzp_test_Y4MCcpHfZNU6rR,3Hr7SDqaZ0G5waN0jsLgsiLx', // Dummy values; users will update
+                'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
+                'active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Add a new gateway if needed
+        $newGateway = DB::table('external_services')
+            ->where('name', 'Paystack') // Replace with the actual name
+            ->first();
+
+        if (!$newGateway) {
+            DB::table('external_services')->insert([
+                'name' => 'Paystack',
+                'type' => 'payment',
+                'details' => 'public_Key,Secret_Key;pk_test_e8d220b7463d64569f0053e78534f38e6b10cf4a,sk_test_6d62cb976e1e0ab43f1e48b2934b0dfc7f32a1fe', // Dummy values; users will update
+                'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
+                'active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Add a new gateway if needed
+        $newGateway = DB::table('external_services')
+            ->where('name', 'Mollie') // Replace with the actual name
+            ->first();
+
+        if (!$newGateway) {
+            DB::table('external_services')->insert([
+                'name' => 'Mollie',
+                'type' => 'payment',
+                'details' => 'api_key;test_dHar4XY7LxsDOtmnkVtjNVWXLSlXsM', // Dummy values; users will update
+                'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
+                'active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Add a new gateway if needed
+        $newGateway = DB::table('external_services')
+            ->where('name', 'Xendit') // Replace with the actual name
+            ->first();
+
+        if (!$newGateway) {
+            DB::table('external_services')->insert([
+                'name' => 'Xendit',
+                'type' => 'payment',
+                'details' => 'secret_key,callback_token;xnd_development_aKJVKYbc4lHkEjcCLzWLrBsKs6jF6nbM6WaCMfnJerP3JW57CLis553XNRdDU,YPZxND92Mt8tdXntTYIEkRX802onZ5OcdKBUzycebuqYvN4n', // Dummy values; users will update
+                'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
+                'active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Add a new gateway if needed
+        $newGateway = DB::table('external_services')
+            ->where('name', 'bkash') // Replace with the actual name
+            ->first();
+
+        if (!$newGateway) {
+            DB::table('external_services')->insert([
+                'name' => 'bkash',
+                'type' => 'payment',
+                'details' => 'Mode,app_key,app_secret,username,password;sandbox,0vWQuCRGiUX7EPVjQDr0EUAYtc,jcUNPBgbcqEDedNKdvE4G1cAK7D3hCjmJccNPZZBq96QIxxwAMEx,01770618567,D7DaC<*E*eG', // Dummy values; users will update
+                'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
+                'active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Add a new gateway if needed
+        $newGateway = DB::table('external_services')
+            ->where('name', 'url') // Replace with the actual name
+            ->first();
+
+        if (!$newGateway) {
+            DB::table('external_services')->insert([
+                'name' => 'url',
+                'type' => 'url',
+                'details' => preg_replace('/^https?:\/\//', '', rtrim(url('/'), '/')), // Dummy values; users will update
+                'active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Add a new gateway if needed
+        $newGateway = DB::table('external_services')
+            ->where('name', 'sslcommerz') // Replace with the actual name
+            ->first();
+
+        if (!$newGateway) {
+            DB::table('external_services')->insert([
+                'name' => 'sslcommerz',
+                'type' => 'payment',
+                'details' => 'appkey,appsecret;12341234,asdfa23423', // Dummy values; users will update
+                'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
+                'active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Add a new gateway if needed
+        $newGateway = DB::table('external_services')
+            ->where('name', 'Mpesa') // Replace with the actual name
+            ->first();
+
+        if (!$newGateway) {
+            DB::table('external_services')->insert([
+                'name' => 'Mpesa',
+                'type' => 'payment',
+                'details' => 'consumer_Key,consumer_Secret;fhfgkj,dtrddhd', // Dummy values; users will update
+                'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
+                'active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Add a new gateway if needed
+        $newGateway = DB::table('external_services')
+            ->where('name', 'Pesapal') // Replace with the actual name
+            ->first();
+
+        if (!$newGateway) {
+            DB::table('external_services')->insert([
+                'name' => 'Pesapal',
+                'type' => 'payment',
+                'details' => 'Mode,Consumer Key,Consumer Secret;sandbox,qkio1BGGYAXTu2JOfm7XSXNruoZsrqEW,osGQ364R49cXKeOYSpaOnT++rHs=', // Dummy values; users will update
+                'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
+                'active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Add a new gateway if needed
+        $newGateway = DB::table('external_services')
+            ->where('name', 'Moneipoint') // Replace with the actual name
+            ->first();
+
+        if (!$newGateway) {
+            DB::table('external_services')->insert([
+                'name' => 'Moneipoint',
+                'type' => 'payment',
+                'details' => 'Mode,client_id,client_secret,terminal_serial;sandbox,api-client-3956952-7e1279e2-95d2-45e1-825a-3a28e0a35168,ZtH02Q%jQ$Imcf%W^B%q,C42P008D01909830', // Dummy values; users will update
+                'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
+                'active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Add a new gateway if needed
+        $newGateway = DB::table('external_services')
+            ->where('name', 'MtnMoMo') // Replace with the actual name
+            ->first();
+
+        if (!$newGateway) {
+            DB::table('external_services')->insert([
+                'name' => 'MtnMoMo',
+                'type' => 'payment',
+                'details' => 'Mode,subscription_key,api_user_id,api_key,country_code;sandbox,your_subscription_key,your_api_user_id,your_api_key,256', // Dummy values; users will update
+                'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
+                'active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Add a new gateway if needed
+        $newGateway = DB::table('external_services')
+            ->where('name', 'PayHere') // Replace with the actual name
+            ->first();
+
+        if (!$newGateway) {
+            DB::table('external_services')->insert([
+                'name' => 'PayHere',
+                'type' => 'payment',
+                'details' => 'Mode,merchant_id,merchant_secret;sandbox,your_merchant_id,your_merchant_secret', // Dummy values; users will update
+                'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
+                'active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Add a new gateway if needed
+        $newGateway = DB::table('external_services')
+            ->where('name', 'Moyasar') // Replace with the actual name
+            ->first();
+
+        if (!$newGateway) {
+            DB::table('external_services')->insert([
+                'name' => 'Moyasar',
+                'type' => 'payment',
+                'details' => 'Mode,Publishable Key,Secret Key,Webhook Secret;test,pk_test_your_publishable_key,sk_test_your_secret_key,your_webhook_secret_token', // Dummy values; users will update
+                'module_status' => json_encode(['ecommerce' => true, 'pos' => true]),
+                'active' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+        //External Services Seeder ended
+
+        if (DB::table('languages')->count() > 0) {
+
+            $lang = DB::table('languages')->orderBy('id')->get(); // Fetch all languages ordered by ID
+
+            $first = $lang->first(); // Get the first record from the collection
+            $default = $lang->where('is_default', 1)->first(); // Check if there's already a default language
+
+            if (!$default && $first) {
+                // Set all is_default = 0
+                DB::table('languages')->update(['is_default' => 0]);
+
+                // Set is_default = 1 for the first row
+                DB::table('languages')->where('id', $first->id)->update(['is_default' => 1]);
+            }
+        } else {
+
+            DB::table('languages')->insert(array(
+                0 =>
+                    array(
+                        'id' => 1,
+                        'language' => 'en',
+                        'created_at' => '2025-02-15 19:31:18',
+                        'updated_at' => '2025-02-23 14:24:00',
+                        'name' => 'English',
+                        'is_default' => 1,
+                    ),
+                1 =>
+                    array(
+                        'id' => 2,
+                        'language' => 'bn',
+                        'created_at' => '2025-02-15 19:31:36',
+                        'updated_at' => '2025-02-23 14:24:00',
+                        'name' => 'Bangla',
+                        'is_default' => 0,
+                    ),
+                2 =>
+                    array(
+                        'id' => 3,
+                        'language' => 'ar',
+                        'created_at' => '2025-02-16 11:54:58',
+                        'updated_at' => '2025-02-23 14:24:00',
+                        'name' => 'Arabic',
+                        'is_default' => 0,
+                    ),
+                3 =>
+                    array(
+                        'id' => 4,
+                        'language' => 'al',
+                        'created_at' => '2025-02-20 19:07:34',
+                        'updated_at' => '2025-02-23 14:24:00',
+                        'name' => 'Albania',
+                        'is_default' => 0,
+                    ),
+                4 =>
+                    array(
+                        'id' => 5,
+                        'language' => 'az',
+                        'created_at' => '2025-02-23 10:43:59',
+                        'updated_at' => '2025-02-23 14:24:00',
+                        'name' => 'Azerbaijan',
+                        'is_default' => 0,
+                    ),
+                5 =>
+                    array(
+                        'id' => 6,
+                        'language' => 'bg',
+                        'created_at' => '2025-02-23 10:52:01',
+                        'updated_at' => '2025-02-23 14:24:00',
+                        'name' => 'Bulgaria',
+                        'is_default' => 0,
+                    ),
+                6 =>
+                    array(
+                        'id' => 7,
+                        'language' => 'de',
+                        'created_at' => '2025-02-23 11:04:53',
+                        'updated_at' => '2025-02-23 14:24:00',
+                        'name' => 'Germany',
+                        'is_default' => 0,
+                    ),
+                7 =>
+                    array(
+                        'id' => 8,
+                        'language' => 'es',
+                        'created_at' => '2025-02-23 11:10:30',
+                        'updated_at' => '2025-02-23 14:24:00',
+                        'name' => 'Spanish',
+                        'is_default' => 0,
+                    ),
+                8 =>
+                    array(
+                        'id' => 9,
+                        'language' => 'fr',
+                        'created_at' => '2025-02-23 14:12:28',
+                        'updated_at' => '2025-02-23 14:24:00',
+                        'name' => 'French',
+                        'is_default' => 0,
+                    ),
+                9 =>
+                    array(
+                        'id' => 10,
+                        'language' => 'id',
+                        'created_at' => '2025-02-23 14:13:28',
+                        'updated_at' => '2025-02-23 14:24:00',
+                        'name' => 'Indonesian',
+                        'is_default' => 0,
+                    ),
+                10 =>
+                    array(
+                        'id' => 11,
+                        'language' => 'tr',
+                        'created_at' => '2025-03-20 12:55:53',
+                        'updated_at' => '2025-03-20 12:55:53',
+                        'name' => 'Turkish',
+                        'is_default' => 0,
+                    ),
+                11 =>
+                    array(
+                        'id' => 12,
+                        'language' => 'vi',
+                        'created_at' => '2025-03-24 16:49:54',
+                        'updated_at' => '2025-03-24 16:49:54',
+                        'name' => 'Vietnamese',
+                        'is_default' => 0,
+                    ),
+                12 =>
+                    array(
+                        'id' => 13,
+                        'language' => 'pt',
+                        'created_at' => '2025-03-24 16:49:54',
+                        'updated_at' => '2025-03-24 16:49:54',
+                        'name' => 'Portuguese',
+                        'is_default' => 0,
+                    ),
+                13 =>
+                    array(
+                        'id' => 14,
+                        'language' => 'ms',
+                        'created_at' => '2025-03-24 16:49:54',
+                        'updated_at' => '2025-03-24 16:49:54',
+                        'name' => 'Malay',
+                        'is_default' => 0,
+                    ),
+                14 =>
+                    array(
+                        'id' => 15,
+                        'language' => 'sr',
+                        'created_at' => '2025-03-24 16:49:54',
+                        'updated_at' => '2025-03-24 16:49:54',
+                        'name' => 'Serbian',
+                        'is_default' => 0,
+                    ),
+            ));
+        }
+
+        TranslationLocaleRegistry::ensureDatabaseRows(database_path('seeders/Tenant/translations'));
+
+        //Translations Table Seeder Started
+        // Step 1: Load existing translations from the database
+        $existing = DB::table('translations')
+            ->select('locale', 'group', 'key')
+            ->get();
+
+        $existingMap = [];
+
+        foreach ($existing as $item) {
+            $group = $item->group ?? 'db';
+            $existingMap[$item->locale . '|' . $group . '|' . $item->key] = true;
+        }
+
+        // Step 2: Load all locale files
+        $directory = database_path('seeders/Tenant/translations');
+        $files = glob($directory . '/*.php');
+
+        $insertData = [];
+
+        foreach ($files as $file) {
+            $data = \App\Support\TranslationSeedFile::load($file);
+            $locale = basename($file, '.php');
+
+            foreach ($data as $row) {
+                $lookupKey = $locale . '|db|' . $row['key'];
+
+                if (!isset($existingMap[$lookupKey])) {
+                    $insertData[] = [
+                        'locale' => $locale,
+                        'group' => 'db',
+                        'key' => $row['key'],
+                        'value' => $row['value'],
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                    $existingMap[$lookupKey] = true;
+                }
+            }
+        }
+
+        // Step 3: Insert new records in chunks
+        if (!empty($insertData)) {
+            $chunks = collect($insertData)->chunk(1000);
+            foreach ($chunks as $chunk) {
+                DB::table('translations')->insert($chunk->toArray());
+            }
+        }
+
+        if (class_exists(\App\Models\Translation::class)) {
+            \App\Models\Translation::forgetCachedTranslations();
+        }
+        //Translations Table Seeder Ended
 
         if (!config('database.connections.saleprosaas_landlord')) {
-            $this->call(ThemeSettingSeeder::class);
-        }
-        else {
+            if (!DB::table('theme_settings')->count()) {
+                $defaults = [
+                    [
+                        'name' => 'Indigo',
+                        'theme_color' => '#6366F1', // 500 shade only
+                        'font_family' => 'Jost',
+                        'icon_pack' => 'solar',
+                        'item_size' => 16,
+                        'input_design' => 'outlined',
+                        'button_style' => 'gradient',
+                        'button_colors' => json_encode(['#6366F1', '#8B5CF6']),
+                        'border_radius' => 'rounded-lg',
+                        'sidebar_style' => 'normal',
+                        'sidebar_corner' => 'rounded',
+                        'auth_background_type' => 'themed',
+                        'is_active' => true,
+                        'active_for' => json_encode(['app']),
+                        'is_deleted' => false,
+                    ],
+                    [
+                        'name' => 'Green',
+                        'theme_color' => '#10B981', // 500 shade only
+                        'font_family' => 'Poppins',
+                        'icon_pack' => 'fontawesome',
+                        'item_size' => 16,
+                        'input_design' => 'filled',
+                        'button_style' => 'filled',
+                        'button_colors' => null,
+                        'border_radius' => 'rounded-none',
+                        'sidebar_style' => 'normal',
+                        'sidebar_corner' => 'rounded',
+                        'auth_background_type' => 'themed',
+                        'is_active' => true,
+                        'active_for' => json_encode(['app']),
+                        'is_deleted' => false,
+                    ],
+                    [
+                        'name' => 'Blue',
+                        'theme_color' => '#3B82F6', // 500 shade only
+                        'font_family' => 'Roboto',
+                        'icon_pack' => 'material',
+                        'item_size' => 16,
+                        'input_design' => 'outlined',
+                        'button_style' => 'outlined',
+                        'button_colors' => null,
+                        'border_radius' => 'rounded',
+                        'sidebar_style' => 'normal',
+                        'sidebar_corner' => 'rounded',
+                        'auth_background_type' => 'themed',
+                        'is_active' => true,
+                        'active_for' => json_encode(['app']),
+                        'is_deleted' => false,
+                    ],
+                    [
+                        'name' => 'Violet',
+                        'theme_color' => '#8b5cf6', // 500 shade only
+                        'font_family' => 'Roboto',
+                        'icon_pack' => 'cupertino',
+                        'item_size' => 16,
+                        'input_design' => 'outlined',
+                        'button_style' => 'gradient',
+                        'button_colors' => json_encode(['#a78bfa', '#7c3aed']),
+                        'border_radius' => 'rounded-lg',
+                        'sidebar_style' => 'normal',
+                        'sidebar_corner' => 'rounded',
+                        'auth_background_type' => 'themed',
+                        'is_active' => true,
+                        'active_for' => json_encode(['app']),
+                        'is_deleted' => false,
+                    ],
+                    [
+                        'name' => 'Red',
+                        'theme_color' => '#F43F5E', // 500 shade only
+                        'font_family' => 'Nunito',
+                        'icon_pack' => 'heroicons',
+                        'item_size' => 16,
+                        'input_design' => 'filled',
+                        'button_style' => 'filled',
+                        'button_colors' => null,
+                        'border_radius' => 'rounded-full',
+                        'sidebar_style' => 'normal',
+                        'sidebar_corner' => 'rounded',
+                        'auth_background_type' => 'themed',
+                        'is_active' => true,
+                        'active_for' => json_encode(['app']),
+                        'is_deleted' => false,
+                    ],
+                    [
+                        'name' => 'Orange',
+                        'theme_color' => '#F97316', // 500 shade only
+                        'font_family' => 'Raleway',
+                        'icon_pack' => 'bootstrap',
+                        'item_size' => 16,
+                        'input_design' => 'filled',
+                        'button_style' => 'outlined',
+                        'button_colors' => null,
+                        'border_radius' => 'rounded-full',
+                        'sidebar_style' => 'normal',
+                        'sidebar_corner' => 'rounded',
+                        'auth_background_type' => 'themed',
+                        'is_active' => true,
+                        'active_for' => json_encode(['app']),
+                        'is_deleted' => false,
+                    ],
+                ];
+                DB::table('theme_settings')->insert($defaults);
+            }
+        } else {
             if (!DB::table('theme_settings')->count()) {
                 $theme_settings = [];
                 tenancy()->central(function () use (&$theme_settings) {
                     $theme_settings = DB::table('theme_settings')
                         ->get()
-                        ->map(fn ($item) => collect($item)->except('id')->toArray())
+                        ->map(fn($item) => collect($item)->except('id')->toArray())
                         ->toArray();
                 });
                 DB::table('theme_settings')->insert($theme_settings);
@@ -47,44 +781,44 @@ class TenantDatabaseSeeder extends Seeder
 
         if (!DB::table('invoice_settings')->count()) {
             $baseData = [
-                'prefix'              => !empty(self::$tenantData) ? mb_substr(str_replace(' ', '', self::$tenantData['site_title']), 0, 10) : 'salepro',
-                'number_of_digit'     => 4,
-                'numbering_type'      => 'datewise',
-                'start_number'        => 1000,
-                'header_text'         => !empty(self::$tenantData) ? self::$tenantData['site_title'] : 'SalePro',
-                'footer_text'         => 'Thank you for shopping with us',
-                'footer_title'        => 'Thank you for shopping with us',
-                'size'                => 'a4',
-                'logo_height'         => 200,
-                'logo_width'          => 200,
-                'primary_color'       => '#ff0000',
-                'text_color'          => '#000000',
+                'prefix' => !empty(self::$tenantData) ? mb_substr(str_replace(' ', '', self::$tenantData['site_title']), 0, 10) : 'salepro',
+                'number_of_digit' => 4,
+                'numbering_type' => 'datewise',
+                'start_number' => 1000,
+                'header_text' => !empty(self::$tenantData) ? self::$tenantData['site_title'] : 'SalePro',
+                'footer_text' => 'Thank you for shopping with us',
+                'footer_title' => 'Thank you for shopping with us',
+                'size' => 'a4',
+                'logo_height' => 200,
+                'logo_width' => 200,
+                'primary_color' => '#ff0000',
+                'text_color' => '#000000',
                 'invoice_date_format' => 'd.m.y h:i A',
-                'is_default'          => 0,
-                'status'              => 0,
+                'is_default' => 0,
+                'status' => 0,
                 'show_column' => json_encode([
-                    "is_default"            => 0,
-                    "status"                => 0,
-                    "show_barcode"          => 1,
-                    "show_qr_code"          => 1,
+                    "is_default" => 0,
+                    "status" => 0,
+                    "show_barcode" => 1,
+                    "show_qr_code" => 1,
                     "show_customer_details" => 1,
                     "show_shipping_details" => 1,
-                    "show_payment_info"     => 1,
-                    "show_discount"         => 1,
-                    "show_tax_info"         => 1,
-                    "show_description"      => 1,
-                    "show_in_words"         => 1,
-                    "active_primary_color"  => 0,
-                    "active_text_color"     => 0,
-                    "show_warehouse_info"   => 1,
-                    "show_bill_to_info"     => 1,
-                    "show_footer_text"      => 1,
-                    "show_biller_info"      => 1,
-                    "show_payment_note"     => 1,
-                    "show_paid_info"        => 1,
-                    "show_ref_number"       => 1,
-                    "show_customer_name"    => 1,
-                    "active_date_format"    => 0,
+                    "show_payment_info" => 1,
+                    "show_discount" => 1,
+                    "show_tax_info" => 1,
+                    "show_description" => 1,
+                    "show_in_words" => 1,
+                    "active_primary_color" => 0,
+                    "active_text_color" => 0,
+                    "show_warehouse_info" => 1,
+                    "show_bill_to_info" => 1,
+                    "show_footer_text" => 1,
+                    "show_biller_info" => 1,
+                    "show_payment_note" => 1,
+                    "show_paid_info" => 1,
+                    "show_ref_number" => 1,
+                    "show_customer_name" => 1,
+                    "active_date_format" => 0,
                     "active_generat_settings" => 0,
                     "active_logo_height_width" => 0,
                     "hide_total_due" => 0,
@@ -123,7 +857,7 @@ class TenantDatabaseSeeder extends Seeder
                 [
                     'id' => 1,
                     'site_title' => !empty(self::$tenantData) ? self::$tenantData['site_title'] : 'SalePro',
-                    'site_logo' => !empty(self::$tenantData) ? self::$tenantData['site_logo'] : '20250102042651.png',
+                    'site_logo' => !empty(self::$tenantData) ? self::$tenantData['site_logo'] : '20250123024505.png',
                     'is_rtl' => 0,
                     'currency' => '1',
                     'package_id' => !empty(self::$tenantData) ? self::$tenantData['package_id'] : 0,
@@ -136,7 +870,8 @@ class TenantDatabaseSeeder extends Seeder
                     'decimal' => 2,
                     'state' => 1,
                     'theme' => 'default.css',
-                    'modules' => !empty(self::$tenantData) ? self::$tenantData['modules'] : NULL,
+                    'modules' => !empty(self::$tenantData) ? self::$tenantData['modules'] : '',
+                    'disabled_modules' => null,
                     'currency_position' => 'prefix',
                     'expiry_date' => !empty(self::$tenantData) ? self::$tenantData['expiry_date'] : '1970-01-01',
                     'expiry_type' => 'days',
@@ -147,6 +882,12 @@ class TenantDatabaseSeeder extends Seeder
                     'is_packing_slip' => 0,
                 ]
             ]);
+
+            // Resolve the fresh business state through the canonical registry and
+            // runtime availability service. Missing packages can never be exposed,
+            // while every installed/package-available module starts enabled.
+            $moduleAccess = app(ModuleAccessService::class);
+            $moduleAccess->initializeBusinessModulesIfUnconfigured();
         }
 
         if (!DB::table('users')->count()) {
@@ -168,39 +909,50 @@ class TenantDatabaseSeeder extends Seeder
             ]);
         }
 
-        if (!DB::table('roles')->count()) {
-            DB::table('roles')->insert([
-                [
-                    'id' => 1,
-                    'name' => 'Admin',
-                    'description' => 'admin can access all data...',
-                    'is_active' => 1,
-                    'guard_name' => 'web',
-                ],
-                [
-                    'id' => 2,
-                    'name' => 'Owner',
-                    'description' => 'Staff of shop',
-                    'is_active' => 1,
-                    'guard_name' => 'web',
-                ],
-                [
-                    'id' => 4,
-                    'name' => 'staff',
-                    'description' => 'staff has specific acess...',
-                    'is_active' => 1,
-                    'guard_name' => 'web',
-                ],
-                [
-                    'id' => 5,
-                    'name' => 'Customer',
-                    'description' => NULL,
-                    'is_active' => 1,
-                    'guard_name' => 'web',
-                ]
-            ]);
-        }
+        $defaultRoles = [
+            [
+                'id' => 1,
+                'name' => 'Admin',
+                'description' => 'admin can access all data...',
+                'is_active' => 1,
+                'guard_name' => 'web',
+            ],
+            [
+                'id' => 2,
+                'name' => 'Owner',
+                'description' => 'Staff of shop',
+                'is_active' => 1,
+                'guard_name' => 'web',
+            ],
+            [
+                'id' => 4,
+                'name' => 'staff',
+                'description' => 'staff has specific acess...',
+                'is_active' => 1,
+                'guard_name' => 'web',
+            ],
+            [
+                'id' => 5,
+                'name' => 'Customer',
+                'description' => NULL,
+                'is_active' => 1,
+                'guard_name' => 'web',
+            ]
+        ];
 
+        foreach ($defaultRoles as $role) {
+            if (!DB::table('roles')->where('id', $role['id'])->exists()
+                && !DB::table('roles')->where('name', $role['name'])->exists()) {
+                DB::table('roles')->insert($role);
+            }
+        }
+    }
+
+    /**
+     * Create the canonical SalePro web permissions without running the full tenant seeder.
+     */
+    public function seedCanonicalPermissions(): \Illuminate\Support\Collection
+    {
         ///permissions table data insert start///
         $existing_permissions = DB::table('permissions')
             ->where('guard_name', 'web')
@@ -363,6 +1115,10 @@ class TenantDatabaseSeeder extends Seeder
                 'guard_name' => 'web',
             ],
             [
+                'name' => 'tax-report',
+                'guard_name' => 'web',
+            ],
+            [
                 'name' => 'users-index',
                 'guard_name' => 'web',
             ],
@@ -468,6 +1224,22 @@ class TenantDatabaseSeeder extends Seeder
             ],
             [
                 'name' => 'account-index',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'account-add',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'chart-of-accounts-manage',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'semantic-account-mappings-manage',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'accounting-activation-manage',
                 'guard_name' => 'web',
             ],
             [
@@ -747,6 +1519,10 @@ class TenantDatabaseSeeder extends Seeder
                 'guard_name' => 'web',
             ],
             [
+                'name' => 'mobile_app',
+                'guard_name' => 'web',
+            ],
+            [
                 'name' => 'account-selection',
                 'guard_name' => 'web',
             ],
@@ -995,14 +1771,6 @@ class TenantDatabaseSeeder extends Seeder
                 'guard_name' => 'web',
             ],
             [
-                'name' => 'sidebar_manufacturing',
-                'guard_name' => 'web',
-            ],
-            [
-                'name' => 'sidebar_repair',
-                'guard_name' => 'web',
-            ],
-            [
                 'name' => 'sidebar_whatsapp',
                 'guard_name' => 'web',
             ],
@@ -1061,8 +1829,362 @@ class TenantDatabaseSeeder extends Seeder
             [
                 'name' => 'cost_edit_in_products',
                 'guard_name' => 'web',
-            ]
+            ],
+            [
+                'name' => 'module.ecommerce.access',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'module.woocommerce.access',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'woocommerce.sync',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'woocommerce.manage',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'module.repair.access',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'repair-dashboard',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'repair-service-index',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'repair-service-view',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'repair-service-add',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'repair-service-edit',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'repair-service-delete',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'repair-parts-view',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'repair-parts-add',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'repair-parts-edit',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'repair-parts-delete',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'repair-charges-edit',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'repair-payment-add',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'repair-payment-delete',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'repair-device-type',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'damage-stock',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'booking',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'project_project_list',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'project_project_add',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'project_project_show',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'project_project_edit',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'project_project_delete',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'project_task_list',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'project_task_add',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'project_task_show',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'project_task_edit',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'project_task_delete',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'project_category_list',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'project_category_add',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'project_category_edit',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'project_category_delete',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'ai-assistant-index',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'restaurant-floor',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'restaurant-table',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'restaurant-reservation',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'restaurant-menu-type',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'restaurant-modifier-group',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'restaurant-kitchen',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'restaurant-kitchen-dashboard',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'restaurant-pos',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-dashboard',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-measurements-index',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-measurements-add',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-measurements-edit',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-measurements-delete',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-orders-index',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-orders-add',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-orders-edit',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-orders-delete',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-order-payments-add',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-templates-index',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-templates-add',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-templates-edit',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-templates-delete',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-materials-manage',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-production-board',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-notifications-manage',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-notifications-send',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-delivery-manage',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-reports',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-trials-view',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-trials-schedule',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-trials-complete',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-alterations-manage',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-alterations-approve',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-catalog.view',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring-catalog.manage',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring.collection.manage',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring.style.manage',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring.style_version.activate',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring.component_role.manage',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'tailoring.order.price_override',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'pending_collections-create',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'pending_collections-index',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'pending_collections-handover',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'pending_collections-approve',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'pending_collections-reject',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'pending_collections-reverse',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'pending_collections-bypass',
+                'guard_name' => 'web',
+            ],
+            [
+                'name' => 'pending_collections-self_approve',
+                'guard_name' => 'web',
+            ],
         ];
+
+        // ModuleRegistry is the canonical source for optional-module access and
+        // granular module permissions. Preserve the historical static list above,
+        // but merge/deduplicate it so new installs cannot drift from role UI or
+        // TenantInfo definitions.
+        $permissionDataMap = [];
+        foreach ($permission_data as $row) {
+            $permissionDataMap[$row['name']] = $row;
+        }
+        foreach (ModuleRegistry::all() as $slug => $definition) {
+            foreach (ModuleRegistry::permissionNames($slug) as $permissionName) {
+                $permissionDataMap[$permissionName] = [
+                    'name' => $permissionName,
+                    'guard_name' => 'web',
+                ];
+            }
+        }
+        $permission_data = array_values($permissionDataMap);
 
         $insertData = [];
 
@@ -1077,9 +2199,35 @@ class TenantDatabaseSeeder extends Seeder
         }
         ///permissions table data insert end///
 
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $canonicalPermissionNames = array_column($permission_data, 'name');
+
+        return \Spatie\Permission\Models\Permission::query()
+            ->where('guard_name', 'web')
+            ->whereIn('name', $canonicalPermissionNames)
+            ->get();
+    }
+
+    private function seedAfterCanonicalPermissions(): void
+    {
         ///role_has_permissions table data insert start///
+        $adminRoleId = DB::table('roles')->where('id', 1)->value('id')
+            ?? DB::table('roles')->where('name', 'Admin')->value('id');
+
+        if (!$adminRoleId) {
+            DB::table('roles')->insert([
+                'id' => 1,
+                'name' => 'Admin',
+                'description' => 'admin can access all data...',
+                'is_active' => 1,
+                'guard_name' => 'web',
+            ]);
+            $adminRoleId = 1;
+        }
+
         $existing_role_permissions = DB::table('role_has_permissions')
-            ->where('role_id', 1)
+            ->where('role_id', $adminRoleId)
             ->pluck('permission_id')
             ->toArray();
 
@@ -1089,16 +2237,15 @@ class TenantDatabaseSeeder extends Seeder
         $all_permissions_map = DB::table('permissions')->pluck('id', 'name')->toArray();
         $permissions_role = [];
 
-        if(!config('database.connections.saleprosaas_landlord')) {
+        if (!config('database.connections.saleprosaas_landlord')) {
             // For salepro
             foreach ($all_permissions_map as $perm_name => $perm_id) {
                 $permissions_role[] = [
                     'permission_id' => $perm_id,
-                    'role_id'       => 1,
+                    'role_id' => $adminRoleId,
                 ];
             }
-        }
-        else {
+        } else {
             $features = $this->features();
             // ১. লজিক সেট করা: টেন্যান্ট ডাটা থাকলে প্যাকেজ ফিচারগুলো এলাউড, না থাকলে কিছুই এলাউড না (Empty)
             $allowedFeatures = !empty(self::$tenantData) ? self::$tenantData['package_features'] : [];
@@ -1119,7 +2266,9 @@ class TenantDatabaseSeeder extends Seeder
                 }
             }
             // ২. মডিউল চেক করে addons হ্যান্ডেল করা
-            if (empty(self::$tenantData['modules'])) {
+            $hasAddon = !empty(array_intersect($allowedFeatures, $this->addonList()));
+
+            if (!$hasAddon) {
                 $excluded_permission_names[] = 'addons';
             }
             // ম্যাপ থেকে চেক করে ডাটা সাজানো
@@ -1128,7 +2277,7 @@ class TenantDatabaseSeeder extends Seeder
                 if (!in_array($perm_name, $excluded_permission_names)) {
                     $permissions_role[] = [
                         'permission_id' => $perm_id,
-                        'role_id'       => 1,
+                        'role_id' => $adminRoleId,
                     ];
                 }
             }
@@ -1145,14 +2294,43 @@ class TenantDatabaseSeeder extends Seeder
         if (!empty($insertData)) {
             DB::table('role_has_permissions')->insert($insertData);
         }
+
+        // This irreversible financial cutover is intentionally available only
+        // to the built-in global Admin and Owner roles. Existing custom roles
+        // retain their configured permissions.
+        $ownerRoleId = DB::table('roles')->where('id', 2)->value('id')
+            ?? DB::table('roles')->where('name', 'Owner')->value('id');
+
+        $privilegedRoleIds = array_values(array_unique(array_filter([$adminRoleId, $ownerRoleId])));
+
+        $activationPermissionId = $all_permissions_map['accounting-activation-manage'] ?? null;
+        if ($activationPermissionId) {
+            foreach ($privilegedRoleIds as $roleId) {
+                if (DB::table('roles')->where('id', $roleId)->exists()
+                    && !DB::table('role_has_permissions')->where(['role_id' => $roleId, 'permission_id' => $activationPermissionId])->exists()) {
+                    DB::table('role_has_permissions')->insert(['role_id' => $roleId, 'permission_id' => $activationPermissionId]);
+                }
+            }
+        }
+
+        $bypassPermissionId = $all_permissions_map['pending_collections-bypass'] ?? null;
+        if ($bypassPermissionId) {
+            foreach ($privilegedRoleIds as $roleId) {
+                if (DB::table('roles')->where('id', $roleId)->exists()
+                    && !DB::table('role_has_permissions')->where(['role_id' => $roleId, 'permission_id' => $bypassPermissionId])->exists()) {
+                    DB::table('role_has_permissions')->insert(['role_id' => $roleId, 'permission_id' => $bypassPermissionId]);
+                }
+            }
+        }
         ///role_has_permissions table data insert end///
 
+        $insertedDefaultPaymentAccount = false;
         if (!DB::table('accounts')->count()) {
             DB::table('accounts')->insert([
                 [
                     'id' => 1,
                     'account_no' => '019912229',
-                    'name' => 'Sales Account',
+                    'name' => 'Main Cash / Bank Account',
                     'initial_balance' => 0.0,
                     'total_balance' => 0.0,
                     'note' => 'This is the default account.',
@@ -1164,20 +2342,27 @@ class TenantDatabaseSeeder extends Seeder
                     'is_payment' => 1,
                 ],
             ]);
+            $insertedDefaultPaymentAccount = true;
+        }
+
+        // The default account is inserted directly by this seeder, so preserve the same
+        // mapping invariant enforced by AccountsController after accounting activation.
+        if ($insertedDefaultPaymentAccount && app(AccountingModeService::class)->isDoubleEntryAuthoritative()) {
+            app(PaymentAccountService::class)->ensureMapping(Account::findOrFail(1));
         }
 
         if (!DB::table('billers')->count()) {
             DB::table('billers')->insert([
                 [
                     'id' => 1,
-                    'name' => 'Test Biller',
+                    'name' => 'Default Biller',
                     'image' => NULL,
-                    'company_name' => 'Test Company',
+                    'company_name' => 'Your Business',
                     'vat_number' => NULL,
-                    'email' => 'test@gmail.com',
-                    'phone_number' => '12312',
-                    'address' => 'Test address',
-                    'city' => 'Test City',
+                    'email' => 'not-configured@example.invalid',
+                    'phone_number' => 'Not configured',
+                    'address' => 'Not configured',
+                    'city' => 'Not configured',
                     'state' => NULL,
                     'postal_code' => NULL,
                     'country' => NULL,
@@ -1186,7 +2371,9 @@ class TenantDatabaseSeeder extends Seeder
             ]);
         }
 
-        if (!DB::table('brands')->count()) {
+        // Catalogue masters are deliberately not part of a public installation.
+        // They are seeded only by DevelopmentDemoSeeder in local/testing work.
+        if ($this->shouldSeedDemoData() && !DB::table('brands')->count()) {
             DB::table('brands')->insert([
                 [
                     'id' => 1,
@@ -1245,201 +2432,201 @@ class TenantDatabaseSeeder extends Seeder
             ]);
         }
 
-        if (!DB::table('categories')->count()) {
+        if ($this->shouldSeedDemoData() && !DB::table('categories')->count()) {
             DB::table('categories')->insert([
                 [
                     'id' => 1,
                     'name' => 'Smartphone & Gadgets',
-                    'image' => NULL,
+                    'image' => '20260706042618.jpg',
                     'parent_id' => NULL,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 2,
                     'name' => 'Phone Accessories',
-                    'image' => NULL,
+                    'image' => '20260706040905.jpg',
                     'parent_id' => 1,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 3,
                     'name' => 'iPhone',
-                    'image' => NULL,
+                    'image' => '20260706022049.jpeg',
                     'parent_id' => 1,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 4,
                     'name' => 'Samsung',
-                    'image' => NULL,
+                    'image' => '20260706041724.png',
                     'parent_id' => 1,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 5,
                     'name' => 'Phone Cases',
-                    'image' => NULL,
+                    'image' => '20260706041412.jpg',
                     'parent_id' => 1,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 6,
                     'name' => 'Laptops & Computers',
-                    'image' => NULL,
+                    'image' => '20260706035746.jpeg',
                     'parent_id' => NULL,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 7,
                     'name' => 'Keyboards',
-                    'image' => NULL,
+                    'image' => '20260706033355.jpg',
                     'parent_id' => 6,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 8,
                     'name' => 'Laptop Bags',
-                    'image' => NULL,
+                    'image' => '20260706035048.jpeg',
                     'parent_id' => 6,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 9,
                     'name' => 'Mouses',
-                    'image' => NULL,
+                    'image' => '20260706040701.png',
                     'parent_id' => 6,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 10,
                     'name' => 'Webcams',
-                    'image' => NULL,
+                    'image' => '20260706044323.jpg',
                     'parent_id' => 6,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 11,
                     'name' => 'Monitors',
-                    'image' => NULL,
+                    'image' => '20200701093146.jpg',
                     'parent_id' => 6,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 12,
                     'name' => 'Smartwatches',
-                    'image' => NULL,
+                    'image' => '20260706042656.jpg',
                     'parent_id' => NULL,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 13,
                     'name' => 'Sport Watches',
-                    'image' => NULL,
+                    'image' => '20260706040324.jpeg',
                     'parent_id' => 12,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 14,
                     'name' => 'Kids Watches',
-                    'image' => NULL,
+                    'image' => '20260706034710.jpg',
                     'parent_id' => 12,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 15,
                     'name' => 'Women Watches',
-                    'image' => NULL,
+                    'image' => '20260706044227.jpg',
                     'parent_id' => 12,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 16,
                     'name' => 'Men Watches',
-                    'image' => NULL,
+                    'image' => '20260706040324.jpeg',
                     'parent_id' => 12,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 23,
                     'name' => 'TVs, Audio & Video',
-                    'image' => NULL,
+                    'image' => '20260706040602.jpg',
                     'parent_id' => NULL,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 24,
                     'name' => 'Television Accessories',
-                    'image' => NULL,
+                    'image' => '20260706043734.jpeg',
                     'parent_id' => 23,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 25,
                     'name' => 'HD, DVD Players',
-                    'image' => NULL,
+                    'image' => '20260706021834.jpg',
                     'parent_id' => 23,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 26,
                     'name' => 'TV-DVD Combos',
-                    'image' => NULL,
+                    'image' => '20260706043925.jpg',
                     'parent_id' => 23,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 27,
                     'name' => 'Projectors',
-                    'image' => NULL,
+                    'image' => '20260706041622.jpg',
                     'parent_id' => 23,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 28,
                     'name' => 'Projection Screen',
-                    'image' => NULL,
+                    'image' => '20260706041549.jpg',
                     'parent_id' => 23,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 29,
                     'name' => 'Fruits & Vegetables',
-                    'image' => NULL,
+                    'image' => '20260706021022.jpg',
                     'parent_id' => NULL,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 30,
                     'name' => 'Dairy & Egg',
-                    'image' => NULL,
+                    'image' => '20260706020634.jpg',
                     'parent_id' => NULL,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 31,
                     'name' => 'Meat & Fish',
-                    'image' => NULL,
+                    'image' => '20260706040218.jpeg',
                     'parent_id' => NULL,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 33,
                     'name' => 'Candy & Chocolates',
-                    'image' => NULL,
+                    'image' => '20260706015414.jpeg',
                     'parent_id' => NULL,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 39,
                     'name' => 'Clothing',
-                    'image' => NULL,
+                    'image' => '20260706020106.jpg',
                     'parent_id' => NULL,
                     'is_active' => 1,
                 ],
                 [
                     'id' => 40,
                     'name' => 'Gym Accessories',
-                    'image' => NULL,
+                    'image' => '20260706021541.jpeg',
                     'parent_id' => NULL,
                     'is_active' => 1,
                 ]
@@ -1475,13 +2662,13 @@ class TenantDatabaseSeeder extends Seeder
                     'id' => 1,
                     'customer_group_id' => 1,
                     'user_id' => NULL,
-                    'name' => 'John Doe',
-                    'company_name' => 'Test Company',
-                    'email' => 'john@gmail.com',
-                    'phone_number' => '231312',
+                    'name' => 'Walk-in Customer',
+                    'company_name' => NULL,
+                    'email' => NULL,
+                    'phone_number' => 'Not configured',
                     'tax_no' => NULL,
-                    'address' => 'Test address',
-                    'city' => 'Test City',
+                    'address' => 'Not configured',
+                    'city' => NULL,
                     'state' => NULL,
                     'postal_code' => NULL,
                     'country' => NULL,
@@ -1501,7 +2688,7 @@ class TenantDatabaseSeeder extends Seeder
                     'warehouse_id' => 1,
                     'biller_id' => 1,
                     'product_number' => 2,
-                    'keybord_active' => 1,
+                    'keybord_active' => 0,
                     'is_table' => 0,
                     'send_sms' => 0,
                     'stripe_public_key' => NULL,
@@ -1516,152 +2703,7 @@ class TenantDatabaseSeeder extends Seeder
             ]);
         }
 
-        if (!DB::table('product_purchases')->count()) {
-            DB::table('product_purchases')->insert([
-                [
-                    'id' => 1,
-                    'purchase_id' => 1,
-                    'product_id' => 1,
-                    'product_batch_id' => NULL,
-                    'variant_id' => NULL,
-                    'imei_number' => NULL,
-                    'qty' => 10.0,
-                    'recieved' => 10.0,
-                    'return_qty' => 0.0,
-                    'purchase_unit_id' => 1,
-                    'net_unit_cost' => 10.0,
-                    'discount' => 0.0,
-                    'tax_rate' => 10.0,
-                    'tax' => 10.0,
-                    'total' => 110.0,
-                ],
-                [
-                    'id' => 2,
-                    'purchase_id' => 2,
-                    'product_id' => 69,
-                    'product_batch_id' => NULL,
-                    'variant_id' => NULL,
-                    'imei_number' => NULL,
-                    'qty' => 50.0,
-                    'recieved' => 50.0,
-                    'return_qty' => 0.0,
-                    'purchase_unit_id' => 1,
-                    'net_unit_cost' => 20.0,
-                    'discount' => 0.0,
-                    'tax_rate' => 10.0,
-                    'tax' => 100.0,
-                    'total' => 1100.0,
-                ],
-                [
-                    'id' => 3,
-                    'purchase_id' => 2,
-                    'product_id' => 70,
-                    'product_batch_id' => NULL,
-                    'variant_id' => NULL,
-                    'imei_number' => NULL,
-                    'qty' => 30.0,
-                    'recieved' => 30.0,
-                    'return_qty' => 0.0,
-                    'purchase_unit_id' => 1,
-                    'net_unit_cost' => 15.0,
-                    'discount' => 0.0,
-                    'tax_rate' => 10.0,
-                    'tax' => 45.0,
-                    'total' => 495.0,
-                ],
-                [
-                    'id' => 4,
-                    'purchase_id' => 2,
-                    'product_id' => 71,
-                    'product_batch_id' => NULL,
-                    'variant_id' => NULL,
-                    'imei_number' => NULL,
-                    'qty' => 20.0,
-                    'recieved' => 20.0,
-                    'return_qty' => 0.0,
-                    'purchase_unit_id' => 1,
-                    'net_unit_cost' => 50.0,
-                    'discount' => 0.0,
-                    'tax_rate' => 10.0,
-                    'tax' => 100.0,
-                    'total' => 1100.0,
-                ],
-                [
-                    'id' => 5,
-                    'purchase_id' => 2,
-                    'product_id' => 72,
-                    'product_batch_id' => NULL,
-                    'variant_id' => NULL,
-                    'imei_number' => NULL,
-                    'qty' => 10.0,
-                    'recieved' => 10.0,
-                    'return_qty' => 0.0,
-                    'purchase_unit_id' => 1,
-                    'net_unit_cost' => 500.0,
-                    'discount' => 0.0,
-                    'tax_rate' => 10.0,
-                    'tax' => 500.0,
-                    'total' => 5500.0,
-                ]
-            ]);
-        }
-
-        if (!DB::table('product_warehouse')->count()) {
-            DB::table('product_warehouse')->insert([
-                [
-                    'id' => 1,
-                    'product_id' => '1',
-                    'product_batch_id' => NULL,
-                    'variant_id' => NULL,
-                    'imei_number' => NULL,
-                    'warehouse_id' => 1,
-                    'qty' => 10.0,
-                    'price' => 20.0,
-                ],
-                [
-                    'id' => 2,
-                    'product_id' => 69,
-                    'product_batch_id' => NULL,
-                    'variant_id' => NULL,
-                    'imei_number' => NULL,
-                    'warehouse_id' => 1,
-                    'qty' => 50.0,
-                    'price' => 30.0,
-                ],
-                [
-                    'id' => 3,
-                    'product_id' => 70,
-                    'product_batch_id' => NULL,
-                    'variant_id' => NULL,
-                    'imei_number' => NULL,
-                    'warehouse_id' => 1,
-                    'qty' => 30.0,
-                    'price' => 25.0,
-                ],
-                [
-                    'id' => 4,
-                    'product_id' => 71,
-                    'product_batch_id' => NULL,
-                    'variant_id' => NULL,
-                    'imei_number' => NULL,
-                    'warehouse_id' => 1,
-                    'qty' => 20.0,
-                    'price' => 80.0,
-                ],
-                [
-                    'id' => 5,
-                    'product_id' => 72,
-                    'product_batch_id' => NULL,
-                    'variant_id' => NULL,
-                    'imei_number' => NULL,
-                    'warehouse_id' => 1,
-                    'qty' => 10.0,
-                    'price' => 800.0,
-                ]
-            ]);
-        }
-
-        if (!DB::table('products')->count()) {
+        if ($this->shouldSeedDemoData() && !DB::table('products')->count()) {
             DB::table('products')->insert([
                 [
                     'id' => 1,
@@ -1677,7 +2719,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 1099.99,
                     'price' => 1299.99,
                     'wholesale_price' => NULL,
-                    'qty' => 624.7,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => 1,
@@ -1718,7 +2760,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 1000.0,
                     'price' => 1249.0,
                     'wholesale_price' => NULL,
-                    'qty' => -152.5,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => 1,
@@ -1759,7 +2801,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 300.0,
                     'price' => 350.0,
                     'wholesale_price' => NULL,
-                    'qty' => -47.7,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => 1,
@@ -1800,7 +2842,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 900.0,
                     'price' => 1050.0,
                     'wholesale_price' => NULL,
-                    'qty' => -18.78,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -1841,7 +2883,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 950.99,
                     'price' => 1150.99,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -1882,7 +2924,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 999.99,
                     'price' => 1111.99,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -1923,7 +2965,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 899.99,
                     'price' => 999.99,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -1964,7 +3006,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 1199.0,
                     'price' => 1300.0,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2005,7 +3047,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 399.0,
                     'price' => 559.0,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2046,7 +3088,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 990.0,
                     'price' => 1250.0,
                     'wholesale_price' => NULL,
-                    'qty' => 84.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2074,7 +3116,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 14,
+                    'id' => 11,
                     'name' => 'Sony Bravia 55X90J 4K Ultra HD 55″ 140 Screen Google Smart LED TV',
                     'code' => '16530612',
                     'type' => 'standard',
@@ -2087,7 +3129,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 350.0,
                     'price' => 499.0,
                     'wholesale_price' => NULL,
-                    'qty' => -1.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2096,7 +3138,7 @@ class TenantDatabaseSeeder extends Seeder
                     'last_date' => NULL,
                     'tax_id' => 1,
                     'tax_method' => 2,
-                    'image' => NULL,
+                    'image' => 'zummXD2dvAtI.png',
                     'file' => NULL,
                     'is_embeded' => NULL,
                     'is_variant' => NULL,
@@ -2115,7 +3157,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 15,
+                    'id' => 12,
                     'name' => 'Samsung 43AU7000 4K Ultra HD 43″ 109 Screen Smart LED TV',
                     'code' => '73189124',
                     'type' => 'standard',
@@ -2128,7 +3170,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 499.0,
                     'price' => 547.0,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2156,7 +3198,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 16,
+                    'id' => 13,
                     'name' => 'Apple TV HD 32GB (2nd Generation)',
                     'code' => '71493353',
                     'type' => 'standard',
@@ -2169,7 +3211,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 79.0,
                     'price' => 109.0,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2197,7 +3239,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 17,
+                    'id' => 14,
                     'name' => 'Apple Watch SE GPS + Cellular 40mm Space Gray',
                     'code' => '92178104',
                     'type' => 'standard',
@@ -2210,7 +3252,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 349.0,
                     'price' => 499.0,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2238,7 +3280,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 18,
+                    'id' => 15,
                     'name' => 'Xbox One Wireless Controller Black Color',
                     'code' => '93060790',
                     'type' => 'standard',
@@ -2251,7 +3293,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 459.0,
                     'price' => 599.0,
                     'wholesale_price' => NULL,
-                    'qty' => -5.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2281,7 +3323,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 19,
+                    'id' => 16,
                     'name' => 'Apple iPhone XS Max-64GB -white',
                     'code' => '22061536',
                     'type' => 'standard',
@@ -2294,7 +3336,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 899.0,
                     'price' => 1059.0,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2324,7 +3366,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 20,
+                    'id' => 17,
                     'name' => 'Apple Watch Series 8 GPS 45mm Midnight Aluminum Case',
                     'code' => '31429623',
                     'type' => 'standard',
@@ -2337,7 +3379,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 399.0,
                     'price' => 499.0,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2367,7 +3409,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 21,
+                    'id' => 18,
                     'name' => 'Huawei Watch GT 2 Sport Stainless Steel 46mm',
                     'code' => '02456392',
                     'type' => 'standard',
@@ -2380,7 +3422,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 369.0,
                     'price' => 599.0,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => 1,
@@ -2410,7 +3452,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 22,
+                    'id' => 19,
                     'name' => 'Samsung Galaxy Active 2 R835U Smartwatch 40mm',
                     'code' => '10203743',
                     'type' => 'standard',
@@ -2423,7 +3465,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 275.0,
                     'price' => 399.0,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2453,7 +3495,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 23,
+                    'id' => 20,
                     'name' => 'Canon EOS R10 RF-S 18-45 IS STM',
                     'code' => '13929367',
                     'type' => 'standard',
@@ -2466,7 +3508,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 439.0,
                     'price' => 577.0,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2496,7 +3538,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 24,
+                    'id' => 21,
                     'name' => 'Sony A7 III Mirrorless Camera Body Only',
                     'code' => '99421096',
                     'type' => 'standard',
@@ -2509,7 +3551,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 299.0,
                     'price' => 379.0,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2539,7 +3581,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 25,
+                    'id' => 22,
                     'name' => 'WOLFANG GA420 Action Camera 4K 60FPS 24MP',
                     'code' => '99218280',
                     'type' => 'standard',
@@ -2552,7 +3594,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 130.0,
                     'price' => 157.99,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2582,7 +3624,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 26,
+                    'id' => 23,
                     'name' => 'Fresh Organic Navel Orange',
                     'code' => '33887520',
                     'type' => 'standard',
@@ -2595,7 +3637,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 2.99,
                     'price' => 3.99,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2622,7 +3664,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 27,
+                    'id' => 24,
                     'name' => 'Banana (pack of 12)',
                     'code' => '27583341',
                     'type' => 'standard',
@@ -2635,7 +3677,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 0.89,
                     'price' => 1.29,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2662,7 +3704,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 28,
+                    'id' => 25,
                     'name' => 'Water Melon ~ 3KG',
                     'code' => '19186147',
                     'type' => 'standard',
@@ -2675,7 +3717,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 2.39,
                     'price' => 3.3,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2702,7 +3744,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 0,
                 ],
                 [
-                    'id' => 29,
+                    'id' => 26,
                     'name' => 'Gala Original Apple - 1KG',
                     'code' => '80912386',
                     'type' => 'standard',
@@ -2715,7 +3757,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 2.39,
                     'price' => 3.19,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2742,7 +3784,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 31,
+                    'id' => 27,
                     'name' => 'Men&#039;s Premium Egyptian Cotton T-shirt',
                     'code' => '30282941',
                     'type' => 'standard',
@@ -2755,7 +3797,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 50.5,
                     'price' => 70.99,
                     'wholesale_price' => NULL,
-                    'qty' => -13.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2764,7 +3806,7 @@ class TenantDatabaseSeeder extends Seeder
                     'last_date' => NULL,
                     'tax_id' => 1,
                     'tax_method' => 2,
-                    'image' => '202402040508081.jpg',
+                    'image' => '202607080830062.jpeg',
                     'file' => NULL,
                     'is_embeded' => 0,
                     'is_variant' => 1,
@@ -2782,7 +3824,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 34,
+                    'id' => 28,
                     'name' => 'Bon Sprayer',
                     'code' => '09138264',
                     'type' => 'standard',
@@ -2795,7 +3837,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 115.0,
                     'price' => 130.0,
                     'wholesale_price' => NULL,
-                    'qty' => 338.5,
+                    'qty' => 0,
                     'alert_quantity' => 5.0,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2822,7 +3864,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 35,
+                    'id' => 29,
                     'name' => 'Toffee',
                     'code' => '76722958',
                     'type' => 'standard',
@@ -2835,7 +3877,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 10.0,
                     'price' => 20.0,
                     'wholesale_price' => NULL,
-                    'qty' => 48.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2862,7 +3904,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 36,
+                    'id' => 30,
                     'name' => 'AMD RYZEN 5 5600G',
                     'code' => '1001',
                     'type' => 'standard',
@@ -2875,7 +3917,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 2500.0,
                     'price' => 3500.0,
                     'wholesale_price' => NULL,
-                    'qty' => 6.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2902,7 +3944,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 37,
+                    'id' => 31,
                     'name' => 'KINGSTON 8GB RAM',
                     'code' => '1002',
                     'type' => 'standard',
@@ -2915,7 +3957,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 1000.0,
                     'price' => 1450.0,
                     'wholesale_price' => NULL,
-                    'qty' => 8.0,
+                    'qty' => 0,
                     'alert_quantity' => 5.0,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2924,7 +3966,7 @@ class TenantDatabaseSeeder extends Seeder
                     'last_date' => NULL,
                     'tax_id' => NULL,
                     'tax_method' => 1,
-                    'image' => '202403080446151.jpg',
+                    'image' => '202607080825182.png',
                     'file' => NULL,
                     'is_embeded' => NULL,
                     'is_variant' => NULL,
@@ -2942,7 +3984,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 38,
+                    'id' => 32,
                     'name' => 'MI BUILD PACKAGE',
                     'code' => '1004',
                     'type' => 'combo',
@@ -2955,7 +3997,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 0.0,
                     'price' => 4950.0,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -2964,7 +4006,7 @@ class TenantDatabaseSeeder extends Seeder
                     'last_date' => NULL,
                     'tax_id' => NULL,
                     'tax_method' => 1,
-                    'image' => '202403080452061.JPG',
+                    'image' => 'zummXD2dvAtI.png',
                     'file' => NULL,
                     'is_embeded' => NULL,
                     'is_variant' => NULL,
@@ -2982,7 +4024,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 39,
+                    'id' => 33,
                     'name' => 'Irene Jack',
                     'code' => '3456',
                     'type' => 'standard',
@@ -2995,7 +4037,287 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 1000.0,
                     'price' => 899.0,
                     'wholesale_price' => NULL,
-                    'qty' => 84.0,
+                    'qty' => 0,
+                    'alert_quantity' => NULL,
+                    'daily_sale_objective' => NULL,
+                    'promotion' => NULL,
+                    'promotion_price' => NULL,
+                    'starting_date' => NULL,
+                    'last_date' => NULL,
+                    'tax_id' => NULL,
+                    'tax_method' => 1,
+                    'image' => 'zummXD2dvAtI.png',
+                    'file' => NULL,
+                    'is_embeded' => NULL,
+                    'is_variant' => NULL,
+                    'is_batch' => NULL,
+                    'is_diffPrice' => NULL,
+                    'is_imei' => NULL,
+                    'featured' => NULL,
+                    'product_list' => NULL,
+                    'variant_list' => NULL,
+                    'qty_list' => NULL,
+                    'price_list' => NULL,
+                    'product_details' => '',
+                    'variant_option' => NULL,
+                    'variant_value' => NULL,
+                    'is_active' => 1,
+                ],
+                [
+                    'id' => 34,
+                    'name' => 'Off white Tshirt',
+                    'code' => '75308742',
+                    'type' => 'standard',
+                    'barcode_symbology' => 'C128',
+                    'brand_id' => NULL,
+                    'category_id' => 39,
+                    'unit_id' => 1,
+                    'purchase_unit_id' => 1,
+                    'sale_unit_id' => 1,
+                    'cost' => 4.8,
+                    'price' => 8.0,
+                    'wholesale_price' => NULL,
+                    'qty' => 0,
+                    'alert_quantity' => NULL,
+                    'daily_sale_objective' => NULL,
+                    'promotion' => NULL,
+                    'promotion_price' => NULL,
+                    'starting_date' => NULL,
+                    'last_date' => NULL,
+                    'tax_id' => NULL,
+                    'tax_method' => 1,
+                    'image' => 'zummXD2dvAtI.png',
+                    'file' => NULL,
+                    'is_embeded' => NULL,
+                    'is_variant' => NULL,
+                    'is_batch' => NULL,
+                    'is_diffPrice' => NULL,
+                    'is_imei' => NULL,
+                    'featured' => NULL,
+                    'product_list' => NULL,
+                    'variant_list' => NULL,
+                    'qty_list' => NULL,
+                    'price_list' => NULL,
+                    'product_details' => '',
+                    'variant_option' => NULL,
+                    'variant_value' => NULL,
+                    'is_active' => 1,
+                ],
+                [
+                    'id' => 35,
+                    'name' => 'samsung laptop',
+                    'code' => '65317202',
+                    'type' => 'standard',
+                    'barcode_symbology' => 'C128',
+                    'brand_id' => 2,
+                    'category_id' => 6,
+                    'unit_id' => 1,
+                    'purchase_unit_id' => 1,
+                    'sale_unit_id' => 1,
+                    'cost' => 50000.0,
+                    'price' => 55000.0,
+                    'wholesale_price' => NULL,
+                    'qty' => 0,
+                    'alert_quantity' => NULL,
+                    'daily_sale_objective' => NULL,
+                    'promotion' => NULL,
+                    'promotion_price' => NULL,
+                    'starting_date' => NULL,
+                    'last_date' => NULL,
+                    'tax_id' => NULL,
+                    'tax_method' => 1,
+                    'image' => 'zummXD2dvAtI.png',
+                    'file' => NULL,
+                    'is_embeded' => NULL,
+                    'is_variant' => NULL,
+                    'is_batch' => NULL,
+                    'is_diffPrice' => NULL,
+                    'is_imei' => 1,
+                    'featured' => NULL,
+                    'product_list' => NULL,
+                    'variant_list' => NULL,
+                    'qty_list' => NULL,
+                    'price_list' => NULL,
+                    'product_details' => '',
+                    'variant_option' => NULL,
+                    'variant_value' => NULL,
+                    'is_active' => 1,
+                ],
+                [
+                    'id' => 36,
+                    'name' => 'samsung laptop 15',
+                    'code' => '67600232',
+                    'type' => 'standard',
+                    'barcode_symbology' => 'C128',
+                    'brand_id' => 2,
+                    'category_id' => 6,
+                    'unit_id' => 1,
+                    'purchase_unit_id' => 1,
+                    'sale_unit_id' => 1,
+                    'cost' => 55000.0,
+                    'price' => 60000.0,
+                    'wholesale_price' => NULL,
+                    'qty' => 0,
+                    'alert_quantity' => NULL,
+                    'daily_sale_objective' => NULL,
+                    'promotion' => NULL,
+                    'promotion_price' => NULL,
+                    'starting_date' => NULL,
+                    'last_date' => NULL,
+                    'tax_id' => NULL,
+                    'tax_method' => 1,
+                    'image' => 'zummXD2dvAtI.png',
+                    'file' => NULL,
+                    'is_embeded' => NULL,
+                    'is_variant' => NULL,
+                    'is_batch' => NULL,
+                    'is_diffPrice' => NULL,
+                    'is_imei' => 1,
+                    'featured' => NULL,
+                    'product_list' => NULL,
+                    'variant_list' => NULL,
+                    'qty_list' => NULL,
+                    'price_list' => NULL,
+                    'product_details' => '',
+                    'variant_option' => NULL,
+                    'variant_value' => NULL,
+                    'is_active' => 1,
+                ],
+                [
+                    'id' => 37,
+                    'name' => 'TAKA',
+                    'code' => '81639204',
+                    'type' => 'standard',
+                    'barcode_symbology' => 'C128',
+                    'brand_id' => 2,
+                    'category_id' => 6,
+                    'unit_id' => 1,
+                    'purchase_unit_id' => 1,
+                    'sale_unit_id' => 1,
+                    'cost' => 3000.0,
+                    'price' => 3500.0,
+                    'wholesale_price' => NULL,
+                    'qty' => 0,
+                    'alert_quantity' => NULL,
+                    'daily_sale_objective' => NULL,
+                    'promotion' => NULL,
+                    'promotion_price' => NULL,
+                    'starting_date' => NULL,
+                    'last_date' => NULL,
+                    'tax_id' => NULL,
+                    'tax_method' => 1,
+                    'image' => 'zummXD2dvAtI.png',
+                    'file' => NULL,
+                    'is_embeded' => 1,
+                    'is_variant' => NULL,
+                    'is_batch' => NULL,
+                    'is_diffPrice' => NULL,
+                    'is_imei' => 1,
+                    'featured' => 1,
+                    'product_list' => NULL,
+                    'variant_list' => NULL,
+                    'qty_list' => NULL,
+                    'price_list' => NULL,
+                    'product_details' => '',
+                    'variant_option' => NULL,
+                    'variant_value' => NULL,
+                    'is_active' => 1,
+                ],
+                [
+                    'id' => 38,
+                    'name' => 'Apple 14',
+                    'code' => 'apple14',
+                    'type' => 'standard',
+                    'barcode_symbology' => 'C128',
+                    'brand_id' => 1,
+                    'category_id' => 3,
+                    'unit_id' => 1,
+                    'purchase_unit_id' => 1,
+                    'sale_unit_id' => 1,
+                    'cost' => 80000.0,
+                    'price' => 85000.0,
+                    'wholesale_price' => NULL,
+                    'qty' => 0,
+                    'alert_quantity' => 5.0,
+                    'daily_sale_objective' => 10.0,
+                    'promotion' => NULL,
+                    'promotion_price' => NULL,
+                    'starting_date' => NULL,
+                    'last_date' => NULL,
+                    'tax_id' => NULL,
+                    'tax_method' => 2,
+                    'image' => 'zummXD2dvAtI.png',
+                    'file' => NULL,
+                    'is_embeded' => 1,
+                    'is_variant' => NULL,
+                    'is_batch' => NULL,
+                    'is_diffPrice' => NULL,
+                    'is_imei' => NULL,
+                    'featured' => NULL,
+                    'product_list' => NULL,
+                    'variant_list' => NULL,
+                    'qty_list' => NULL,
+                    'price_list' => NULL,
+                    'product_details' => '',
+                    'variant_option' => NULL,
+                    'variant_value' => NULL,
+                    'is_active' => 1,
+                ],
+                [
+                    'id' => 39,
+                    'name' => 'Laptop11',
+                    'code' => '1111111',
+                    'type' => 'standard',
+                    'barcode_symbology' => 'C128',
+                    'brand_id' => 2,
+                    'category_id' => 6,
+                    'unit_id' => 1,
+                    'purchase_unit_id' => 1,
+                    'sale_unit_id' => 1,
+                    'cost' => 30000.0,
+                    'price' => 32500.0,
+                    'wholesale_price' => NULL,
+                    'qty' => 0,
+                    'alert_quantity' => 2.0,
+                    'daily_sale_objective' => NULL,
+                    'promotion' => NULL,
+                    'promotion_price' => NULL,
+                    'starting_date' => NULL,
+                    'last_date' => NULL,
+                    'tax_id' => NULL,
+                    'tax_method' => 1,
+                    'image' => 'zummXD2dvAtI.png',
+                    'file' => NULL,
+                    'is_embeded' => NULL,
+                    'is_variant' => NULL,
+                    'is_batch' => NULL,
+                    'is_diffPrice' => NULL,
+                    'is_imei' => NULL,
+                    'featured' => NULL,
+                    'product_list' => NULL,
+                    'variant_list' => NULL,
+                    'qty_list' => NULL,
+                    'price_list' => NULL,
+                    'product_details' => '',
+                    'variant_option' => NULL,
+                    'variant_value' => NULL,
+                    'is_active' => 1,
+                ],
+                [
+                    'id' => 40,
+                    'name' => 'Shirt',
+                    'code' => '112233',
+                    'type' => 'service',
+                    'barcode_symbology' => 'C39',
+                    'brand_id' => 1,
+                    'category_id' => 1,
+                    'unit_id' => 0,
+                    'purchase_unit_id' => 0,
+                    'sale_unit_id' => 0,
+                    'cost' => 0.0,
+                    'price' => 10.0,
+                    'wholesale_price' => NULL,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -3023,48 +4345,8 @@ class TenantDatabaseSeeder extends Seeder
                 ],
                 [
                     'id' => 41,
-                    'name' => 'off white Tshirt',
-                    'code' => '75308742',
-                    'type' => 'standard',
-                    'barcode_symbology' => 'C128',
-                    'brand_id' => NULL,
-                    'category_id' => 39,
-                    'unit_id' => 1,
-                    'purchase_unit_id' => 1,
-                    'sale_unit_id' => 1,
-                    'cost' => 4.8,
-                    'price' => 8.0,
-                    'wholesale_price' => NULL,
-                    'qty' => -1.0,
-                    'alert_quantity' => NULL,
-                    'daily_sale_objective' => NULL,
-                    'promotion' => NULL,
-                    'promotion_price' => NULL,
-                    'starting_date' => NULL,
-                    'last_date' => NULL,
-                    'tax_id' => NULL,
-                    'tax_method' => 1,
-                    'image' => 'zummXD2dvAtI.png',
-                    'file' => NULL,
-                    'is_embeded' => NULL,
-                    'is_variant' => NULL,
-                    'is_batch' => NULL,
-                    'is_diffPrice' => NULL,
-                    'is_imei' => NULL,
-                    'featured' => NULL,
-                    'product_list' => NULL,
-                    'variant_list' => NULL,
-                    'qty_list' => NULL,
-                    'price_list' => NULL,
-                    'product_details' => '',
-                    'variant_option' => NULL,
-                    'variant_value' => NULL,
-                    'is_active' => 1,
-                ],
-                [
-                    'id' => 42,
-                    'name' => 'test',
-                    'code' => '125',
+                    'name' => '14 pro max',
+                    'code' => '34692007',
                     'type' => 'standard',
                     'barcode_symbology' => 'C128',
                     'brand_id' => 1,
@@ -3072,12 +4354,132 @@ class TenantDatabaseSeeder extends Seeder
                     'unit_id' => 1,
                     'purchase_unit_id' => 1,
                     'sale_unit_id' => 1,
-                    'cost' => 12.0,
-                    'price' => 124.0,
+                    'cost' => 15000.0,
+                    'price' => 16000.0,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
-                    'daily_sale_objective' => -1.0,
+                    'daily_sale_objective' => NULL,
+                    'promotion' => NULL,
+                    'promotion_price' => NULL,
+                    'starting_date' => NULL,
+                    'last_date' => NULL,
+                    'tax_id' => NULL,
+                    'tax_method' => 1,
+                    'image' => '202607080814462.jpg',
+                    'file' => NULL,
+                    'is_embeded' => 1,
+                    'is_variant' => 1,
+                    'is_batch' => NULL,
+                    'is_diffPrice' => NULL,
+                    'is_imei' => 1,
+                    'featured' => NULL,
+                    'product_list' => NULL,
+                    'variant_list' => NULL,
+                    'qty_list' => NULL,
+                    'price_list' => NULL,
+                    'product_details' => '',
+                    'variant_option' => '["RAM | ROM","Color"]',
+                    'variant_value' => '["128GB,256GB,512GB","SpaceBlack,Silver,Gold,DeepPurple"]',
+                    'is_active' => 1,
+                ],
+                [
+                    'id' => 42,
+                    'name' => 'Iphone 15 Pro Max',
+                    'code' => '63028277',
+                    'type' => 'standard',
+                    'barcode_symbology' => 'C128',
+                    'brand_id' => 1,
+                    'category_id' => 1,
+                    'unit_id' => 1,
+                    'purchase_unit_id' => 1,
+                    'sale_unit_id' => 1,
+                    'cost' => 0.0,
+                    'price' => 0.0,
+                    'wholesale_price' => NULL,
+                    'qty' => 0,
+                    'alert_quantity' => NULL,
+                    'daily_sale_objective' => NULL,
+                    'promotion' => NULL,
+                    'promotion_price' => NULL,
+                    'starting_date' => NULL,
+                    'last_date' => NULL,
+                    'tax_id' => NULL,
+                    'tax_method' => 1,
+                    'image' => '202607080815422.jpg',
+                    'file' => NULL,
+                    'is_embeded' => NULL,
+                    'is_variant' => 1,
+                    'is_batch' => NULL,
+                    'is_diffPrice' => NULL,
+                    'is_imei' => 1,
+                    'featured' => 1,
+                    'product_list' => NULL,
+                    'variant_list' => NULL,
+                    'qty_list' => NULL,
+                    'price_list' => NULL,
+                    'product_details' => '',
+                    'variant_option' => '["Condition","RAM | ROM","Color"]',
+                    'variant_value' => '["Brand New,Pre-Owned","256GB,512GB","BlackTitanium,WhiteTitanium,BlueTitanium,NaturalTitanium"]',
+                    'is_active' => 1,
+                ],
+                [
+                    'id' => 43,
+                    'name' => 'Product Test V',
+                    'code' => 'KK',
+                    'type' => 'standard',
+                    'barcode_symbology' => 'C128',
+                    'brand_id' => 1,
+                    'category_id' => 1,
+                    'unit_id' => 1,
+                    'purchase_unit_id' => 1,
+                    'sale_unit_id' => 1,
+                    'cost' => 44.0,
+                    'price' => 23.0,
+                    'wholesale_price' => NULL,
+                    'qty' => 0,
+                    'alert_quantity' => NULL,
+                    'daily_sale_objective' => NULL,
+                    'promotion' => NULL,
+                    'promotion_price' => NULL,
+                    'starting_date' => '2024-05-18',
+                    'last_date' => NULL,
+                    'tax_id' => NULL,
+                    'tax_method' => 1,
+                    'image' => 'zummXD2dvAtI.png',
+                    'file' => NULL,
+                    'is_embeded' => NULL,
+                    'is_variant' => 1,
+                    'is_batch' => NULL,
+                    'is_diffPrice' => 1,
+                    'is_imei' => NULL,
+                    'featured' => NULL,
+                    'product_list' => NULL,
+                    'variant_list' => NULL,
+                    'qty_list' => NULL,
+                    'price_list' => NULL,
+                    'product_details' => '',
+                    'variant_option' => '["Quantity","Size","Price","Color"]',
+                    'variant_value' => '["3KG,2KG,5KG","Large,Medium,Small","120,500,70","RED,GReen,Blue"]',
+                    'is_active' => 1,
+                ],
+                [
+                    'id' => 44,
+                    'name' => 'PRUEBA',
+                    'code' => '000',
+                    'type' => 'standard',
+                    'barcode_symbology' => 'C128',
+                    'brand_id' => 1,
+                    'category_id' => 3,
+                    'unit_id' => 9,
+                    'purchase_unit_id' => 9,
+                    'sale_unit_id' => 9,
+                    'cost' => 7.0,
+                    'price' => 7.0,
+                    'wholesale_price' => 7.0,
+                    'qty' => 0,
+                    'alert_quantity' => NULL,
+                    'daily_sale_objective' => NULL,
                     'promotion' => NULL,
                     'promotion_price' => NULL,
                     'starting_date' => NULL,
@@ -3091,86 +4493,6 @@ class TenantDatabaseSeeder extends Seeder
                     'is_batch' => NULL,
                     'is_diffPrice' => NULL,
                     'is_imei' => NULL,
-                    'featured' => NULL,
-                    'product_list' => NULL,
-                    'variant_list' => NULL,
-                    'qty_list' => NULL,
-                    'price_list' => NULL,
-                    'product_details' => '',
-                    'variant_option' => NULL,
-                    'variant_value' => NULL,
-                    'is_active' => 1,
-                ],
-                [
-                    'id' => 43,
-                    'name' => 'samsung laptop',
-                    'code' => '65317202',
-                    'type' => 'standard',
-                    'barcode_symbology' => 'C128',
-                    'brand_id' => 2,
-                    'category_id' => 6,
-                    'unit_id' => 1,
-                    'purchase_unit_id' => 1,
-                    'sale_unit_id' => 1,
-                    'cost' => 50000.0,
-                    'price' => 55000.0,
-                    'wholesale_price' => NULL,
-                    'qty' => -5.0,
-                    'alert_quantity' => NULL,
-                    'daily_sale_objective' => NULL,
-                    'promotion' => NULL,
-                    'promotion_price' => NULL,
-                    'starting_date' => NULL,
-                    'last_date' => NULL,
-                    'tax_id' => NULL,
-                    'tax_method' => 1,
-                    'image' => 'zummXD2dvAtI.png',
-                    'file' => NULL,
-                    'is_embeded' => NULL,
-                    'is_variant' => NULL,
-                    'is_batch' => NULL,
-                    'is_diffPrice' => NULL,
-                    'is_imei' => 1,
-                    'featured' => NULL,
-                    'product_list' => NULL,
-                    'variant_list' => NULL,
-                    'qty_list' => NULL,
-                    'price_list' => NULL,
-                    'product_details' => '',
-                    'variant_option' => NULL,
-                    'variant_value' => NULL,
-                    'is_active' => 1,
-                ],
-                [
-                    'id' => 44,
-                    'name' => 'samsung laptop 15',
-                    'code' => '67600232',
-                    'type' => 'standard',
-                    'barcode_symbology' => 'C128',
-                    'brand_id' => 2,
-                    'category_id' => 6,
-                    'unit_id' => 1,
-                    'purchase_unit_id' => 1,
-                    'sale_unit_id' => 1,
-                    'cost' => 55000.0,
-                    'price' => 60000.0,
-                    'wholesale_price' => NULL,
-                    'qty' => 3.0,
-                    'alert_quantity' => NULL,
-                    'daily_sale_objective' => NULL,
-                    'promotion' => NULL,
-                    'promotion_price' => NULL,
-                    'starting_date' => NULL,
-                    'last_date' => NULL,
-                    'tax_id' => NULL,
-                    'tax_method' => 1,
-                    'image' => 'zummXD2dvAtI.png',
-                    'file' => NULL,
-                    'is_embeded' => NULL,
-                    'is_variant' => NULL,
-                    'is_batch' => NULL,
-                    'is_diffPrice' => NULL,
-                    'is_imei' => 1,
                     'featured' => NULL,
                     'product_list' => NULL,
                     'variant_list' => NULL,
@@ -3183,71 +4505,71 @@ class TenantDatabaseSeeder extends Seeder
                 ],
                 [
                     'id' => 45,
-                    'name' => 'TAKA',
-                    'code' => '81639204',
+                    'name' => 'Prueba Easy',
+                    'code' => '190',
                     'type' => 'standard',
                     'barcode_symbology' => 'C128',
-                    'brand_id' => 2,
-                    'category_id' => 6,
-                    'unit_id' => 1,
-                    'purchase_unit_id' => 1,
-                    'sale_unit_id' => 1,
-                    'cost' => 3000.0,
-                    'price' => 3500.0,
-                    'wholesale_price' => NULL,
-                    'qty' => 2.0,
-                    'alert_quantity' => NULL,
-                    'daily_sale_objective' => NULL,
-                    'promotion' => NULL,
-                    'promotion_price' => NULL,
-                    'starting_date' => NULL,
-                    'last_date' => NULL,
-                    'tax_id' => NULL,
+                    'brand_id' => 1,
+                    'category_id' => 3,
+                    'unit_id' => 4,
+                    'purchase_unit_id' => 4,
+                    'sale_unit_id' => 4,
+                    'cost' => 777.0,
+                    'price' => 777.0,
+                    'wholesale_price' => 777.0,
+                    'qty' => 0,
+                    'alert_quantity' => 120.0,
+                    'daily_sale_objective' => 65.0,
+                    'promotion' => 1,
+                    'promotion_price' => '150',
+                    'starting_date' => '2024-06-11',
+                    'last_date' => '2024-06-20',
+                    'tax_id' => 1,
                     'tax_method' => 1,
                     'image' => 'zummXD2dvAtI.png',
                     'file' => NULL,
                     'is_embeded' => 1,
-                    'is_variant' => NULL,
+                    'is_variant' => 1,
                     'is_batch' => NULL,
                     'is_diffPrice' => NULL,
-                    'is_imei' => 1,
+                    'is_imei' => NULL,
                     'featured' => 1,
                     'product_list' => NULL,
                     'variant_list' => NULL,
                     'qty_list' => NULL,
                     'price_list' => NULL,
                     'product_details' => '',
-                    'variant_option' => NULL,
-                    'variant_value' => NULL,
+                    'variant_option' => '["BLANCO","NEGRO"]',
+                    'variant_value' => '["199","299"]',
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 47,
-                    'name' => 'Apple 14',
-                    'code' => 'apple14',
+                    'id' => 46,
+                    'name' => 'Producto Prueba',
+                    'code' => '777',
                     'type' => 'standard',
                     'barcode_symbology' => 'C128',
-                    'brand_id' => 1,
-                    'category_id' => 3,
-                    'unit_id' => 1,
-                    'purchase_unit_id' => 1,
-                    'sale_unit_id' => 1,
-                    'cost' => 80000.0,
-                    'price' => 85000.0,
-                    'wholesale_price' => NULL,
-                    'qty' => 19.0,
-                    'alert_quantity' => 5.0,
+                    'brand_id' => 2,
+                    'category_id' => 4,
+                    'unit_id' => 4,
+                    'purchase_unit_id' => 4,
+                    'sale_unit_id' => 4,
+                    'cost' => 200.0,
+                    'price' => 200.0,
+                    'wholesale_price' => 200.0,
+                    'qty' => 0,
+                    'alert_quantity' => 10.0,
                     'daily_sale_objective' => 10.0,
-                    'promotion' => NULL,
-                    'promotion_price' => NULL,
+                    'promotion' => 1,
+                    'promotion_price' => '175',
                     'starting_date' => NULL,
-                    'last_date' => NULL,
+                    'last_date' => '2024-06-25',
                     'tax_id' => NULL,
-                    'tax_method' => 2,
+                    'tax_method' => 1,
                     'image' => 'zummXD2dvAtI.png',
                     'file' => NULL,
-                    'is_embeded' => 1,
-                    'is_variant' => NULL,
+                    'is_embeded' => NULL,
+                    'is_variant' => 1,
                     'is_batch' => NULL,
                     'is_diffPrice' => NULL,
                     'is_imei' => NULL,
@@ -3256,37 +4578,77 @@ class TenantDatabaseSeeder extends Seeder
                     'variant_list' => NULL,
                     'qty_list' => NULL,
                     'price_list' => NULL,
-                    'product_details' => '',
-                    'variant_option' => NULL,
-                    'variant_value' => NULL,
+                    'product_details' => '<p>Prueba de imagenes easymax</p>',
+                    'variant_option' => '["NEGRO","NEGRO","NEGRO","NEGRO"]',
+                    'variant_value' => '["255","255","255","255"]',
+                    'is_active' => 1,
+                ],
+                [
+                    'id' => 47,
+                    'name' => 'IPHONE 14 PRO MAX',
+                    'code' => '01234',
+                    'type' => 'standard',
+                    'barcode_symbology' => 'C128',
+                    'brand_id' => 1,
+                    'category_id' => 3,
+                    'unit_id' => 1,
+                    'purchase_unit_id' => 1,
+                    'sale_unit_id' => 1,
+                    'cost' => 1500.0,
+                    'price' => 1500.0,
+                    'wholesale_price' => 1499.0,
+                    'qty' => 0,
+                    'alert_quantity' => NULL,
+                    'daily_sale_objective' => 15.0,
+                    'promotion' => 1,
+                    'promotion_price' => '1299',
+                    'starting_date' => '2024-06-11',
+                    'last_date' => '2024-06-25',
+                    'tax_id' => NULL,
+                    'tax_method' => 1,
+                    'image' => '202607080814462.jpg',
+                    'file' => NULL,
+                    'is_embeded' => NULL,
+                    'is_variant' => 1,
+                    'is_batch' => NULL,
+                    'is_diffPrice' => 1,
+                    'is_imei' => NULL,
+                    'featured' => NULL,
+                    'product_list' => NULL,
+                    'variant_list' => NULL,
+                    'qty_list' => NULL,
+                    'price_list' => NULL,
+                    'product_details' => '<p><a class=@sh-anchor@ href=@https://www.bing.com/ck/a?!&amp;&amp;p=3057d02af68c6961JmltdHM9MTcxODA2NDAwMCZpZ3VpZD0zZTNlNjhiMy1jOTY5LTZkYzYtMzJjMS03Y2Q0Yzg1NjZjMDUmaW5zaWQ9NjU4Mw&amp;ptn=3&amp;ver=2&amp;hsh=3&amp;fclid=3e3e68b3-c969-6dc6-32c1-7cd4c8566c05&amp;psq=apple+descripcion&amp;u=a1aHR0cHM6Ly9odW1hbmlkYWRlcy5jb20vYXBwbGUv&amp;ntb=1@ target=@_blank@ rel=@noopener@ data-tg-citations=@1;2@ data-tgpsgid=@d_anstgsen0@>Apple es una&nbsp;<strong>empresa multinacional estadounidense que dise&ntilde;a, fabrica y vende productos electr&oacute;nicos y de software</strong></a><a class=@sup-target@ href=@https://www.bing.com/ck/a?!&amp;&amp;p=d1b09c46723a5d2aJmltdHM9MTcxODA2NDAwMCZpZ3VpZD0zZTNlNjhiMy1jOTY5LTZkYzYtMzJjMS03Y2Q0Yzg1NjZjMDUmaW5zaWQ9NjU4NA&amp;ptn=3&amp;ver=2&amp;hsh=3&amp;fclid=3e3e68b3-c969-6dc6-32c1-7cd4c8566c05&amp;psq=apple+descripcion&amp;u=a1aHR0cHM6Ly9odW1hbmlkYWRlcy5jb20vYXBwbGUv&amp;ntb=1@ target=@_blank@ rel=@noopener@ data-tgpsgid=@d_anstgpsg1@><sup>1</sup></a><a class=@sup-target@ href=@https://www.bing.com/ck/a?!&amp;&amp;p=21491c7be3d7d5d9JmltdHM9MTcxODA2NDAwMCZpZ3VpZD0zZTNlNjhiMy1jOTY5LTZkYzYtMzJjMS03Y2Q0Yzg1NjZjMDUmaW5zaWQ9NjU4NQ&amp;ptn=3&amp;ver=2&amp;hsh=3&amp;fclid=3e3e68b3-c969-6dc6-32c1-7cd4c8566c05&amp;psq=apple+descripcion&amp;u=a1aHR0cHM6Ly93d3cuMTJjYXJhY3RlcmlzdGljYXMuY29tL2FwcGxlLw&amp;ntb=1@ target=@_blank@ rel=@noopener@ data-tgpsgid=@d_anstgpsg2@><sup>2</sup></a>.&nbsp;<a class=@sh-anchor@ href=@https://www.bing.com/ck/a?!&amp;&amp;p=c80ea6db0a534e3eJmltdHM9MTcxODA2NDAwMCZpZ3VpZD0zZTNlNjhiMy1jOTY5LTZkYzYtMzJjMS03Y2Q0Yzg1NjZjMDUmaW5zaWQ9NjU4Ng&amp;ptn=3&amp;ver=2&amp;hsh=3&amp;fclid=3e3e68b3-c969-6dc6-32c1-7cd4c8566c05&amp;psq=apple+descripcion&amp;u=a1aHR0cHM6Ly93d3cuMTJjYXJhY3RlcmlzdGljYXMuY29tL2FwcGxlLw&amp;ntb=1@ target=@_blank@ rel=@noopener@ data-tg-citations=@2@ data-tgpsgid=@d_anstgsen1@>Entre sus productos m&aacute;s conocidos se encuentran el iPhone, el iPad, el Mac, el iPod, el Apple Watch y el Apple TV. Tambi&eacute;n ofrece servicios en l&iacute;nea como iTunes, iCloud, Apple Music y Apple Pay. Apple tiene su sede en el Apple Park, en Cupertino, California, y su centro europeo en Cork, Irlanda</a></p>',
+                    'variant_option' => '["Color Blanco","Color Rosa","RAM","Almacenamiento","Color Blanco","Color Rosa","RAM","Almacenamiento","Color Blanco","Color Rosa","RAM","Almacenamiento"]',
+                    'variant_value' => '["1600","1699","8,16,32","32,64,128","1600","1699","8,16,32","32,64,128","1600","1699","8,16,32","32,64,128"]',
                     'is_active' => 1,
                 ],
                 [
                     'id' => 48,
-                    'name' => 'Laptop11',
-                    'code' => '1111111',
+                    'name' => 'T-Shirt',
+                    'code' => '003',
                     'type' => 'standard',
                     'barcode_symbology' => 'C128',
-                    'brand_id' => 2,
-                    'category_id' => 6,
+                    'brand_id' => NULL,
+                    'category_id' => 4,
                     'unit_id' => 1,
                     'purchase_unit_id' => 1,
                     'sale_unit_id' => 1,
-                    'cost' => 30000.0,
-                    'price' => 32500.0,
+                    'cost' => 8000.0,
+                    'price' => 9500.0,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
-                    'alert_quantity' => 2.0,
+                    'qty' => 0,
+                    'alert_quantity' => 3.0,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
                     'promotion_price' => NULL,
-                    'starting_date' => NULL,
+                    'starting_date' => '2024-06-21',
                     'last_date' => NULL,
                     'tax_id' => NULL,
                     'tax_method' => 1,
-                    'image' => 'zummXD2dvAtI.png',
+                    'image' => '202607080830062.jpeg',
                     'file' => NULL,
-                    'is_embeded' => NULL,
+                    'is_embeded' => 1,
                     'is_variant' => NULL,
                     'is_batch' => NULL,
                     'is_diffPrice' => NULL,
@@ -3303,19 +4665,19 @@ class TenantDatabaseSeeder extends Seeder
                 ],
                 [
                     'id' => 49,
-                    'name' => 'Shirt',
-                    'code' => '112233',
-                    'type' => 'service',
+                    'name' => 'Laptop',
+                    'code' => '83058761',
+                    'type' => 'standard',
                     'barcode_symbology' => 'C39',
-                    'brand_id' => 1,
-                    'category_id' => 1,
-                    'unit_id' => 0,
-                    'purchase_unit_id' => 0,
-                    'sale_unit_id' => 0,
-                    'cost' => 0.0,
-                    'price' => 10.0,
-                    'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'brand_id' => 2,
+                    'category_id' => 6,
+                    'unit_id' => 1,
+                    'purchase_unit_id' => 1,
+                    'sale_unit_id' => 1,
+                    'cost' => 1000.0,
+                    'price' => 2000.0,
+                    'wholesale_price' => 500.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -3343,366 +4705,6 @@ class TenantDatabaseSeeder extends Seeder
                 ],
                 [
                     'id' => 50,
-                    'name' => '14 pro max',
-                    'code' => '34692007',
-                    'type' => 'standard',
-                    'barcode_symbology' => 'C128',
-                    'brand_id' => 1,
-                    'category_id' => 1,
-                    'unit_id' => 1,
-                    'purchase_unit_id' => 1,
-                    'sale_unit_id' => 1,
-                    'cost' => 15000.0,
-                    'price' => 16000.0,
-                    'wholesale_price' => NULL,
-                    'qty' => 4.0,
-                    'alert_quantity' => NULL,
-                    'daily_sale_objective' => NULL,
-                    'promotion' => NULL,
-                    'promotion_price' => NULL,
-                    'starting_date' => NULL,
-                    'last_date' => NULL,
-                    'tax_id' => NULL,
-                    'tax_method' => 1,
-                    'image' => 'zummXD2dvAtI.png',
-                    'file' => NULL,
-                    'is_embeded' => 1,
-                    'is_variant' => 1,
-                    'is_batch' => NULL,
-                    'is_diffPrice' => NULL,
-                    'is_imei' => 1,
-                    'featured' => NULL,
-                    'product_list' => NULL,
-                    'variant_list' => NULL,
-                    'qty_list' => NULL,
-                    'price_list' => NULL,
-                    'product_details' => '',
-                    'variant_option' => '["RAM | ROM","Color"]',
-                    'variant_value' => '["128GB,256GB,512GB","SpaceBlack,Silver,Gold,DeepPurple"]',
-                    'is_active' => 1,
-                ],
-                [
-                    'id' => 51,
-                    'name' => 'Iphone 15 Pro Max',
-                    'code' => '63028277',
-                    'type' => 'standard',
-                    'barcode_symbology' => 'C128',
-                    'brand_id' => 1,
-                    'category_id' => 1,
-                    'unit_id' => 1,
-                    'purchase_unit_id' => 1,
-                    'sale_unit_id' => 1,
-                    'cost' => 0.0,
-                    'price' => 0.0,
-                    'wholesale_price' => NULL,
-                    'qty' => 145.0,
-                    'alert_quantity' => NULL,
-                    'daily_sale_objective' => NULL,
-                    'promotion' => NULL,
-                    'promotion_price' => NULL,
-                    'starting_date' => NULL,
-                    'last_date' => NULL,
-                    'tax_id' => NULL,
-                    'tax_method' => 1,
-                    'image' => '202405130525171.jpg',
-                    'file' => NULL,
-                    'is_embeded' => NULL,
-                    'is_variant' => 1,
-                    'is_batch' => NULL,
-                    'is_diffPrice' => NULL,
-                    'is_imei' => 1,
-                    'featured' => 1,
-                    'product_list' => NULL,
-                    'variant_list' => NULL,
-                    'qty_list' => NULL,
-                    'price_list' => NULL,
-                    'product_details' => '',
-                    'variant_option' => '["Condition","RAM | ROM","Color"]',
-                    'variant_value' => '["Brand New,Pre-Owned","256GB,512GB","BlackTitanium,WhiteTitanium,BlueTitanium,NaturalTitanium"]',
-                    'is_active' => 1,
-                ],
-                [
-                    'id' => 52,
-                    'name' => 'Product Test',
-                    'code' => 'KK',
-                    'type' => 'standard',
-                    'barcode_symbology' => 'C128',
-                    'brand_id' => 1,
-                    'category_id' => 1,
-                    'unit_id' => 1,
-                    'purchase_unit_id' => 1,
-                    'sale_unit_id' => 1,
-                    'cost' => 44.0,
-                    'price' => 23.0,
-                    'wholesale_price' => NULL,
-                    'qty' => 0.0,
-                    'alert_quantity' => NULL,
-                    'daily_sale_objective' => NULL,
-                    'promotion' => NULL,
-                    'promotion_price' => NULL,
-                    'starting_date' => '2024-05-18',
-                    'last_date' => NULL,
-                    'tax_id' => NULL,
-                    'tax_method' => 1,
-                    'image' => '202405180442251.png',
-                    'file' => NULL,
-                    'is_embeded' => NULL,
-                    'is_variant' => 1,
-                    'is_batch' => NULL,
-                    'is_diffPrice' => 1,
-                    'is_imei' => NULL,
-                    'featured' => NULL,
-                    'product_list' => NULL,
-                    'variant_list' => NULL,
-                    'qty_list' => NULL,
-                    'price_list' => NULL,
-                    'product_details' => '',
-                    'variant_option' => '["Quantity","Size","Price","Color"]',
-                    'variant_value' => '["3KG,2KG,5KG","Large,Medium,Small","120,500,70","RED,GReen,Blue"]',
-                    'is_active' => 1,
-                ],
-                [
-                    'id' => 58,
-                    'name' => 'PRUEBA',
-                    'code' => '000',
-                    'type' => 'standard',
-                    'barcode_symbology' => 'C128',
-                    'brand_id' => 1,
-                    'category_id' => 3,
-                    'unit_id' => 9,
-                    'purchase_unit_id' => 9,
-                    'sale_unit_id' => 9,
-                    'cost' => 7.0,
-                    'price' => 7.0,
-                    'wholesale_price' => 7.0,
-                    'qty' => 0.0,
-                    'alert_quantity' => NULL,
-                    'daily_sale_objective' => NULL,
-                    'promotion' => NULL,
-                    'promotion_price' => NULL,
-                    'starting_date' => NULL,
-                    'last_date' => NULL,
-                    'tax_id' => NULL,
-                    'tax_method' => 1,
-                    'image' => '202406111018041.jpg',
-                    'file' => NULL,
-                    'is_embeded' => NULL,
-                    'is_variant' => NULL,
-                    'is_batch' => NULL,
-                    'is_diffPrice' => NULL,
-                    'is_imei' => NULL,
-                    'featured' => NULL,
-                    'product_list' => NULL,
-                    'variant_list' => NULL,
-                    'qty_list' => NULL,
-                    'price_list' => NULL,
-                    'product_details' => '',
-                    'variant_option' => NULL,
-                    'variant_value' => NULL,
-                    'is_active' => 1,
-                ],
-                [
-                    'id' => 59,
-                    'name' => 'Prueba Easy',
-                    'code' => '190',
-                    'type' => 'standard',
-                    'barcode_symbology' => 'C128',
-                    'brand_id' => 1,
-                    'category_id' => 3,
-                    'unit_id' => 4,
-                    'purchase_unit_id' => 4,
-                    'sale_unit_id' => 4,
-                    'cost' => 777.0,
-                    'price' => 777.0,
-                    'wholesale_price' => 777.0,
-                    'qty' => 0.0,
-                    'alert_quantity' => 120.0,
-                    'daily_sale_objective' => 65.0,
-                    'promotion' => 1,
-                    'promotion_price' => '150',
-                    'starting_date' => '2024-06-11',
-                    'last_date' => '2024-06-20',
-                    'tax_id' => 1,
-                    'tax_method' => 1,
-                    'image' => '202406111023031.jpg',
-                    'file' => NULL,
-                    'is_embeded' => 1,
-                    'is_variant' => 1,
-                    'is_batch' => NULL,
-                    'is_diffPrice' => NULL,
-                    'is_imei' => NULL,
-                    'featured' => 1,
-                    'product_list' => NULL,
-                    'variant_list' => NULL,
-                    'qty_list' => NULL,
-                    'price_list' => NULL,
-                    'product_details' => '',
-                    'variant_option' => '["BLANCO","NEGRO"]',
-                    'variant_value' => '["199","299"]',
-                    'is_active' => 1,
-                ],
-                [
-                    'id' => 60,
-                    'name' => 'Producto Prueba',
-                    'code' => '777',
-                    'type' => 'standard',
-                    'barcode_symbology' => 'C128',
-                    'brand_id' => 2,
-                    'category_id' => 4,
-                    'unit_id' => 4,
-                    'purchase_unit_id' => 4,
-                    'sale_unit_id' => 4,
-                    'cost' => 200.0,
-                    'price' => 200.0,
-                    'wholesale_price' => 200.0,
-                    'qty' => 0.0,
-                    'alert_quantity' => 10.0,
-                    'daily_sale_objective' => 10.0,
-                    'promotion' => 1,
-                    'promotion_price' => '175',
-                    'starting_date' => NULL,
-                    'last_date' => '2024-06-25',
-                    'tax_id' => NULL,
-                    'tax_method' => 1,
-                    'image' => '202406111027511.png,202406111027512.jpg,202406111027513.jpg,202406111027514.jpg',
-                    'file' => NULL,
-                    'is_embeded' => NULL,
-                    'is_variant' => 1,
-                    'is_batch' => NULL,
-                    'is_diffPrice' => NULL,
-                    'is_imei' => NULL,
-                    'featured' => NULL,
-                    'product_list' => NULL,
-                    'variant_list' => NULL,
-                    'qty_list' => NULL,
-                    'price_list' => NULL,
-                    'product_details' => '<p>Prueba de imagenes easymax</p>',
-                    'variant_option' => '["NEGRO","NEGRO","NEGRO","NEGRO"]',
-                    'variant_value' => '["255","255","255","255"]',
-                    'is_active' => 1,
-                ],
-                [
-                    'id' => 61,
-                    'name' => 'IPHONE 14 PRO MAX',
-                    'code' => '01234',
-                    'type' => 'standard',
-                    'barcode_symbology' => 'C128',
-                    'brand_id' => 1,
-                    'category_id' => 3,
-                    'unit_id' => 1,
-                    'purchase_unit_id' => 1,
-                    'sale_unit_id' => 1,
-                    'cost' => 1500.0,
-                    'price' => 1500.0,
-                    'wholesale_price' => 1499.0,
-                    'qty' => 0.0,
-                    'alert_quantity' => NULL,
-                    'daily_sale_objective' => 15.0,
-                    'promotion' => 1,
-                    'promotion_price' => '1299',
-                    'starting_date' => '2024-06-11',
-                    'last_date' => '2024-06-25',
-                    'tax_id' => NULL,
-                    'tax_method' => 1,
-                    'image' => '202406111040331.jpg,202406111040342.jpg,202406111040343.jpg',
-                    'file' => NULL,
-                    'is_embeded' => NULL,
-                    'is_variant' => 1,
-                    'is_batch' => NULL,
-                    'is_diffPrice' => 1,
-                    'is_imei' => NULL,
-                    'featured' => NULL,
-                    'product_list' => NULL,
-                    'variant_list' => NULL,
-                    'qty_list' => NULL,
-                    'price_list' => NULL,
-                    'product_details' => '<p><a class=@sh-anchor@ href=@https://www.bing.com/ck/a?!&amp;&amp;p=3057d02af68c6961JmltdHM9MTcxODA2NDAwMCZpZ3VpZD0zZTNlNjhiMy1jOTY5LTZkYzYtMzJjMS03Y2Q0Yzg1NjZjMDUmaW5zaWQ9NjU4Mw&amp;ptn=3&amp;ver=2&amp;hsh=3&amp;fclid=3e3e68b3-c969-6dc6-32c1-7cd4c8566c05&amp;psq=apple+descripcion&amp;u=a1aHR0cHM6Ly9odW1hbmlkYWRlcy5jb20vYXBwbGUv&amp;ntb=1@ target=@_blank@ rel=@noopener@ data-tg-citations=@1;2@ data-tgpsgid=@d_anstgsen0@>Apple es una&nbsp;<strong>empresa multinacional estadounidense que dise&ntilde;a, fabrica y vende productos electr&oacute;nicos y de software</strong></a><a class=@sup-target@ href=@https://www.bing.com/ck/a?!&amp;&amp;p=d1b09c46723a5d2aJmltdHM9MTcxODA2NDAwMCZpZ3VpZD0zZTNlNjhiMy1jOTY5LTZkYzYtMzJjMS03Y2Q0Yzg1NjZjMDUmaW5zaWQ9NjU4NA&amp;ptn=3&amp;ver=2&amp;hsh=3&amp;fclid=3e3e68b3-c969-6dc6-32c1-7cd4c8566c05&amp;psq=apple+descripcion&amp;u=a1aHR0cHM6Ly9odW1hbmlkYWRlcy5jb20vYXBwbGUv&amp;ntb=1@ target=@_blank@ rel=@noopener@ data-tgpsgid=@d_anstgpsg1@><sup>1</sup></a><a class=@sup-target@ href=@https://www.bing.com/ck/a?!&amp;&amp;p=21491c7be3d7d5d9JmltdHM9MTcxODA2NDAwMCZpZ3VpZD0zZTNlNjhiMy1jOTY5LTZkYzYtMzJjMS03Y2Q0Yzg1NjZjMDUmaW5zaWQ9NjU4NQ&amp;ptn=3&amp;ver=2&amp;hsh=3&amp;fclid=3e3e68b3-c969-6dc6-32c1-7cd4c8566c05&amp;psq=apple+descripcion&amp;u=a1aHR0cHM6Ly93d3cuMTJjYXJhY3RlcmlzdGljYXMuY29tL2FwcGxlLw&amp;ntb=1@ target=@_blank@ rel=@noopener@ data-tgpsgid=@d_anstgpsg2@><sup>2</sup></a>.&nbsp;<a class=@sh-anchor@ href=@https://www.bing.com/ck/a?!&amp;&amp;p=c80ea6db0a534e3eJmltdHM9MTcxODA2NDAwMCZpZ3VpZD0zZTNlNjhiMy1jOTY5LTZkYzYtMzJjMS03Y2Q0Yzg1NjZjMDUmaW5zaWQ9NjU4Ng&amp;ptn=3&amp;ver=2&amp;hsh=3&amp;fclid=3e3e68b3-c969-6dc6-32c1-7cd4c8566c05&amp;psq=apple+descripcion&amp;u=a1aHR0cHM6Ly93d3cuMTJjYXJhY3RlcmlzdGljYXMuY29tL2FwcGxlLw&amp;ntb=1@ target=@_blank@ rel=@noopener@ data-tg-citations=@2@ data-tgpsgid=@d_anstgsen1@>Entre sus productos m&aacute;s conocidos se encuentran el iPhone, el iPad, el Mac, el iPod, el Apple Watch y el Apple TV. Tambi&eacute;n ofrece servicios en l&iacute;nea como iTunes, iCloud, Apple Music y Apple Pay. Apple tiene su sede en el Apple Park, en Cupertino, California, y su centro europeo en Cork, Irlanda</a></p>',
-                    'variant_option' => '["Color Blanco","Color Rosa","RAM","Almacenamiento","Color Blanco","Color Rosa","RAM","Almacenamiento","Color Blanco","Color Rosa","RAM","Almacenamiento"]',
-                    'variant_value' => '["1600","1699","8,16,32","32,64,128","1600","1699","8,16,32","32,64,128","1600","1699","8,16,32","32,64,128"]',
-                    'is_active' => 1,
-                ],
-                [
-                    'id' => 62,
-                    'name' => 'T-Shirt',
-                    'code' => '003',
-                    'type' => 'standard',
-                    'barcode_symbology' => 'C128',
-                    'brand_id' => NULL,
-                    'category_id' => 4,
-                    'unit_id' => 1,
-                    'purchase_unit_id' => 1,
-                    'sale_unit_id' => 1,
-                    'cost' => 8000.0,
-                    'price' => 9500.0,
-                    'wholesale_price' => NULL,
-                    'qty' => 0.0,
-                    'alert_quantity' => 3.0,
-                    'daily_sale_objective' => NULL,
-                    'promotion' => NULL,
-                    'promotion_price' => NULL,
-                    'starting_date' => '2024-06-21',
-                    'last_date' => NULL,
-                    'tax_id' => NULL,
-                    'tax_method' => 1,
-                    'image' => '202406210233561.jpg',
-                    'file' => NULL,
-                    'is_embeded' => 1,
-                    'is_variant' => NULL,
-                    'is_batch' => NULL,
-                    'is_diffPrice' => NULL,
-                    'is_imei' => NULL,
-                    'featured' => NULL,
-                    'product_list' => NULL,
-                    'variant_list' => NULL,
-                    'qty_list' => NULL,
-                    'price_list' => NULL,
-                    'product_details' => '',
-                    'variant_option' => NULL,
-                    'variant_value' => NULL,
-                    'is_active' => 1,
-                ],
-                [
-                    'id' => 63,
-                    'name' => 'Laptop',
-                    'code' => '83058761',
-                    'type' => 'standard',
-                    'barcode_symbology' => 'C39',
-                    'brand_id' => 2,
-                    'category_id' => 6,
-                    'unit_id' => 1,
-                    'purchase_unit_id' => 1,
-                    'sale_unit_id' => 1,
-                    'cost' => 1000.0,
-                    'price' => 2000.0,
-                    'wholesale_price' => 500.0,
-                    'qty' => 0.0,
-                    'alert_quantity' => NULL,
-                    'daily_sale_objective' => NULL,
-                    'promotion' => NULL,
-                    'promotion_price' => NULL,
-                    'starting_date' => NULL,
-                    'last_date' => NULL,
-                    'tax_id' => NULL,
-                    'tax_method' => 1,
-                    'image' => 'zummXD2dvAtI.png',
-                    'file' => NULL,
-                    'is_embeded' => NULL,
-                    'is_variant' => NULL,
-                    'is_batch' => NULL,
-                    'is_diffPrice' => NULL,
-                    'is_imei' => NULL,
-                    'featured' => NULL,
-                    'product_list' => NULL,
-                    'variant_list' => NULL,
-                    'qty_list' => NULL,
-                    'price_list' => NULL,
-                    'product_details' => '',
-                    'variant_option' => NULL,
-                    'variant_value' => NULL,
-                    'is_active' => 1,
-                ],
-                [
-                    'id' => 64,
                     'name' => 'Glass',
                     'code' => '37580174',
                     'type' => 'standard',
@@ -3715,7 +4717,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 70.0,
                     'price' => 100.0,
                     'wholesale_price' => 60.0,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => 5.0,
                     'daily_sale_objective' => 3.0,
                     'promotion' => NULL,
@@ -3724,7 +4726,7 @@ class TenantDatabaseSeeder extends Seeder
                     'last_date' => NULL,
                     'tax_id' => NULL,
                     'tax_method' => 1,
-                    'image' => '202407010954551.png',
+                    'image' => '202607080742312.jpg',
                     'file' => NULL,
                     'is_embeded' => 1,
                     'is_variant' => NULL,
@@ -3742,8 +4744,8 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 65,
-                    'name' => 'test prod',
+                    'id' => 51,
+                    'name' => 'Test Prod V',
                     'code' => '862837',
                     'type' => 'standard',
                     'barcode_symbology' => 'C128',
@@ -3755,7 +4757,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 100.0,
                     'price' => 150.0,
                     'wholesale_price' => 120.0,
-                    'qty' => 27.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -3782,7 +4784,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 66,
+                    'id' => 52,
                     'name' => 'Earphone True Wireless G70',
                     'code' => '2312021280054',
                     'type' => 'standard',
@@ -3795,7 +4797,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 58.0,
                     'price' => 17.0,
                     'wholesale_price' => NULL,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => NULL,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -3804,7 +4806,7 @@ class TenantDatabaseSeeder extends Seeder
                     'last_date' => NULL,
                     'tax_id' => NULL,
                     'tax_method' => 1,
-                    'image' => '202409080650101.jpg',
+                    'image' => '202607080812502.png',
                     'file' => NULL,
                     'is_embeded' => NULL,
                     'is_variant' => NULL,
@@ -3845,7 +4847,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 67,
+                    'id' => 53,
                     'name' => 'T shirt',
                     'code' => '07116185',
                     'type' => 'standard',
@@ -3858,7 +4860,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 500.0,
                     'price' => 1000.0,
                     'wholesale_price' => 700.0,
-                    'qty' => 0.0,
+                    'qty' => 0,
                     'alert_quantity' => 100.0,
                     'daily_sale_objective' => 100.0,
                     'promotion' => NULL,
@@ -3885,47 +4887,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 68,
-                    'name' => 'kannadasan yogaraja',
-                    'code' => '38259140',
-                    'type' => 'standard',
-                    'barcode_symbology' => 'C128',
-                    'brand_id' => 2,
-                    'category_id' => 2,
-                    'unit_id' => 1,
-                    'purchase_unit_id' => 1,
-                    'sale_unit_id' => 1,
-                    'cost' => 200.0,
-                    'price' => 10.0,
-                    'wholesale_price' => NULL,
-                    'qty' => 0.0,
-                    'alert_quantity' => NULL,
-                    'daily_sale_objective' => NULL,
-                    'promotion' => NULL,
-                    'promotion_price' => NULL,
-                    'starting_date' => NULL,
-                    'last_date' => NULL,
-                    'tax_id' => 3,
-                    'tax_method' => 1,
-                    'image' => '202410261213471.png,202410261213482.jpeg',
-                    'file' => NULL,
-                    'is_embeded' => NULL,
-                    'is_variant' => NULL,
-                    'is_batch' => NULL,
-                    'is_diffPrice' => NULL,
-                    'is_imei' => NULL,
-                    'featured' => NULL,
-                    'product_list' => NULL,
-                    'variant_list' => NULL,
-                    'qty_list' => NULL,
-                    'price_list' => NULL,
-                    'product_details' => '',
-                    'variant_option' => NULL,
-                    'variant_value' => NULL,
-                    'is_active' => 1,
-                ],
-                [
-                    'id' => 69,
+                    'id' => 56,
                     'name' => 'Dumbbell',
                     'code' => 'gym001',
                     'type' => 'standard',
@@ -3938,7 +4900,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 20.0,
                     'price' => 30.0,
                     'wholesale_price' => NULL,
-                    'qty' => 50.0,
+                    'qty' => 0,
                     'alert_quantity' => 10.0,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -3947,7 +4909,7 @@ class TenantDatabaseSeeder extends Seeder
                     'last_date' => NULL,
                     'tax_id' => 1,
                     'tax_method' => 1,
-                    'image' => NULL,
+                    'image' => 'zummXD2dvAtI.png',
                     'file' => NULL,
                     'is_embeded' => NULL,
                     'is_variant' => NULL,
@@ -3965,7 +4927,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 70,
+                    'id' => 57,
                     'name' => 'Twister',
                     'code' => 'gym002',
                     'type' => 'standard',
@@ -3978,7 +4940,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 15.0,
                     'price' => 25.0,
                     'wholesale_price' => NULL,
-                    'qty' => 30.0,
+                    'qty' => 0,
                     'alert_quantity' => 5.0,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -3987,7 +4949,7 @@ class TenantDatabaseSeeder extends Seeder
                     'last_date' => NULL,
                     'tax_id' => 1,
                     'tax_method' => 1,
-                    'image' => NULL,
+                    'image' => 'zummXD2dvAtI.png',
                     'file' => NULL,
                     'is_embeded' => NULL,
                     'is_variant' => NULL,
@@ -4005,7 +4967,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 71,
+                    'id' => 58,
                     'name' => 'Ab Bench',
                     'code' => 'gym003',
                     'type' => 'standard',
@@ -4018,7 +4980,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 50.0,
                     'price' => 80.0,
                     'wholesale_price' => NULL,
-                    'qty' => 20.0,
+                    'qty' => 0,
                     'alert_quantity' => 5.0,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -4027,7 +4989,7 @@ class TenantDatabaseSeeder extends Seeder
                     'last_date' => NULL,
                     'tax_id' => 1,
                     'tax_method' => 1,
-                    'image' => NULL,
+                    'image' => 'zummXD2dvAtI.png',
                     'file' => NULL,
                     'is_embeded' => NULL,
                     'is_variant' => NULL,
@@ -4045,7 +5007,7 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ],
                 [
-                    'id' => 72,
+                    'id' => 59,
                     'name' => 'Treadmill',
                     'code' => 'gym004',
                     'type' => 'standard',
@@ -4058,7 +5020,7 @@ class TenantDatabaseSeeder extends Seeder
                     'cost' => 500.0,
                     'price' => 800.0,
                     'wholesale_price' => NULL,
-                    'qty' => 10.0,
+                    'qty' => 0,
                     'alert_quantity' => 2.0,
                     'daily_sale_objective' => NULL,
                     'promotion' => NULL,
@@ -4067,7 +5029,7 @@ class TenantDatabaseSeeder extends Seeder
                     'last_date' => NULL,
                     'tax_id' => 1,
                     'tax_method' => 1,
-                    'image' => NULL,
+                    'image' => 'zummXD2dvAtI.png',
                     'file' => NULL,
                     'is_embeded' => NULL,
                     'is_variant' => NULL,
@@ -4085,62 +5047,10 @@ class TenantDatabaseSeeder extends Seeder
                     'is_active' => 1,
                 ]
             ]);
+
         }
 
-        if (!DB::table('purchases')->count()) {
-            DB::table('purchases')->insert([
-                [
-                    'id' => 1,
-                    'reference_no' => 'pr-20230528-125929',
-                    'user_id' => 1,
-                    'warehouse_id' => 1,
-                    'supplier_id' => NULL,
-                    'currency_id' => 1,
-                    'exchange_rate' => 1.0,
-                    'item' => 1,
-                    'total_qty' => 10,
-                    'total_discount' => 0.0,
-                    'total_tax' => 10.0,
-                    'total_cost' => 110.0,
-                    'order_tax_rate' => 0.0,
-                    'order_tax' => 0.0,
-                    'order_discount' => 0.0,
-                    'shipping_cost' => 0.0,
-                    'grand_total' => 110.0,
-                    'paid_amount' => 0.0,
-                    'status' => 1,
-                    'payment_status' => 1,
-                    'document' => NULL,
-                    'note' => NULL,
-                ],
-                [
-                    'id' => 2,
-                    'reference_no' => 'pr-20240423-160001',
-                    'user_id' => 1,
-                    'warehouse_id' => 1,
-                    'supplier_id' => 1,
-                    'currency_id' => 1,
-                    'exchange_rate' => 1.0,
-                    'item' => 4,
-                    'total_qty' => 110.0,
-                    'total_discount' => 0.0,
-                    'total_tax' => 745.0,
-                    'total_cost' => 7450.0,
-                    'order_tax_rate' => 0.0,
-                    'order_tax' => 0.0,
-                    'order_discount' => 0.0,
-                    'shipping_cost' => 0.0,
-                    'grand_total' => 8195.0,
-                    'paid_amount' => 8195.0,
-                    'status' => 1,
-                    'payment_status' => 2,
-                    'document' => NULL,
-                    'note' => 'Initial gym equipment purchase.',
-                ]
-            ]);
-        }
-
-        if (!DB::table('suppliers')->count()) {
+        if ($this->shouldSeedDemoData() && !DB::table('suppliers')->count()) {
             DB::table('suppliers')->insert([
                 [
                     'id' => 1,
@@ -4160,7 +5070,7 @@ class TenantDatabaseSeeder extends Seeder
             ]);
         }
 
-        if (!DB::table('taxes')->count()) {
+        if ($this->shouldSeedDemoData() && !DB::table('taxes')->count()) {
             DB::table('taxes')->insert([
                 [
                     'id' => 1,
@@ -4181,7 +5091,34 @@ class TenantDatabaseSeeder extends Seeder
                     'operator' => '*',
                     'operation_value' => 1.0,
                     'is_active' => 1,
-                ]
+                ],
+                [
+                    'id' => 4,
+                    'unit_code' => 'ltr',
+                    'unit_name' => 'Liter',
+                    'base_unit' => NULL,
+                    'operator' => '*',
+                    'operation_value' => 1.0,
+                    'is_active' => 1,
+                ],
+                [
+                    'id' => 5,
+                    'unit_code' => 'm',
+                    'unit_name' => 'Meter',
+                    'base_unit' => NULL,
+                    'operator' => '*',
+                    'operation_value' => 1.0,
+                    'is_active' => 1,
+                ],
+                [
+                    'id' => 9,
+                    'unit_code' => 'set',
+                    'unit_name' => 'Set',
+                    'base_unit' => NULL,
+                    'operator' => '*',
+                    'operation_value' => 1.0,
+                    'is_active' => 1,
+                ],
             ]);
         }
 
@@ -4189,13 +5126,146 @@ class TenantDatabaseSeeder extends Seeder
             DB::table('warehouses')->insert([
                 [
                     'id' => 1,
-                    'name' => 'Test Shop',
-                    'phone' => '9991111',
+                    'name' => 'Default Warehouse',
+                    'phone' => NULL,
                     'email' => NULL,
-                    'address' => 'Test address',
+                    'address' => 'Not configured',
                     'is_active' => 1,
                 ]
             ]);
         }
+
+        if (!DB::table('notification_settings')->count()) {
+            DB::table('notification_settings')->insert([
+                [
+                    'event' => 'sale_created',
+                    'notify_in_app' => 1,
+                    'notify_whatsapp' => 0,
+                    'notify_sms' => 0,
+                    'notify_mail' => 0,
+                    'whatsapp_message' => 'Hello [customer], your order [reference] of [amount] has been created successfully!',
+                    'sms_message' => 'Order [reference] confirmed. Total: [amount]. Thank you!',
+                    'mail_message' => 'Dear [customer],<br><br>Thank you for your order. Your transaction reference [reference] for the total amount of [amount] has been created successfully.<br><br>Best Regards,<br>Management',
+                    'recipients' => json_encode(['admin', 'customer']), // 👈 Updated to JSON string representation
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ],
+                [
+                    'event' => 'purchase_created',
+                    'notify_in_app' => 1,
+                    'notify_whatsapp' => 0,
+                    'notify_sms' => 0,
+                    'notify_mail' => 0,
+                    'whatsapp_message' => 'New Purchase Order created: [reference].',
+                    'sms_message' => 'Purchase [reference] logged in system.',
+                    'mail_message' => 'Hello Admin,<br><br>A new Purchase Order has been processed with Reference ID: <strong>[reference]</strong>.<br><br>Please check your backend inventory panel for details.',
+                    'recipients' => json_encode(['admin']),
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ],
+                [
+                    'event' => 'low_stock',
+                    'notify_in_app' => 1,
+                    'notify_whatsapp' => 0,
+                    'notify_sms' => 0,
+                    'notify_mail' => 0,
+                    'whatsapp_message' => '⚠️ ALERT: The following items are running low on stock: [product]',
+                    'sms_message' => 'Low Stock Alert: [product]',
+                    'mail_message' => 'System Alert Notice:<br><br>The following inventory items have fallen below their configured safety minimum metrics:<br><br><strong>[product]</strong><br><br>Please coordinate with warehouse teams for restocking operations.',
+                    'recipients' => json_encode(['admin', 'supplier']), // 👈 Both now assigned out of the box
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ],
+                [
+                    'event' => 'payment_received',
+                    'notify_in_app' => 1,
+                    'notify_whatsapp' => 0,
+                    'notify_sms' => 0,
+                    'notify_mail' => 0,
+                    'whatsapp_message' => 'Hi [customer], we received your payment for [reference]. Balance updated.',
+                    'sms_message' => 'Payment received for [reference]. Amount: [amount].',
+                    'mail_message' => 'Dear [customer],<br><br>We have successfully recognized your payment submission of [amount] toward bill reference balance record: [reference]. Your ledger balance parameters have been shifted accordingly.',
+                    'recipients' => json_encode(['admin', 'customer']),
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ],
+                [
+                    'event' => 'quotation_created',
+                    'notify_in_app' => 1,
+                    'notify_whatsapp' => 0,
+                    'notify_sms' => 0,
+                    'notify_mail' => 0,
+                    'whatsapp_message' => 'Hello [customer], your quotation [reference] is ready for review.',
+                    'sms_message' => 'Quotation [reference] has been sent.',
+                    'mail_message' => 'Dear [customer],<br><br>Your custom quotation ledger sheet has been computed. Review document details linked with system request reference token: <strong>[reference]</strong>.<br><br>Let us know if you have any questions.',
+                    'recipients' => json_encode(['customer']),
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ],
+                [
+                    'event' => 'expiry_alert',
+                    'notify_in_app' => 1,
+                    'notify_whatsapp' => 0,
+                    'notify_sms' => 0,
+                    'notify_mail' => 0,
+                    'whatsapp_message' => '⏳ EXPIRY NOTICE: The following items expire soon: [product]',
+                    'sms_message' => 'Product Expiry Alert: [product]',
+                    'mail_message' => 'Automated Cron Maintenance Log:<br><br>Attention: The following product item groups are reaching their expiration threshold parameters:<br><br>[product]<br><br>Please implement swift rotational clearings.',
+                    'recipients' => json_encode(['admin']),
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ],
+                [
+                    'event' => 'stock_transfer',
+                    'notify_in_app' => 1,
+                    'notify_whatsapp' => 0,
+                    'notify_sms' => 0,
+                    'notify_mail' => 0,
+                    'whatsapp_message' => 'Stock transfer [reference] has been initiated.',
+                    'sms_message' => 'Transfer [reference] dispatched.',
+                    'mail_message' => 'Internal Transfer Route Alert:<br><br>Stock movement assignment ledger [reference] has shifted status to dispatched or initialized. Verify upon localized arrival routing.',
+                    'recipients' => json_encode(['admin']),
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ]
+            ]);
+        }
+
+        if (!DB::table('services')->count()) {
+            DB::table('services')->insert([
+                [
+                    'id' => 1,
+                    'name' => 'Dine In',
+                    'description' => 'Table service for guests dining at the restaurant.',
+                    'is_active' => 1,
+                    'is_deleted' => 0,
+                    'created_at' => '2026-08-17 11:45:00',
+                    'updated_at' => '2026-08-17 11:45:00',
+                ],
+                [
+                    'id' => 2,
+                    'name' => 'Take Away',
+                    'description' => 'Counter pickup / takeaway service.',
+                    'is_active' => 1,
+                    'is_deleted' => 0,
+                    'created_at' => '2026-08-17 11:45:00',
+                    'updated_at' => '2026-08-17 11:45:00',
+                ],
+                [
+                    'id' => 3,
+                    'name' => 'Delivery',
+                    'description' => 'Restaurant delivery service.',
+                    'is_active' => 1,
+                    'is_deleted' => 0,
+                    'created_at' => '2026-08-17 11:45:00',
+                    'updated_at' => '2026-08-17 11:45:00',
+                ],
+            ]);
+        }
+    }
+
+    private function shouldSeedDemoData(): bool
+    {
+        return (bool) config('salepro.seed_demo_data', false);
     }
 }

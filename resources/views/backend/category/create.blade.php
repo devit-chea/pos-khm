@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <x-success-message key="message" />
 <x-error-message key="not_permitted" />
@@ -7,10 +11,10 @@
     <div class="container-fluid">
         <!-- Trigger the modal with a button -->
          @can('categories-add')
-            <button type="button" class="btn btn-info" data-toggle="modal" data-target="#category-modal"><i class="dripicons-plus"></i> {{__("db.Add Category")}}</button>&nbsp;
+            <button type="button" class="btn btn-info" data-toggle="modal" data-target="#category-modal"><i class="ti ti-plus"></i> {{__("db.Add Category")}}</button>&nbsp;
         @endcan
         @can('categories-import')
-            <button class="btn btn-primary" data-toggle="modal" data-target="#importCategory"><i class="dripicons-copy"></i> {{__('db.Import Category')}}</button>
+            <button class="btn btn-primary" data-toggle="modal" data-target="#importCategory"><i class="ti ti-copy"></i> {{__('db.Import Category')}}</button>
         @endcan
     </div>
     <div class="table-responsive">
@@ -39,7 +43,7 @@
             @method('PUT')
       <div class="modal-header">
         <h5 id="exampleModalLabel" class="modal-title">{{__('db.Update Category')}}</h5>
-        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
       </div>
       <div class="modal-body">
         <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -59,19 +63,21 @@
                 <label>{{__('db.Parent Category')}}</label>
                 <select name="parent_id" class="form-control selectpicker" id="parent">
                     <option value="">No {{__('db.parent')}}</option>
-                    @foreach($categories_list as $category)
+                    @foreach (get_active_categories() as $category)
                     <option value="{{$category->id}}">{{$category->name}}</option>
                     @endforeach
                 </select>
                 <x-validation-error fieldName="parent_id" />
             </div>
+            @module('woocommerce')
             @if (\Schema::hasColumn('categories', 'woocommerce_category_id'))
             <div class="col-md-6 form-group mt-4">
                 <h5><input name="is_sync_disable" type="checkbox" id="is_sync_disable" value="1">&nbsp; {{__('db.Disable Woocommerce Sync')}}</h5>
                 <x-validation-error fieldName="is_sync_disable" />
             </div>
             @endif
-            @if(in_array('restaurant',explode(',',$general_setting->modules)))
+            @endmodule
+            @module('restaurant')
             <div class="col-md-12 mt-3">
                 <h6><strong>{{ __('For Website') }}</strong></h6>
                 <hr>
@@ -80,8 +86,8 @@
                 <br>
                 <input type="checkbox" name="featured" id="featured" value="1"> <label>{{ __('List on website') }}</label>
             </div>
-            @endif
-            @if(in_array('ecommerce',explode(',',$general_setting->modules)))
+            @endmodule
+            @if(app(\App\Services\ModuleAccessService::class)->userCanAccess(auth()->user(), 'ecommerce'))
             <div class="col-md-12 mt-3">
                 <h6><strong>{{ __('For Website') }}</strong></h6>
                 <hr>
@@ -97,7 +103,7 @@
             </div>
             @endif
         </div>
-        @if(in_array('ecommerce',explode(',',$general_setting->modules)))
+        @if(app(\App\Services\ModuleAccessService::class)->userCanAccess(auth()->user(), 'ecommerce'))
         <div class="row">
             <div class="col-md-12 mt-3">
                 <h6><strong>{{ __('For SEO') }}</strong></h6>
@@ -130,7 +136,7 @@
           @csrf
         <div class="modal-header">
           <h5 id="exampleModalLabel" class="modal-title">{{__('db.Import Category')}}</h5>
-          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
         </div>
         <div class="modal-body">
             <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -146,7 +152,7 @@
                 <div class="col-md-6">
                     <div class="form-group">
                         <label> {{__('db.Sample File')}}</label>
-                        <a href="sample_file/sample_category.csv" class="btn btn-info btn-block btn-md"><i class="dripicons-download"></i>  {{__('db.Download')}}</a>
+                        <a href="sample_file/sample_category.csv" class="btn btn-info btn-block btn-md"><i class="ti ti-download"></i>  {{__('db.Download')}}</a>
                     </div>
                 </div>
             </div>
@@ -160,17 +166,13 @@
 
 @endsection
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
-    function confirmDelete() {
-      if (confirm("If you delete category all products under this category will also be deleted. Are you sure want to delete?")) {
-          return true;
-      }
-      return false;
-    }
+    function confirmDelete() { return true; }
 
     var category_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
     $.ajaxSetup({
         headers: {
@@ -228,8 +230,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         order:[['2', 'asc']],
@@ -260,7 +262,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -269,7 +271,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -278,7 +280,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -287,7 +289,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -295,7 +297,7 @@
                 footer:true
             },
             {
-                text: '<i title="delete" class="dripicons-cross"></i>',
+                text: '<i title="delete" class="ti ti-x"></i>',
                 className: 'buttons-delete',
                 action: function ( e, dt, node, config ) {
                     if(user_verified == '1') {
@@ -305,7 +307,7 @@
                                 category_id[i-1] = $(this).closest('tr').data('id');
                             }
                         });
-                        if(category_id.length && confirm("If you delete category all products under this category will also be deleted. Are you sure want to delete?")) {
+                        if (category_id.length) { SaleProConfirm.open({ message: "If you delete category all products under this category will also be deleted. Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                             $.ajax({
                                 type:'POST',
                                 url:'category/deletebyselection',
@@ -318,16 +320,18 @@
                                 }
                             });
                         }
+                        });
+                        }
                         else if(!category_id.length)
-                            alert('No category is selected!');
+                            SaleProToast.show('No category is selected!');
                     }
                     else
-                        alert('This feature is disable for demo!');
+                        SaleProToast.show('This feature is disable for demo!');
                 }
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],

@@ -15,7 +15,7 @@
             <tr>
                 <th>#</th>
                 <th>{{ __('db.Product') }}</th>
-                <th>{{ __('db.Qty') }}</th>
+                <th>{{ __('db.qty') }}</th>
                 <th>{{ __('db.Received') }}</th>
                 <th>{{ __('db.Unit Cost') }}</th>
                 <th>{{ __('db.Tax') }}</th>
@@ -64,6 +64,6 @@
         </tbody>
     </table>
 
-    <p><strong>{{ __('db.Note') }}</strong>: {{ $production_details->note }}</p>
+    <p><strong>{{ __('db.note') }}</strong>: {{ $production_details->note }}</p>
     <p><strong>{{ __('db.Created By') }}</strong>: {{ $production_details->createdBy->name ?? '' }}</p>
 </div>

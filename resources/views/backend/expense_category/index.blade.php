@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <x-error-message key="code" />
 <x-success-message key="message" />
@@ -6,8 +10,8 @@
 
 <section>
     <div class="container-fluid">
-        <button class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="dripicons-plus"></i> {{__('db.Add Expense Category')}}</button>&nbsp;
-        <button class="btn btn-primary" data-toggle="modal" data-target="#importExpenseCategory"><i class="dripicons-copy"></i> {{__('db.Import Expense Category')}}</button>
+        <button class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="ti ti-plus"></i> {{__('db.Add Expense Category')}}</button>&nbsp;
+        <button class="btn btn-primary" data-toggle="modal" data-target="#importExpenseCategory"><i class="ti ti-copy"></i> {{__('db.Import Expense Category')}}</button>
     </div>
     <div class="table-responsive">
         <table id="expense_category-table" class="table">
@@ -32,13 +36,13 @@
                                 <span class="sr-only">Toggle Dropdown</span>
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
-                                <li><button type="button" data-id="{{$expense_category->id}}" class="open-Editexpense_categoryDialog btn btn-link" data-toggle="modal" data-target="#editModal"><i class="dripicons-document-edit"></i> {{__('db.edit')}}</button></li>
+                                <li><button type="button" data-id="{{$expense_category->id}}" class="open-Editexpense_categoryDialog btn btn-link" data-toggle="modal" data-target="#editModal"><i class="ti ti-edit"></i> {{__('db.edit')}}</button></li>
                                 <li class="divider"></li>
                                 <form action="{{ route('expense_categories.destroy', $expense_category->id) }}" method="POST">
                                     @csrf
                                     @method('DELETE')
                                     <li>
-                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> {{__('db.delete')}}</button>
+                                        <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> {{__('db.delete')}}</button>
                                     </li>
                                 </form>
                             </ul>
@@ -58,7 +62,7 @@
           @csrf
         <div class="modal-header">
           <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Expense Category')}}</h5>
-          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
         </div>
         <div class="modal-body">
           <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -93,7 +97,7 @@
             @method('PUT')
       <div class="modal-header">
         <h5 id="exampleModalLabel" class="modal-title"> {{__('db.Update Expense Category')}}</h5>
-        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
       </div>
       <div class="modal-body">
         <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -122,7 +126,7 @@
           @csrf
         <div class="modal-header">
           <h5 id="exampleModalLabel" class="modal-title">{{__('db.Import Expense Category')}}</h5>
-          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
         </div>
         <div class="modal-body">
             <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -138,7 +142,7 @@
                 <div class="col-md-6">
                     <div class="form-group">
                         <label> {{__('db.Sample File')}}</label>
-                        <a href="sample_file/sample_expense_category.csv" class="btn btn-info btn-block btn-md"><i class="dripicons-download"></i>  {{__('db.Download')}}</a>
+                        <a href="sample_file/sample_expense_category.csv" class="btn btn-info btn-block btn-md"><i class="ti ti-download"></i>  {{__('db.Download')}}</a>
                     </div>
                 </div>
             </div>
@@ -153,6 +157,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $("ul#expense").siblings('a').attr('aria-expanded','true');
@@ -160,7 +165,7 @@
     $("ul#expense #exp-cat-menu").addClass("active");
 
     var expense_category_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
     $.ajaxSetup({
         headers: {
@@ -187,12 +192,7 @@
         });
     })
 
-function confirmDelete() {
-    if (confirm("Are you sure want to delete?")) {
-        return true;
-    }
-    return false;
-}
+function confirmDelete() { return true; }
 
     $('#expense_category-table').DataTable( {
         "order": [],
@@ -201,8 +201,8 @@ function confirmDelete() {
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -231,7 +231,7 @@ function confirmDelete() {
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -260,7 +260,7 @@ function confirmDelete() {
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -277,7 +277,7 @@ function confirmDelete() {
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -294,7 +294,7 @@ function confirmDelete() {
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -302,7 +302,7 @@ function confirmDelete() {
                 },
             },
             {
-                text: '<i title="delete" class="dripicons-cross"></i>',
+                text: '<i title="delete" class="ti ti-x"></i>',
                 className: 'buttons-delete',
                 action: function ( e, dt, node, config ) {
                     if(user_verified == '1') {
@@ -312,7 +312,7 @@ function confirmDelete() {
                                 expense_category_id[i-1] = $(this).closest('tr').data('id');
                             }
                         });
-                        if(expense_category_id.length && confirm("Are you sure want to delete?")) {
+                        if (expense_category_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                             $.ajax({
                                 type:'POST',
                                 url:'expense_categories/deletebyselection',
@@ -325,21 +325,23 @@ function confirmDelete() {
                                                 dt.row($(this).closest('tr')).remove().draw(false);
                                         }
                                     });
-                                    alert(data);
+                                    SaleProToast.show(data);
                                 }
                             });
                             // dt.rows({ page: 'current', selected: true }).remove().draw(false);
                         }
+                        });
+                        }
                         else if(!expense_category_id.length)
-                            alert('No expense category is selected!');
+                            SaleProToast.show('No expense category is selected!');
                     }
                     else
-                        alert('This feature is disable for demo!');
+                        SaleProToast.show('This feature is disable for demo!');
                 }
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],

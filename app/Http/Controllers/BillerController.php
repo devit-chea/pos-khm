@@ -194,9 +194,9 @@ class BillerController extends Controller
 
     protected function mailAction($data, $mailSetting)
     {
-        $message = 'Data inserted successfully';
+        $message = __('db.Data inserted successfully');
         if(!$mailSetting) {
-            $message = 'Data inserted successfully. Please setup your <a href="setting/mail_setting">mail setting</a> to send mail.';
+            $message = __('db.Data inserted successfully. Please setup your <a href="setting/mail_setting">mail setting</a> to send mail.');
         }
         else if($data['email'] && $mailSetting) {
             try{

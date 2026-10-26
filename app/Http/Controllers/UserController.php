@@ -48,7 +48,7 @@ class UserController extends Controller
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_customer_group_list = CustomerGroup::where('is_active', true)->get();
             $numberOfUserAccount = User::where('is_active', true)->count();
-            $lims_account_list = Account::select('id', 'name')->where('is_active', true)->get();
+            $lims_account_list = app(\App\Services\PaymentAccountService::class)->validOperationalAccounts();
             return view('backend.user.create', compact('lims_role_list', 'lims_biller_list', 'lims_warehouse_list', 'lims_account_list', 'lims_customer_group_list', 'numberOfUserAccount'));
         }
         else
@@ -63,6 +63,9 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
+        if ($request->filled('account_id')) {
+            app(\App\Services\PaymentAccountService::class)->assertValidId((int) $request->account_id);
+        }
         $this->validate($request, [
             'name' => [
                 'max:255',
@@ -114,6 +117,11 @@ class UserController extends Controller
         $data['is_deleted'] = false;
         $data['password'] = bcrypt($data['password']);
         $data['phone'] = $data['phone_number'];
+        app(\App\Services\WarehouseAccessService::class)->assertValidUserAssignment(
+            (int) $data['role_id'],
+            $data['warehouse_id'] ?? null,
+            (int) $data['role_id'] === 5
+        );
         $user_data = User::create($data);
         if($data['role_id'] == 5) {
             $data['user_id'] = $user_data->id;
@@ -133,7 +141,7 @@ class UserController extends Controller
             $lims_role_list = Roles::where('is_active', true)->get();
             $lims_biller_list = Biller::where('is_active', true)->get();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
-            $lims_account_list = Account::select('id', 'name')->where('is_active', true)->get();
+            $lims_account_list = app(\App\Services\PaymentAccountService::class)->validOperationalAccounts();
             return view('backend.user.edit', compact('lims_user_data', 'lims_role_list', 'lims_biller_list', 'lims_warehouse_list', 'lims_account_list'));
         }
         else
@@ -142,8 +150,12 @@ class UserController extends Controller
 
     public function update(Request $request, $id)
     {
-        if(!env('USER_VERIFIED'))
+        if(!config('app.user_verified'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
+
+        if ($request->filled('account_id')) {
+            app(\App\Services\PaymentAccountService::class)->assertValidId((int) $request->account_id);
+        }
 
         $this->validate($request, [
             'name' => [
@@ -167,7 +179,19 @@ class UserController extends Controller
         if(!empty($request['password']))
             $input['password'] = bcrypt($request['password']);
         $lims_user_data = User::find($id);
+        $roleId = (int) ($input['role_id'] ?? $lims_user_data->role_id);
+        $warehouseId = $input['warehouse_id'] ?? null;
+        app(\App\Services\WarehouseAccessService::class)->assertValidUserAssignment(
+            $roleId,
+            $warehouseId,
+            false,
+            $lims_user_data
+        );
         $lims_user_data->update($input);
+        if ($employee = \App\Models\Employee::withoutGlobalScope('authorized_warehouse')->where('user_id', $lims_user_data->id)->first()) {
+            $employee->warehouse_id = $warehouseId ?: null;
+            $employee->saveQuietly();
+        }
 
         cache()->forget('user_role');
         return redirect('user')->with('message2', __('db.Data updated successfullly'));
@@ -175,7 +199,7 @@ class UserController extends Controller
 
     public function toggleStatus(Request $request)
     {
-        if(!env('USER_VERIFIED'))
+        if(!config('app.user_verified'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
         
         $user = User::find($request->id);
@@ -204,7 +228,7 @@ class UserController extends Controller
 
     public function profileUpdate(Request $request, $id)
     {
-        if(!env('USER_VERIFIED'))
+        if(!config('app.user_verified'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
 
         $input = $request->all();
@@ -215,7 +239,7 @@ class UserController extends Controller
 
     public function changePassword(Request $request, $id)
     {
-        if(!env('USER_VERIFIED'))
+        if(!config('app.user_verified'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
 
         $input = $request->all();
@@ -249,7 +273,7 @@ class UserController extends Controller
 
     public function destroy($id)
     {
-        if(!env('USER_VERIFIED'))
+        if(!config('app.user_verified'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
 
         $lims_user_data = User::find($id);

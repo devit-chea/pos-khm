@@ -1,29 +1,42 @@
 <?php 
+
 namespace App\SMSProviders;
+
+use Illuminate\Support\Facades\Http;
 
 class Twilio
 {
+    public function send($data)
+    {
+        $details = is_string($data['details'] ?? null)
+            ? json_decode($data['details'], true)
+            : (array) ($data['details'] ?? []);
+
+        $accountSid = $details['account_sid'] ?? '';
+        $authToken = $details['auth_token'] ?? '';
+        $fromNumber = $details['twilio_number'] ?? '';
+        $recipient = $data['recipent'] ?? ($data['numbers'][0] ?? '');
+        $message = $data['message'] ?? '';
+
+        $endpoint = "https://api.twilio.com/2010-04-01/Accounts/{$accountSid}/Messages.json";
+
+        $response = Http::withBasicAuth($accountSid, $authToken)
+            ->asForm()
+            ->timeout(15)
+            ->post($endpoint, [
+                'To'   => $recipient,
+                'From' => $fromNumber,
+                'Body' => $message,
+            ]);
+
+        return $response->json() ?? [
+            'status' => $response->successful() ? 'queued' : 'failed',
+            'body'   => $response->body(),
+        ];
+    }
+
     public function initialize($data)
     {
-        $endpoint = "https://api.smstoday.net/send";
-        $ch = curl_init();
-        $array_post = http_build_query(array(
-            'text'=> $data['message'],
-            'numbers'=>$data['numbers'],
-            'api_key'=> 'lwbKCGZjMGsbSfKoOWVXvIEK2Mw3siIwtNJ',
-            'password'=> 'Farmer@2018',
-            'from'=> 'FarmerTribe'
-        ));
-
-        curl_setopt($ch, CURLOPT_URL,$endpoint);
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS,$array_post);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-        $server_output = curl_exec($ch);
-
-        curl_close ($ch);
-        //dd($server_output);
-        $message = "SMS sent successfully";
+        return $this->send($data);
     }
 }

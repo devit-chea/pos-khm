@@ -24,4 +24,9 @@ class Supplier extends Model
     {
         return $this->hasMany(ReturnPurchase::class, 'supplier_id');
     }
+
+    public function indiaGstProfile()
+    {
+        return $this->hasOne(\Modules\IndiaGST\Entities\IndiaGstSupplierProfile::class, 'supplier_id');
+    }
 }

@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <x-validation-error fieldName="unit_code" />
 <x-validation-error fieldName="unit_name" />
@@ -7,8 +11,8 @@
 
 <section>
     <div class="container-fluid">
-        <a href="#" data-toggle="modal" data-target="#createUnitModal" class="btn btn-info"><i class="dripicons-plus"></i> {{__('db.Add Unit')}}</a>&nbsp;
-        <a href="#" data-toggle="modal" data-target="#importUnit" class="btn btn-primary"><i class="dripicons-copy"></i> {{__('db.Import Unit')}}</a>
+        <a href="#" data-toggle="modal" data-target="#createUnitModal" class="btn btn-info"><i class="ti ti-plus"></i> {{__('db.Add Unit')}}</a>&nbsp;
+        <a href="#" data-toggle="modal" data-target="#importUnit" class="btn btn-primary"><i class="ti ti-copy"></i> {{__('db.Import Unit')}}</a>
     </div>
     <div class="table-responsive">
         <table id="unit-table" class="table">
@@ -53,7 +57,7 @@
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                                 <li>
-                                    <button type="button" data-id="{{$unit->id}}" class="open-EditUnitDialog btn btn-link" data-toggle="modal" data-target="#editModal"><i class="dripicons-document-edit"></i> {{__('db.edit')}}
+                                    <button type="button" data-id="{{$unit->id}}" class="open-EditUnitDialog btn btn-link" data-toggle="modal" data-target="#editModal"><i class="ti ti-edit"></i> {{__('db.edit')}}
                                 </button>
                                 </li>
                                 <li class="divider"></li>
@@ -61,7 +65,7 @@
                                     @csrf
                                     @method('DELETE')
                                     <li>
-                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> {{__('db.delete')}}</button>
+                                        <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> {{__('db.delete')}}</button>
                                     </li>
                                 </form>
                             </ul>
@@ -80,16 +84,15 @@
 <div id="editModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" class="modal fade text-left">
     <div role="document" class="modal-dialog">
       <div class="modal-content">
-        <form action="{{ route('unit.update', 1) }}" method="POST">
+        <form id="edit-unit-form" action="" method="POST" data-base-url="{{ url('unit') }}">
           @csrf
           @method('PUT')
           <div class="modal-header">
             <h5 id="exampleModalLabel" class="modal-title"> {{__('db.Update Unit')}}</h5>
-            <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+            <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
           </div>
           <div class="modal-body">
           <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
-            <form>
                 <input type="hidden" name="unit_id">
                 <div class="form-group">
                 <label>{{__('db.Code')}} *</label>
@@ -128,7 +131,6 @@
                 </div>
 
                 <input type="submit" value="{{__('db.submit')}}" class="btn btn-primary">
-            </form>
         </div>
         </form>
       </div>
@@ -142,7 +144,7 @@
           @csrf
           <div class="modal-header">
             <h5 id="exampleModalLabel" class="modal-title"> {{__('db.Import Unit')}}</h5>
-            <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+            <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
           </div>
           <div class="modal-body">
             <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -157,7 +159,7 @@
                 <div class="col-md-6">
                     <div class="form-group">
                         <label> {{__('db.Sample File')}}</label>
-                        <a href="sample_file/sample_unit.csv" class="btn btn-info btn-block btn-md"><i class="dripicons-download"></i>  {{__('db.Download')}}</a>
+                        <a href="sample_file/sample_unit.csv" class="btn btn-info btn-block btn-md"><i class="ti ti-download"></i>  {{__('db.Download')}}</a>
                     </div>
                 </div>
             </div>
@@ -173,13 +175,14 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
     $("ul#setting").siblings('a').attr('aria-expanded','true');
     $("ul#setting").addClass("show");
     $("ul#setting #unit-menu").addClass("active");
 
     var unit_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
     $.ajaxSetup({
         headers: {
@@ -189,12 +192,7 @@
 
     $(".operator").hide();
     $(".operation_value").hide();
-     function confirmDelete() {
-        if (confirm("Are you sure want to delete?")) {
-            return true;
-        }
-        return false;
-    }
+     function confirmDelete() { return true; }
     $(document).ready(function() {
     $(document).on('click', '.open-EditUnitDialog', function() {
         var url = "unit/"
@@ -207,6 +205,13 @@
             $("select[name='operator']").val(data['operator']);
             $("input[name='operation_value']").val(data['operation_value']);
             $("input[name='unit_id']").val(data['id']);
+            var $editForm = $("#edit-unit-form");
+            $editForm.attr('action', $editForm.data('base-url') + '/' + data['id']);
+
+            // A unit can never use itself as its base unit. Keep the backend
+            // validation as the authority and prevent the invalid choice in UI.
+            $("#base_unit_edit option").prop('disabled', false);
+            $("#base_unit_edit option[value='" + data['id'] + "']").prop('disabled', true);
             $("#base_unit_edit").val(data['base_unit']);
 
             if (data['base_unit'] != null) {
@@ -251,7 +256,7 @@
                 unitArray: unit
             },
            success:function(data){
-            alert('Exported to CSV file successfully! Click Ok to download file');
+            SaleProToast.show('Exported to CSV file successfully! Click Ok to download file');
             window.location.href = data;
            }
         });
@@ -293,8 +298,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -323,7 +328,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -331,7 +336,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -339,7 +344,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -347,14 +352,14 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
                 },
             },
             {
-                text: '<i title="delete" class="dripicons-cross"></i>',
+                text: '<i title="delete" class="ti ti-x"></i>',
                 className: 'buttons-delete',
                 action: function ( e, dt, node, config ) {
                     if(user_verified == '1') {
@@ -364,7 +369,7 @@
                                 unit_id[i-1] = $(this).closest('tr').data('id');
                             }
                         });
-                        if(unit_id.length && confirm("Are you sure want to delete?")) {
+                        if (unit_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                             $.ajax({
                                 type:'POST',
                                 url:'unit/deletebyselection',
@@ -372,21 +377,23 @@
                                     unitIdArray: unit_id
                                 },
                                 success:function(data){
-                                    alert(data);
+                                    SaleProToast.show(data);
                                 }
                             });
                             dt.rows({ page: 'current', selected: true }).remove().draw(false);
                         }
+                        });
+                        }
                         else if(!unit_id.length)
-                            alert('No unit is selected!');
+                            SaleProToast.show('No unit is selected!');
                     }
                     else
-                        alert('This feature is disable for demo!');
+                        SaleProToast.show('This feature is disable for demo!');
                 }
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],

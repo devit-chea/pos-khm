@@ -49,8 +49,7 @@ class WhatsappSetting extends Model
                 $originalName = $file->getClientOriginalName();
 
                 // 🟢 Step 1: Upload media to WhatsApp
-                $uploadResponse = Http::withOptions(['verify' => false])
-                    ->withHeaders([
+                $uploadResponse = Http::withHeaders([
                         'Authorization' => "Bearer {$this->permanent_access_token}",
                     ])->attach(
                         'file',
@@ -96,8 +95,7 @@ class WhatsappSetting extends Model
                 // Dispatch to queue for async send
                 dispatch(function () use ($headers, $messageEndpoint, $payload, $phoneNumber, &$results) {
                     // Send message request
-                    $response = Http::withOptions(['verify' => false])
-                    ->withHeaders($headers)
+                    $response = Http::withHeaders($headers)
                     ->post($messageEndpoint, $payload);
 
                     // Store response per number for debug purpose
@@ -117,13 +115,43 @@ class WhatsappSetting extends Model
         }
     }
 
+    /**
+     * Send one text message synchronously and return the provider's confirmed
+     * response.  Queue workers use this method so a delivery is never marked
+     * sent merely because a second deferred closure was scheduled.
+     */
+    public function sendTextMessageSynchronously(string $phoneNumber, string $message): array
+    {
+        $endpoint = "{$this->baseUrl}/{$this->phone_number_id}/messages";
+        $response = Http::withHeaders([
+            'Authorization' => "Bearer {$this->permanent_access_token}",
+            'Accept' => 'application/json',
+        ])->post($endpoint, [
+            'messaging_product' => 'whatsapp',
+            'to' => $phoneNumber,
+            'type' => 'text',
+            'text' => ['body' => $message],
+        ]);
+
+        if (!$response->successful()) {
+            throw new \RuntimeException('WhatsApp provider rejected the message with HTTP ' . $response->status());
+        }
+
+        $messageId = data_get($response->json(), 'messages.0.id');
+        if (!$messageId) {
+            throw new \RuntimeException('WhatsApp provider did not confirm a message id.');
+        }
+
+        return ['message_id' => (string) $messageId, 'status' => $response->status()];
+    }
+
     // 🔹 Get templates from Facebook
     public function getTemplates()
     {
         $url = "{$this->baseUrl}/{$this->business_account_id}/message_templates";
         $headers = ['Authorization' => "Bearer {$this->permanent_access_token}"];
 
-        $response = Http::withOptions(['verify' => false])->withHeaders($headers)->get($url);
+        $response = Http->withHeaders($headers)->get($url);
 
         if ($response->successful()) {
             return $response->json('data');
@@ -138,7 +166,7 @@ class WhatsappSetting extends Model
         $url = "{$this->baseUrl}/{$this->business_account_id}/message_templates?name={$name}";
         $headers = ['Authorization' => "Bearer {$this->permanent_access_token}"];
 
-        $response = Http::withOptions(['verify' => false])->withHeaders($headers)->delete($url);
+        $response = Http->withHeaders($headers)->delete($url);
 
         if ($response->successful()) {
             return ['success' => true, 'message' => __('db.template_deleted_successfully')];

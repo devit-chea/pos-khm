@@ -1,3 +1,6 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 <!DOCTYPE html>
 <html dir="ltr" lang="en-US">
 
@@ -10,19 +13,19 @@
 
     @if(!config('database.connections.saleprosaas_landlord'))
     <!-- Plugins CSS -->
-    <link href="{{ asset('frontend/css/plugins.css') }}" rel="stylesheet" />
+    <link href="{{ asset($asset_prefix . 'frontend/css/plugins.css') }}" rel="stylesheet" />
     <!-- style CSS -->
-    <link rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'" href="{{ asset('frontend/css/style.css') }}">
+    <link rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'" href="{{ asset($asset_prefix . 'frontend/css/style.css') }}">
     <noscript>
-        <link rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'" href="{{ asset('frontend/css/style.css') }}">
+        <link rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'" href="{{ asset($asset_prefix . 'frontend/css/style.css') }}">
     </noscript>
     @else
     <!-- Plugins CSS -->
-    <link href="{{ asset('../../frontend/css/plugins.css') }}" rel="stylesheet" />
+    <link href="{{ asset($asset_prefix . 'frontend/css/plugins.css') }}" rel="stylesheet" />
     <!-- style CSS -->
-    <link rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'" href="{{ asset('../../frontend/css/style.css') }}">
+    <link rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'" href="{{ asset($asset_prefix . 'frontend/css/style.css') }}">
     <noscript>
-        <link rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'" href="{{ asset('../../frontend/css/style.css') }}">
+        <link rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'" href="{{ asset($asset_prefix . 'frontend/css/style.css') }}">
     </noscript>
     @endif
     <!-- google fonts-->
@@ -43,8 +46,8 @@
                 </div>
                 <div class="col-md-6 offset-md-3  error-text text-center">
                     <i class="las la-binoculars"style="color:var(--theme-color);font-size: 90px;margin-bottom:30px"></i>
-                    <h2 class="h1">{{__("db.We shall be back soon!")}}</h2>
-                    <p class="lead">{{__("db.Sorry for the inconvenience. We are performing some working to improve your experience and will be back online shortly!")}}</p>
+                    <h2 class="h1">{{__("db.maintenance_short_message")}}</h2>
+                    <p class="lead">{{__("db.maintenance_long_message")}}</p>
                 </div>
             </div>
         </div>

@@ -22,7 +22,7 @@
                             <div class="row">
                                 <div class="col-md-12">
                                     <div class="form-group">
-                                        <label>{{__('db.UserName')}} *</strong> </label>
+                                        <label>{{__('db.username')}} *</strong> </label>
                                         <input type="text" name="name" value="{{$lims_user_data->name}}" required class="form-control" />
                                     @if($errors->has('name'))
                                     <span>
@@ -31,7 +31,7 @@
                                     @endif
                                 </div>
                                 <div class="form-group">
-                                    <label>{{__('db.Email')}} *</strong> </label>
+                                    <label>{{__('db.email')}} *</strong> </label>
                                     <input type="email" name="email" value="{{$lims_user_data->email}}" required class="form-control">
                                     @if($errors->has('email'))
                                     <span>

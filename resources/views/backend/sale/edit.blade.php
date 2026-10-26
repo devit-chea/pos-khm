@@ -17,6 +17,17 @@
 
 <?php $authUser = Auth::user()->role_id; ?>
 
+@php
+    $restaurantModuleEnabled = (bool) ($restaurantModuleEnabled ?? false);
+    $selectedWarehouseId = $selectedWarehouseId ?? $lims_sale_data->warehouse_id;
+    $selectedWarehouse = collect($lims_warehouse_list)->first(function ($warehouse) use ($selectedWarehouseId) {
+        return (string) $warehouse->id === (string) $selectedWarehouseId;
+    });
+    $isRestaurantWarehouse = (bool) ($isRestaurantWarehouse ?? false);
+    $selectedServiceId = (string) ($lims_sale_data->service_id ?? '1');
+    $phase2EditBlocked = app(\App\Services\ZatcaIntegrationService::class)->isPhase2Active();
+@endphp
+
 <section id="pos-layout" class="forms hidden-print">
     <div class="container-fluid">
         <div class="row">
@@ -26,6 +37,12 @@
                         <h4>{{__('db.Update Sale')}}</h4>
                     </div>
                     <div class="card-body">
+                        @if($phase2EditBlocked)
+                            <div class="alert alert-warning" role="alert">
+                                Editing or finalizing an existing sale is unavailable in ZATCA Phase 2 until fiscal-aware update validation is complete.
+                                This sale has not been changed. Please leave it unchanged and contact an administrator.
+                            </div>
+                        @endif
                         <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
                         <form action="{{ route('sales.update', $lims_sale_data->id) }}" method="POST" enctype="multipart/form-data" id="payment-form">
                             @csrf
@@ -38,9 +55,9 @@
                                         <div class="form-group">
                                             <label>{{__('db.date')}}</label>
                                             @can('change_sale_date')
-                                                <input type="text" name="created_at" class="form-control date" value="{{date($general_setting->date_format, strtotime($lims_sale_data->created_at->toDateString()))}}" />
+                                                <input type="text" name="created_at" class="form-control date" value="{{date(gen_setting()->date_format, strtotime($lims_sale_data->created_at->toDateString()))}}" />
                                             @else
-                                                <input type="text" name="created_at" class="form-control date" value="{{date($general_setting->date_format, strtotime($lims_sale_data->created_at->toDateString()))}}" readonly/>
+                                                <input type="text" name="created_at" class="form-control date" value="{{date(gen_setting()->date_format, strtotime($lims_sale_data->created_at->toDateString()))}}" readonly/>
                                             @endcan
                                         </div>
                                     </div>
@@ -56,7 +73,24 @@
                                             <input type="hidden" name="customer_id_hidden" value="{{ $lims_sale_data->customer_id }}" />
                                             <select required name="customer_id" class="selectpicker form-control" data-live-search="true" id="customer_id" title="Select customer...">
                                                 @foreach($lims_customer_list as $customer)
-                                                <option value="{{$customer->id}}">{{$customer->name . ' (' . $customer->phone_number . ')'}}</option>
+                                                @php
+                                                $creditPolicy = 'unlimited';
+                                                $creditLimitVal = '';
+                                                if ($customer->type === 'walkin') {
+                                                    $creditPolicy = 'disabled';
+                                                    $creditLimitVal = '0';
+                                                } elseif ($customer->credit_limit !== null && $customer->credit_limit !== '') {
+                                                    $limitFloat = (float)$customer->credit_limit;
+                                                    if ($limitFloat == 0) {
+                                                        $creditPolicy = 'disabled';
+                                                        $creditLimitVal = '0';
+                                                    } elseif ($limitFloat > 0) {
+                                                        $creditPolicy = 'limited';
+                                                        $creditLimitVal = $customer->credit_limit;
+                                                    }
+                                                }
+                                                @endphp
+                                                <option value="{{$customer->id}}" data-type="{{$customer->type}}" data-credit-policy="{{ $creditPolicy }}" data-credit-limit="{{ $creditLimitVal }}">{{$customer->name . ' (' . $customer->phone_number . ')'}}</option>
                                                 @endforeach
                                             </select>
                                             <x-validation-error fieldName="customer_id" />
@@ -68,10 +102,23 @@
                                             <input type="hidden" name="warehouse_id_hidden" value="{{$lims_sale_data->warehouse_id}}" />
                                             <select required id="warehouse_id" name="warehouse_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" title="Select warehouse...">
                                                 @foreach($lims_warehouse_list as $warehouse)
-                                                <option value="{{$warehouse->id}}">{{$warehouse->name}}</option>
+                                                <option value="{{$warehouse->id}}" data-pos-type="{{ $warehouse->pos_type ?? 'regular' }}">{{$warehouse->name}}</option>
                                                 @endforeach
                                             </select>
                                             <x-validation-error fieldName="warehouse_id" />
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label>{{ __('db.Sales Agent') }}</label>
+                                            <select name="sales_agent_id" id="sales_agent_id" class="selectpicker form-control" data-live-search="true" title="Select staff...">
+                                                <option value="">Unassigned</option>
+                                                @foreach($sales_agent_list as $agent)
+                                                <option value="{{ $agent->id }}" data-warehouse-id="{{ $agent->warehouse_id }}" @selected((string) old('sales_agent_id', $lims_sale_data->sales_agent_id) === (string) $agent->id)>
+                                                    {{ $agent->name }}@if($agent->staff_id) ({{ $agent->staff_id }})@endif
+                                                </option>
+                                                @endforeach
+                                            </select>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
@@ -85,6 +132,41 @@
                                             </select>
                                         </div>
                                     </div>
+                                    @if($restaurantModuleEnabled)
+                                    <div class="col-md-4 restaurant-sale-field" @if(!$isRestaurantWarehouse) style="display:none;" @endif>
+                                        <div class="form-group">
+                                            <label>{{__('db.Service')}}</label>
+                                            <select id="service_id" name="service_id" class="selectpicker form-control" title="Select service..."
+                                                @if($isRestaurantWarehouse) required @else disabled @endif>
+                                                @foreach($service_list as $service)
+                                                <option value="{{$service->id}}" @if((string) $service->id === $selectedServiceId) selected @endif>{{$service->name}}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 restaurant-sale-field" @if(!$isRestaurantWarehouse) style="display:none;" @endif>
+                                        <div class="form-group">
+                                            <label>{{__('db.table')}}</label>
+                                            <select id="table_id" name="table_id" class="selectpicker form-control" data-live-search="true" title="Select table...">
+                                                @foreach($lims_table_list as $table)
+                                                <option value="{{$table->id}}" data-warehouse-id="{{$table->warehouse_id}}" @if((string) $table->id === (string) $lims_sale_data->table_id) selected @endif>
+                                                    {{$table->name}} at {{$table->floor}} ({{$table->number_of_person}})
+                                                </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 restaurant-sale-field" @if(!$isRestaurantWarehouse) style="display:none;" @endif>
+                                        <div class="form-group">
+                                            <label>{{__('db.Waiter')}}</label>
+                                            <select id="waiter_id" name="waiter_id" class="selectpicker form-control" title="Select waiter...">
+                                                @foreach($waiter_list as $waiter)
+                                                <option value="{{$waiter->id}}" @if((string) $waiter->id === (string) $lims_sale_data->waiter_id) selected @endif>{{$waiter->name}}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                    @endif
                                 </div>
                                 <div class="row mt-3">
                                     <div class="col-md-12">
@@ -114,7 +196,7 @@
                                                         <th>{{__('db.Discount')}}</th>
                                                         <th>{{__('db.Tax')}}</th>
                                                         <th>{{__('db.Subtotal')}}</th>
-                                                        <th><i class="dripicons-trash"></i></th>
+                                                        <th><i class="ti ti-trash"></i></th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -129,15 +211,19 @@
                                                         $product_data = DB::table('products')->find($product_sale->product_id);
                                                         if($product_sale->variant_id){
                                                             $product_variant_data = \App\Models\ProductVariant::select('id', 'item_code')->FindExactProduct($product_data->id, $product_sale->variant_id)->first();
-                                                            $product_variant_id = $product_variant_data->id;
-                                                            $product_data->code = $product_variant_data->item_code;
+                                                            $product_variant_id = $product_variant_data->id ?? null;
+                                                            $product_data->code = $product_variant_data->item_code ?? $product_data->code;
+                                                            $variant_name = isset($variantMap) && $variantMap->has($product_sale->variant_id) ? $variantMap->get($product_sale->variant_id)->name : null;
                                                         }
-                                                        else
+                                                        else {
                                                             $product_variant_id = null;
-                                                        if($product_data->tax_method == 1){
+                                                            $variant_name = null;
+                                                        }
+                                                        $product_price = $product_sale->net_unit_price;
+                                                        if($product_data && $product_data->tax_method == 1){
                                                             $product_price = $product_sale->net_unit_price + ($product_sale->discount / $product_sale->qty);
                                                         }
-                                                        elseif ($product_data->tax_method == 2) {
+                                                        elseif ($product_data && $product_data->tax_method == 2) {
                                                             $product_price =($product_sale->total / $product_sale->qty) + ($product_sale->discount / $product_sale->qty);
                                                         }
 
@@ -180,7 +266,10 @@
 
                                                         $product_batch_data = \App\Models\ProductBatch::select('batch_no', 'expired_date')->find($product_sale->product_batch_id);
                                                     ?>
-                                                        <td><strong class="edit-product btn btn-link pl-0 pr-0" data-toggle="modal" data-target="#editModal">{{$product_data->name}} <i class="dripicons-document-edit"></i></strong>
+                                                        <td><strong class="edit-product btn btn-link pl-0 pr-0" data-toggle="modal" data-target="#editModal">{{$product_data->name}} <i class="ti ti-edit"></i></strong>
+                                                        @if(!empty($variant_name))
+                                                            <br><span class="product-variant font-weight-bold" style="font-size: 0.85em; color: #555;">{{ __('db.Variant') ?? 'Variant' }}: {{ $variant_name }}</span>
+                                                        @endif
                                                         <br>
                                                         <span>{{$product_data->code}}</span>
 
@@ -214,57 +303,38 @@
                                                             <input type="hidden" class="product-batch-id" name="product_batch_id[]" value="{{$product_sale->product_batch_id}}">
                                                             <input type="text" class="form-control batch-no" name="batch_no[]" value="{{$product_batch_data->batch_no}}" required/>
                                                         @endif
-                                                        @if(in_array('restaurant',explode(',',$general_setting->modules)))
+                                                        @if($restaurantModuleEnabled)
                                                         @php
                                                             $toppings = json_decode($product_sale->topping_id, true);
                                                             $toppingTotal = collect($toppings)->sum('price');
                                                         @endphp
 
                                                         @if(!empty($toppings))
-                                                            Includes: {{ collect($toppings)->pluck('name')->implode(', ') }}
+                                                            <span class="restaurant-topping-display" @if(!$isRestaurantWarehouse) style="display:none;" @endif>
+                                                                Includes: {{ collect($toppings)->pluck('name')->implode(', ') }}
+                                                            </span>
                                                         @endif
                                                         @endif
                                                         </td>
                                                         <td>
                                                             <div class="input-group"><span class="input-group-btn">
                                                             @if($product_data->is_imei != 1)
-                                                            <button type="button" class="btn btn-default minus mr-1" style="padding:5px 8px"><i class="dripicons-minus"></i></button></span>
+                                                            <button type="button" class="btn btn-default minus mr-1" style="padding:5px 8px"><i class="ti ti-minus"></i></button></span>
                                                             @endif
 
-                                                            <input type="text" class="form-control qty numkey input-number" name="qty[]" value="{{$product_sale->qty}}" style="font-size:13px;max-width:50px;padding: 0 0;text-align:center" step="any" min="1" max="{{($product_sale->qty+$product_data->qty)}}" required/><span class="input-group-btn">
+                                                            <input type="text" class="form-control qty numkey input-number" name="qty[]" value="{{$product_sale->qty}}" style="font-size:13px;max-width:50px;padding: 0 0;text-align:center" step="any" min="0.000001" max="{{($product_sale->qty+$product_data->qty)}}" required/><span class="input-group-btn">
 
                                                             @if($product_data->is_imei != 1)
-                                                            <button type="button" class="btn btn-default plus ml-1" style="padding:5px 8px"><i class="dripicons-plus"></i></button>
+                                                            <button type="button" class="btn btn-default plus ml-1" style="padding:5px 8px"><i class="ti ti-plus"></i></button>
                                                             @endif
                                                             </span></div>
                                                         </td>
 
-                                                        <td class="net_unit_price">
-                                                            @if(in_array('restaurant',explode(',',$general_setting->modules)) && !empty($toppings))
-
-                                                            {{ number_format((float)($product_sale->net_unit_price + $toppingTotal), $general_setting->decimal, '.', '')}}
-
-                                                            @else
-
-                                                            {{ number_format((float)$product_sale->net_unit_price, $general_setting->decimal, '.', '')}}
-
-                                                            @endif
-
-                                                        </td>
-                                                        <td class="discount">{{ number_format((float)$product_sale->discount, $general_setting->decimal, '.', '')}}</td>
-                                                        <td class="tax">{{ number_format((float)$product_sale->tax, $general_setting->decimal, '.', '')}}</td>
-                                                        <td class="sub-total">
-                                                            @if(in_array('restaurant',explode(',',$general_setting->modules)) && !empty($toppings))
-
-                                                            {{ number_format((float)($product_sale->total + $toppingTotal), $general_setting->decimal, '.', '')}}
-
-                                                            @else
-
-                                                            {{ number_format((float)$product_sale->total, $general_setting->decimal, '.', '')}}
-
-                                                            @endif
-                                                        </td>
-                                                        <td><button type="button" class="ibtnDel btn btn-sm btn-danger"><i class="dripicons-trash"></i></button></td>
+                                                        <td class="net_unit_price">{{ number_format((float)$product_sale->net_unit_price, gen_setting()->decimal, '.', '')}}</td>
+                                                        <td class="discount">{{ number_format((float)$product_sale->discount, gen_setting()->decimal, '.', '')}}</td>
+                                                        <td class="tax">{{ number_format((float)$product_sale->tax, gen_setting()->decimal, '.', '')}}</td>
+                                                        <td class="sub-total">{{ number_format((float)$product_sale->total, gen_setting()->decimal, '.', '')}}</td>
+                                                        <td><button type="button" class="ibtnDel btn btn-sm btn-danger"><i class="ti ti-trash"></i></button></td>
                                                         <input type="hidden" class="product-code" name="product_code[]" value="{{$product_data->code}}"/>
                                                         <input type="hidden" class="product-id" name="product_id[]" value="{{$product_data->id}}"/>
                                                         <input type="hidden" class="product_type" name="product_type[]" value="{{$product_data->type}}"/>
@@ -287,8 +357,9 @@
                                                         <input type="hidden" class="imei-number" name="imei_number[]"  value="{{$product_sale->imei_number}}" />
                                                         <input type="hidden" class="is-imei"  value="{{$product_data->is_imei}}" />
 
-                                                        @if(in_array('restaurant',explode(',',$general_setting->modules)))
-                                                        <input type="hidden" class="topping_product" name="topping_product[]"  value="{{$product_sale->topping_id}}" />
+                                                        @if($restaurantModuleEnabled)
+                                                        <input type="hidden" class="topping_product" name="topping_product[]" value="{{$product_sale->topping_id}}"
+                                                            @if(!$isRestaurantWarehouse) disabled @endif />
                                                         @endif
                                                     </tr>
                                                     @endforeach
@@ -297,10 +368,10 @@
                                                     <th>{{__('db.Total')}}</th>
                                                     <th id="total-qty">{{$lims_sale_data->total_qty}}</th>
                                                     <th></th>
-                                                    <th id="total-discount">{{ number_format((float)$lims_sale_data->total_discount, $general_setting->decimal, '.', '')}}</th>
-                                                    <th id="total-tax">{{ number_format((float)$lims_sale_data->total_tax, $general_setting->decimal, '.', '')}}</th>
-                                                    <th id="total">{{ number_format((float)$lims_sale_data->total_price, $general_setting->decimal, '.', '')}}</th>
-                                                    <th><i class="dripicons-trash"></i></th>
+                                                    <th id="total-discount">{{ number_format((float)$lims_sale_data->total_discount, gen_setting()->decimal, '.', '')}}</th>
+                                                    <th id="total-tax">{{ number_format((float)$lims_sale_data->total_tax, gen_setting()->decimal, '.', '')}}</th>
+                                                    <th id="total">{{ number_format((float)$lims_sale_data->total_price, gen_setting()->decimal, '.', '')}}</th>
+                                                    <th><i class="ti ti-trash"></i></th>
                                                 </tfoot>
                                             </table>
                                         </div>
@@ -399,7 +470,7 @@
                                     </div>
                                     <div class="col-md-4">
                                         <div class="form-group">
-                                            <label>{{__('db.Attach Document')}}</label> <i class="dripicons-question" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
+                                            <label>{{__('db.Attach Document')}}</label> <i class="ti ti-info-circle" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
                                             <input type="file" name="document" class="form-control" />
 
                                             <x-validation-error fieldName="document" />
@@ -472,8 +543,8 @@
                                             <select name="sale_status" class="form-control">
                                                 <option value="1">{{__('db.Completed')}}</option>
                                                 <option value="2">{{__('db.Pending')}}</option>
-                                                @if(in_array('restaurant',explode(',',$general_setting->modules)))
-                                                <option value="5">{{__('db.Processing')}}</option>
+                                                @if($restaurantModuleEnabled)
+                                                <option value="5" class="restaurant-sale-status-option" @if(!$isRestaurantWarehouse) disabled hidden @endif>{{__('db.Processing')}}</option>
                                                 @endif
                                             </select>
                                             <x-validation-error fieldName="sale_status" />
@@ -485,7 +556,7 @@
                                             <label>
                                                 <strong>{{__('db.Coupon Discount')}}</strong>
                                             </label>
-                                            <p class="mt-2 pl-2"><strong id="coupon-text">{{ number_format((float)$lims_sale_data->coupon_discount, $general_setting->decimal, '.', '')}}</strong></p>
+                                            <p class="mt-2 pl-2"><strong id="coupon-text">{{ number_format((float)$lims_sale_data->coupon_discount, gen_setting()->decimal, '.', '')}}</strong></p>
                                         </div>
                                     </div>
                                     @endif
@@ -511,7 +582,8 @@
                                 </div>
                                 <div class="form-group">
                                     <input type="hidden" name="draft" value="0" />
-                                    <button id="submit-button" type="submit" class="btn btn-primary">{{__('db.submit')}}</button>
+                                    @include('backend.sale.credit_limit_checker')
+                                    <button id="submit-button" type="submit" class="btn btn-primary sale-submit-btn" @if($phase2EditBlocked) disabled aria-disabled="true" @endif>{{__('db.submit')}}</button>
                                 </div>
                             </div>
                         </div>
@@ -524,22 +596,22 @@
     <div class="container-fluid">
         <table class="table table-bordered table-condensed totals">
             <td><strong>{{__('db.Items')}}</strong>
-                <span class="pull-right" id="item">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="item">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
             <td><strong>{{__('db.Total')}}</strong>
-                <span class="pull-right" id="subtotal">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="subtotal">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
             <td><strong>{{__('db.Order Tax')}}</strong>
-                <span class="pull-right" id="order_tax">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="order_tax">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
             <td><strong>{{__('db.Order Discount')}}</strong>
-                <span class="pull-right" id="order_discount">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="order_discount">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
             <td><strong>{{__('db.Shipping Cost')}}</strong>
-                <span class="pull-right" id="shipping_cost">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="shipping_cost">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
             <td><strong>{{__('db.grand total')}}</strong>
-                <span class="pull-right" id="grand_total">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="grand_total">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
         </table>
     </div>
@@ -549,7 +621,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="modal_header" class="modal-title"></h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                     <form>
@@ -746,7 +818,7 @@
                         // Auto-click if only one result
                         if (data.length === 1) {
 
-                            //let product = data[0]; // ✅ define it properly
+                            //let product = data.name; // ✅ define it properly
 
                             if (click === 0) {
                                 $('#product-results-container .product-img').first().trigger('click');
@@ -772,9 +844,9 @@
         // Trigger on input
         $input.on('input', function () {
             const value = $(this).val().trim();
+            clearTimeout(typingTimer);
             if (value.length >= 3) {
                 click = 0;
-                clearTimeout(typingTimer);
                 typingTimer = setTimeout(() => searchProducts(value), doneTypingInterval);
             } else {
                 clearResults();
@@ -783,10 +855,17 @@
 
         // Trigger on paste
         $input.on('paste', function (e) {
-            const pastedData = (e.originalEvent || e).clipboardData.getData('text');
-            if (pastedData.length >= 3) {
+            e.preventDefault();
+            clearTimeout(typingTimer);
+            const clipboard = (e.originalEvent || e).clipboardData || window.clipboardData;
+            const pastedData = clipboard ? clipboard.getData('text') : '';
+            const cleanPasted = String(pastedData || '').trim();
+            $(this).val(cleanPasted);
+            if (cleanPasted.length >= 3) {
                 click = 0;
-                searchProducts(pastedData.trim());
+                searchProducts(cleanPasted);
+            } else {
+                clearResults();
             }
         });
 
@@ -842,7 +921,7 @@
             $.ajax({
                 type: 'GET',
                 async: false,
-                url: '{{route("package.fetchData", $general_setting->package_id)}}',
+                url: '{{route("package.fetchData", gen_setting()->package_id)}}',
                 success: function(data) {
                     if(data['number_of_invoice'] > 0 && data['number_of_invoice'] <= numberOfInvoice) {
                         localStorage.setItem("message", "You don't have permission to create another invoice as you already exceed the limit! Subscribe to another package if you wants more!");
@@ -855,9 +934,83 @@
 
     var currency = <?php echo json_encode($currency) ?>;
     var currencyChange = false;
-    var without_stock = <?php echo json_encode($general_setting->without_stock) ?>;
+    var without_stock = <?php echo json_encode(gen_setting()->without_stock) ?>;
     var authUser = <?php echo json_encode($authUser) ?>;
     var all_permission = '<?php echo json_encode($all_permission) ?>';
+    var restaurantModuleEnabled = @json($restaurantModuleEnabled);
+
+    function isSelectedRestaurantWarehouse() {
+        if (!restaurantModuleEnabled) {
+            return false;
+        }
+
+        var posType = $('#warehouse_id').find(':selected').data('pos-type');
+        return String(posType || '').toLowerCase() === 'restaurant';
+    }
+
+    function filterEditRestaurantTablesByWarehouse() {
+        if (!$('#table_id').length) {
+            return;
+        }
+
+        var warehouseId = String($('#warehouse_id').val() || '');
+        var currentTableId = String($('#table_id').val() || '');
+        var currentTableIsAvailable = false;
+
+        $('#table_id option').each(function () {
+            var belongsToWarehouse = String($(this).data('warehouse-id') || '') === warehouseId;
+            $(this).prop('disabled', !belongsToWarehouse).prop('hidden', !belongsToWarehouse);
+            if (belongsToWarehouse && String($(this).val()) === currentTableId) {
+                currentTableIsAvailable = true;
+            }
+        });
+
+        if (!currentTableIsAvailable) {
+            $('#table_id').val('');
+        }
+    }
+
+    function syncEditRestaurantServiceRequirements() {
+        var isRestaurant = isSelectedRestaurantWarehouse();
+        var isDineIn = isRestaurant && String($('#service_id').val() || '') === '1';
+
+        $('#table_id, #waiter_id')
+            .prop('disabled', !isDineIn)
+            .prop('required', isDineIn);
+
+        if (!isDineIn) {
+            $('#table_id, #waiter_id').val('');
+        }
+    }
+
+    function syncEditRestaurantWarehouseUi() {
+        var isRestaurant = isSelectedRestaurantWarehouse();
+        var $processingOption = $('select[name="sale_status"] option[value="5"]');
+
+        $('.restaurant-sale-field').toggle(isRestaurant);
+        $('#service_id')
+            .prop('disabled', !isRestaurant)
+            .prop('required', isRestaurant);
+
+        if (isRestaurant) {
+            filterEditRestaurantTablesByWarehouse();
+            syncEditRestaurantServiceRequirements();
+        } else {
+            $('#table_id, #waiter_id').prop('disabled', true).prop('required', false);
+        }
+
+        $processingOption
+            .prop('disabled', !isRestaurant)
+            .prop('hidden', !isRestaurant);
+
+        if (!isRestaurant && String($('select[name="sale_status"]').val() || '') === '5') {
+            $('select[name="sale_status"]').val('1');
+        }
+
+        $('.restaurant-topping-display').toggle(isRestaurant);
+        $('.topping_product').prop('disabled', !isRestaurant);
+        $('.selectpicker').selectpicker('refresh');
+    }
 
     $('#currency').val(currency['id']);
 
@@ -893,6 +1046,16 @@
     $('select[name="sale_status"]').val($('input[name="sale_status_hidden"]').val());
     $('select[name="order_tax_rate"]').val($('input[name="order_tax_rate_hidden"]').val());
     $('.selectpicker').selectpicker('refresh');
+    syncEditRestaurantWarehouseUi();
+
+    $('#warehouse_id').on('change', function () {
+        syncEditRestaurantWarehouseUi();
+    });
+
+    $(document).on('change', '#service_id', function () {
+        syncEditRestaurantServiceRequirements();
+        $('.selectpicker').selectpicker('refresh');
+    });
 
 $(window).on('load', async function () {
 
@@ -951,7 +1114,7 @@ for(rowindex  =0; rowindex <= rownumber; rowindex++){
     var total_discount = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount').text());
     var quantity = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val());
     exist_qty.push(quantity);
-    product_discount.push((total_discount / quantity).toFixed({{$general_setting->decimal}}));
+    product_discount.push((total_discount / quantity).toFixed({{gen_setting()->decimal}}));
     tax_rate.push(parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val()));
     tax_name.push($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-name').val());
     tax_method.push($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-method').val());
@@ -993,7 +1156,7 @@ $("#myTable").on('focusout', '.qty', function () {
         // --- 1) Empty or non-numeric check
         if (value === "" || isNaN(value)) {
             $input.val(1);
-            alert("Quantity must be a number.");
+            SaleProToast.show("Quantity must be a number.");
             return;
         }
 
@@ -1002,14 +1165,14 @@ $("#myTable").on('focusout', '.qty', function () {
         // --- 2) Must be greater than 0
         if (value <= 0) {
             $input.val(1);
-            alert("Quantity must be greater than 0.");
+            SaleProToast.show("Quantity must be greater than 0.");
             return;
         }
 
         // --- 3) Max attribute validation
         if (!isNaN(max) && value > max && without_stock == 'no') {
             $input.val(max);
-            alert("Quantity cannot exceed available stock (" + max + ").");
+            SaleProToast.show("Quantity cannot exceed available stock (" + max + ");.");
             return;
         }
 
@@ -1065,14 +1228,14 @@ $('button[name="update_btn"]').on("click", function() {
     var edit_unit_price = $('input[name="edit_unit_price"]').val();
 
     if (parseFloat(edit_discount) > parseFloat(edit_unit_price)) {
-        alert('Invalid Discount Input!');
+        SaleProToast.show('Invalid Discount Input!');
         return;
     }
 
     if(edit_qty < 0) {
         $('input[name="edit_qty"]').val(1);
         edit_qty = 1;
-        alert("Quantity can't be less than 0");
+        SaleProToast.show("Quantity can't be less than 0");
     }
 
     var tax_rate_all = <?php echo json_encode($tax_rate_all) ?>;
@@ -1127,7 +1290,7 @@ $("#myTable").on('click', '.plus', function() {
     if(!qty)
         qty = 1;
     else if(!isNaN(max_qty) && parseFloat(qty) >= parseFloat(max_qty) && without_stock == 'no') {
-        alert("Quantity cannot exceed available stock (" + max_qty + ").");
+        SaleProToast.show("Quantity cannot exceed available stock (" + max_qty + ");.");
         return;
     }
     else
@@ -1166,7 +1329,7 @@ $("#myTable").on("change", ".batch-no", function () {
     var warehouse_id = $('#warehouse_id').val();
     $.get('{{url("/check-batch-availability")}}/' + product_id + '/' + $(this).val() + '/' + warehouse_id, function(data) {
         if(data['message'] != 'ok') {
-            alert(data['message']);
+            SaleProToast.show(data['message']);
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.batch-no').val('');
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product-batch-id').val('');
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.expired-date').text('');
@@ -1189,19 +1352,17 @@ $(document).on('click', '.product-img', function() {
     var warehouse_id = $('#warehouse_id').val();
     var biller_id = $('#biller_id').val();
 
-    @if(in_array('restaurant',explode(',',$general_setting->modules)))
-    var table_id = $('#table_id').val();
-    var waiter_id = $('#waiter_id').val();
-    var service_id = $('#service_id').val();
-    @endif
+    // Restaurant-only UI is governed by the selected warehouse's canonical POS type.
+    // Edit Sale has no table/waiter/service controls in this Blade, so do not read
+    // non-existent restaurant fields merely because the Restaurant module is installed.
 
     var data = $(this).data();
     productSearch(data);
 });
 
-function productSearch(data) {
+async function productSearch(data) {
     if(data.embedded == 1) {
-        alert('{{ __("db.This product has been added using the weight scale machine.")}}');
+        SaleProToast.show('{{ __("db.product_added_using_scale_weight");}}');
         return;
     }
     var item_code = data.code;
@@ -1215,7 +1376,7 @@ function productSearch(data) {
                 imeiNumbersArray = imeiNumbers.split(",");
 
                 if(imeiNumbersArray.includes(data.imei)) {
-                    alert('Same imei or serial number is not allowed!');
+                    SaleProToast.show('Same imei or serial number is not allowed!');
                     flag = false;
                     $('#product-search-input').val('');
                     return;
@@ -1236,48 +1397,59 @@ function productSearch(data) {
             price: data.price,
             customer_id: $('#customer_id').val()
         };
-        $.ajax({
+        await $.ajax({
             type: 'GET',
-            async: false,
             url: '{{url("sales/lims_product_search")}}',
             data: {
                 data: product
             },
             success: function(data) {
-                if(data[23]) {
-                    data[15] = 1;
+                // Capture rowindex immediately — it's a shared global that can
+                // change if the user clicks another product before this callback fires.
+                const capturedRowindex = rowindex;
+
+                if(isSelectedRestaurantWarehouse() && data.extras) {
+                    data.qty = 1;
                     pre_qty = 0;
                 }
-                if(pre_qty > 0 && data[21]) {
-                    var old_batch = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.batch-no').val();
-
-                    if(old_batch && old_batch != data[22]) {
+                if(pre_qty > 0 && data.batch_id) {
+                    const $existingRow = $('table.order-list tbody tr:nth-child(' + (capturedRowindex + 1) + ')');
+                    const old_batch = $existingRow.find('.batch-no').val();
+                    if(old_batch && old_batch != data.batch_no) {
                         pre_qty = 0;
-                        data[15] = 1;
+                        data.qty = 1;
                     }
-
                 }
+
                 var flag = 1;
                 if (pre_qty > 0) {
-                    var qty = data[15];
-                    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val(qty);
+                    const qty = data.qty;
+                    rowindex = capturedRowindex;
+                    const $existingRow = $('table.order-list tbody tr:nth-child(' + (capturedRowindex + 1) + ')');
+                    $existingRow.find('.qty').val(qty);
 
-                    product_price[rowindex] = parseFloat(data[2] * currency['exchange_rate']) + parseFloat(data[2] * currency['exchange_rate'] * groupRate(data));
+                    product_price[capturedRowindex] = parseFloat(data.price * currency['exchange_rate']) + parseFloat(data.price * currency['exchange_rate'] * groupRate(data));
 
+                    // Update discount from fresh server response (qty may affect discount tier)
+                    if (data.discount !== undefined) {
+                        product_discount[capturedRowindex] = parseFloat(data.discount) * currency['exchange_rate'];
+                    }
+
+                    rowindex = capturedRowindex;
+                    checkQuantity(String(qty), true);
                     flag = 0;
                 }
                 $("input[name='product_code_name']").val('');
 
                 if(flag){
+                    rowindex = capturedRowindex;
                     addNewProduct(data);
                 }
-                else if(data[18] != 'null' && data[18] != '') {
-                    var imeiNumbers = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.imei-number').val();
-                    if(imeiNumbers)
-                        imeiNumbers += ','+data[18];
-                    else
-                        imeiNumbers = data[18];
-                    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.imei-number').val(imeiNumbers);
+                else if(data.imei_number != 'null' && data.imei_number != '') {
+                    const $existingRow = $('table.order-list tbody tr:nth-child(' + (capturedRowindex + 1) + ')');
+                    let imeiNumbers = $existingRow.find('.imei-number').val();
+                    imeiNumbers = imeiNumbers ? imeiNumbers + ',' + data.imei_number : data.imei_number;
+                    $existingRow.find('.imei-number').val(imeiNumbers);
                 }
             }
         });
@@ -1285,34 +1457,38 @@ function productSearch(data) {
 
 }
 
-// Markup for a product search result: none when the server already applied a fixed customer group price (data[24])
+// Markup for a product search result: none when the server already applied a fixed customer group price
 function groupRate(d) {
-    return (d && d[24]) ? 0 : (customer_group_rate || 0);
+    return (d && d.group_price) ? 0 : (customer_group_rate || 0);
 }
 
 function addNewProduct(data){
     $('.payment-btn').removeAttr('disabled');
-    var newRow = $('<tr id='+ data[1] +'>');
-    newRow.attr('data-group-price', data[24] ? 1 : 0);
+    var newRow = $('<tr id='+ data.code +'>');
+    newRow.attr('data-group-price', data.group_price ? 1 : 0);
     var cols = '';
-    temp_unit_name = (data[6]).split(',');
-    pos = product_code.indexOf(data[1]);
+    temp_unit_name = (data.unit_name).split(',');
+    pos = product_code.indexOf(data.code);
 
     let stockDisplay = '';
-
-    if (all_permission.includes("cart-product-update")) {
-        if(data[20].trim() == 'standard' || data[20].trim() == 'combo'){
-            if (!data[18] || data[18] == 'null') {
-                stockDisplay = ` | {{ __('db.In Stock') }} : <span class="in-stock">` + data[19] + `</span>`;
-            }
-        }
-        cols += '<td class="product-title"><strong class="edit-product btn btn-link pl-0 pr-0" data-toggle="modal" data-target="#editModal">' + data[0] + ' <i class="dripicons-document-edit"></i></strong><br><span>' + data[1] + '</span>' + stockDisplay + ' <strong class="product-price d-md-none"></strong>';
-    } else {
-        cols += '<td class="product-title"><strong>' + data[0] + '<br><span>' + data[1] + '</span>' + stockDisplay + ' <strong class="product-price d-md-none"></strong>';
+    var variantDisplay = '';
+    if (data.variant_name && data.variant_name.length > 0) {
+        variantDisplay = '<br><span class="product-variant font-weight-bold" style="font-size: 0.85em; color: #555;">' + "{{trans('file.Variant') == 'file.Variant' ? 'Variant' : trans('file.Variant')}}" + ': ' + data.variant_name + '</span>';
     }
 
-    if(data[12]) {
-        cols += '<br><input style="font-size:13px;padding:3px 25px 3px 10px;height:30px !important" type="text" class="form-control batch-no" value="'+data[22]+'" required/> <input type="hidden" class="product-batch-id" name="product_batch_id[]" value="'+data[21]+'"/>';
+    if (all_permission.includes("cart-product-update")) {
+        if(data.type.trim() == 'standard' || data.type.trim() == 'combo'){
+            if (!data.imei_number || data.imei_number == 'null') {
+                stockDisplay = ` | {{ __('db.In Stock') }} : <span class="in-stock">` + data.warehouse_qty + `</span>`;
+            }
+        }
+        cols += '<td class="product-title"><strong class="edit-product btn btn-link pl-0 pr-0" data-toggle="modal" data-target="#editModal">' + data.name + ' <i class="ti ti-edit"></i></strong>' + variantDisplay + '<br><span>' + data.code + '</span>' + stockDisplay + ' <strong class="product-price d-md-none"></strong>';
+    } else {
+        cols += '<td class="product-title"><strong>' + data.name + '</strong>' + variantDisplay + '<br><span>' + data.code + '</span>' + stockDisplay + ' <strong class="product-price d-md-none"></strong>';
+    }
+
+    if(data.is_batch) {
+        cols += '<br><input style="font-size:13px;padding:3px 25px 3px 10px;height:30px !important" type="text" class="form-control batch-no" value="'+data.batch_no+'" required/> <input type="hidden" class="product-batch-id" name="product_batch_id[]" value="'+data.batch_id+'"/>';
     }
     else {
         cols += '<input type="text" class="form-control batch-no d-none" disabled/> <input type="hidden" class="product-batch-id" name="product_batch_id[]"/>';
@@ -1322,16 +1498,16 @@ function addNewProduct(data){
     cols += '<td><div class="input-group"><span class="input-group-btn">';
 
     // If no IMEI, show minus button
-    if (!data[18] || data[18] == 'null') {
-        cols += '<button type="button" class="btn btn-default minus mr-1" style="padding:5px 8px"><i class="dripicons-minus"></i></button></span>';
+    if (!data.imei_number || data.imei_number == 'null') {
+        cols += '<button type="button" class="btn btn-default minus mr-1" style="padding:5px 8px"><i class="ti ti-minus"></i></button></span>';
     }
 
     // Input field
-    cols += '<input type="text" name="qty[]" class="form-control qty numkey input-number" style="font-size:13px;max-width:50px;padding: 0 0;text-align:center" step="any" value="'+data[15]+'" max="'+data[19]+'" required><span class="input-group-btn">';
+    cols += '<input type="text" name="qty[]" class="form-control qty numkey input-number" style="font-size:13px;max-width:50px;padding: 0 0;text-align:center" step="any" min="0.000001" value="'+data.qty+'" max="'+data.warehouse_qty+'" required><span class="input-group-btn">';
 
     // If no IMEI, show plus button
-    if (!data[18] || data[18] == 'null') {
-        cols += '<button type="button" class="btn btn-default plus ml-1" style="padding:5px 8px"><i class="dripicons-plus"></i></button>';
+    if (!data.imei_number || data.imei_number == 'null') {
+        cols += '<button type="button" class="btn btn-default plus ml-1" style="padding:5px 8px"><i class="ti ti-plus"></i></button>';
     }
 
     cols += '</span></div></td>';
@@ -1342,27 +1518,27 @@ function addNewProduct(data){
 
     cols += '<td class="sub-total"></td>';
     // Always show delete button
-    cols += '<td><button type="button" class="ibtnDel btn btn-danger btn-sm mr-2"><i class="dripicons-trash"></i></button></td>';
+    cols += '<td><button type="button" class="ibtnDel btn btn-danger btn-sm mr-2"><i class="ti ti-trash"></i></button></td>';
 
-    cols += '<input type="hidden" class="product-code" name="product_code[]" value="' + data[1] + '"/>';
-    cols += '<input type="hidden" class="product-id" name="product_id[]" value="' + data[9] + '"/>';
-    cols += '<input type="hidden" class="product_type" name="product_type[]" value="' + data[20] + '"/>';
+    cols += '<input type="hidden" class="product-code" name="product_code[]" value="' + data.code + '"/>';
+    cols += '<input type="hidden" class="product-id" name="product_id[]" value="' + data.id + '"/>';
+    cols += '<input type="hidden" class="product_type" name="product_type[]" value="' + data.type + '"/>';
     cols += '<input type="hidden" class="product_price" />';
     cols += '<input type="hidden" class="sale-unit" name="sale_unit[]" value="' + temp_unit_name[0] + '"/>';
     cols += '<input type="hidden" class="net_unit_price" name="net_unit_price[]" />';
     cols += '<input type="hidden" class="discount-value" name="discount[]" />';
-    cols += '<input type="hidden" class="tax-rate" name="tax_rate[]" value="' + data[3] + '"/>';
+    cols += '<input type="hidden" class="tax-rate" name="tax_rate[]" value="' + data.tax_rate + '"/>';
     cols += '<input type="hidden" class="tax-value" name="tax[]" />';
-    cols += '<input type="hidden" class="tax-name" value="'+data[4]+'" />';
-    cols += '<input type="hidden" class="tax-method" value="'+data[5]+'" />';
-    cols += '<input type="hidden" class="sale-unit-operator" value="'+data[7]+'" />';
-    cols += '<input type="hidden" class="sale-unit-operation-value" value="'+data[8]+'" />';
+    cols += '<input type="hidden" class="tax-name" value="'+data.tax_name+'" />';
+    cols += '<input type="hidden" class="tax-method" value="'+data.tax_method+'" />';
+    cols += '<input type="hidden" class="sale-unit-operator" value="'+data.unit_operator+'" />';
+    cols += '<input type="hidden" class="sale-unit-operation-value" value="'+data.unit_operation_value+'" />';
     cols += '<input type="hidden" class="subtotal-value" name="subtotal[]" />';
-    if(data[18] != 'null' && data[18] != '')
-        cols += '<input type="hidden" class="imei-number" name="imei_number[]" value="'+data[18]+'" />';
+    if(data.imei_number != 'null' && data.imei_number != '')
+        cols += '<input type="hidden" class="imei-number" name="imei_number[]" value="'+data.imei_number+'" />';
     else
         cols += '<input type="hidden" class="imei-number" name="imei_number[]" value="" />';
-    if(data[23]){
+    if(isSelectedRestaurantWarehouse() && data.extras){
         cols += '<input type="hidden" class="topping_product" name="topping_product[]" value="" />';
         cols += '<input type="hidden" class="topping-price" name="topping-price" value="" />';
     }
@@ -1373,34 +1549,45 @@ function addNewProduct(data){
 
     rowindex = newRow.index();
 
-    product_price.splice(rowindex, 0, parseFloat(data[2]) + parseFloat(data[2] * groupRate(data)));
+    // ── Price Arrays ──────────────────────────────────────────────────────────
+    // NOTE: edit.blade.php does not apply currency exchange rate on new adds
+    // (existing rows loaded from DB already have their currency baked in).
+    const _cgRate    = groupRate(data);
+    const _retail    = parseFloat(data.price) + parseFloat(data.price * _cgRate);
+    const _wholesale = data.wholesale_price
+        ? parseFloat(data.wholesale_price) + parseFloat(data.wholesale_price * _cgRate)
+        : 0;
 
-    if(data[16])
-        wholesale_price.splice(rowindex, 0, parseFloat(data[16]) + parseFloat(data[16] * groupRate(data)));
-    else
-        wholesale_price.splice(rowindex, 0, '{{number_format(0, $general_setting->decimal, '.', '')}}');
-    cost.splice(rowindex, 0, parseFloat(data[17]));
-    product_discount.splice(rowindex, 0, '{{number_format(0, $general_setting->decimal, '.', '')}}');
-    tax_rate.splice(rowindex, 0, parseFloat(data[3]));
-    tax_name.splice(rowindex, 0, data[4]);
-    tax_method.splice(rowindex, 0, data[5]);
-    unit_name.splice(rowindex, 0, data[6]);
-    unit_operator.splice(rowindex, 0, data[7]);
-    unit_operation_value.splice(rowindex, 0, data[8]);
-    is_imei.splice(rowindex, 0, data[13]);
-    is_variant.splice(rowindex, 0, data[14]);
+    product_price.splice(rowindex, 0, _retail);
+    wholesale_price.splice(rowindex, 0, _wholesale || '{{number_format(0, gen_setting()->decimal, '.', '')}}');
+    cost.splice(rowindex, 0, parseFloat(data.cost));
 
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product_price').val(product_price[rowindex]);
+    // ── Discount from server response (no second AJAX needed) ─────────────────
+    const _discountPerUnit = parseFloat(data.discount || 0);
+    product_discount.splice(rowindex, 0, _discountPerUnit);
 
-    checkQuantity(data[15], true);
-    checkDiscount(data[15], true);
+    tax_rate.splice(rowindex, 0, parseFloat(data.tax_rate));
+    tax_name.splice(rowindex, 0, data.tax_name);
+    tax_method.splice(rowindex, 0, data.tax_method);
+    unit_name.splice(rowindex, 0, data.unit_name);
+    unit_operator.splice(rowindex, 0, data.unit_operator);
+    unit_operation_value.splice(rowindex, 0, data.unit_operation_value);
+    is_imei.splice(rowindex, 0, data.is_imei);
+    is_variant.splice(rowindex, 0, data.is_variant);
 
-    if(data[16]) {
+    // Cache row reference once
+    const $newRow = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')');
+    $newRow.find('.product_price').val(product_price[rowindex]);
+
+    // ── Single synchronous calculation — no AJAX, no redundant DOM scans ──
+    checkQuantity(data.qty, true);
+
+    if(data.wholesale_price) {
         populatePriceOption();
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.edit-product').click();
+        $newRow.find('.edit-product').click();
     }
 
-    if (data[23] && Array.isArray(data[23]) && data[23].length > 0) {
+    if (isSelectedRestaurantWarehouse() && data.extras && Array.isArray(data.extras) && data.extras.length > 0) {
         if(productSale && productSale.length > 0) {
 
             if (product_discount[rowindex] < 1) {
@@ -1413,8 +1600,8 @@ function addNewProduct(data){
                 @endif
             }
 
-            // Find a match for current data[9] (product_id)
-            let matchedIndex = productSale.findIndex(p => parseInt(p.product_id) === parseInt(data[9]));
+            // Find a match for current data.id (product_id)
+            let matchedIndex = productSale.findIndex(p => parseInt(p.product_id) === parseInt(data.id));
 
             if (matchedIndex !== -1) {
                 let matchedProduct = productSale[matchedIndex];
@@ -1427,13 +1614,13 @@ function addNewProduct(data){
 
                 newRow.find('.product-title').append(`<br><small>Includes: ${toppingNames}</small>`);
                 newRow.find('.topping_product').val(matchedProduct.topping_id);
-                newRow.find('.topping-price').val(totalToppingPrice.toFixed({{$general_setting->decimal}}));
+                newRow.find('.topping-price').val(totalToppingPrice.toFixed({{gen_setting()->decimal}}));
 
                 const currentPrice = parseFloat(newRow.find('.product-price').text()) || 0;
                 const newPrice = currentPrice + totalToppingPrice;
                 newPrice -= product_discount[rowindex];
-                newRow.find('.product-price').text(newPrice.toFixed({{$general_setting->decimal}}));
-                newRow.find('.sub-total').text(newPrice.toFixed({{$general_setting->decimal}}));
+                newRow.find('.product-price').text(newPrice.toFixed({{gen_setting()->decimal}}));
+                newRow.find('.sub-total').text(newPrice.toFixed({{gen_setting()->decimal}}));
 
                 // Remove used item from array
                 productSale.splice(matchedIndex, 1);
@@ -1446,7 +1633,7 @@ function addNewProduct(data){
 
             function openToppingsModal(data, selectedToppings = [], rowIndex = null) {
                 let modalContent = '<form id="product-selection-form">';
-                data[23].forEach(product => {
+                data.extras.forEach(product => {
                     const selected = selectedToppings.find(t => t.id == product.id);
                     const isChecked = selected ? 'checked' : '';
                     const qty = selected ? selected.qty : 1;
@@ -1469,7 +1656,7 @@ function addNewProduct(data){
                         <div class="modal-dialog" role="document">
                             <div class="modal-content">
                                 <div class="modal-header">
-                                    <h5 class="modal-title" id="productSelectionModalLabel">{{__('db.Select Additional Products')}}</h5>
+                                    <h5 class="modal-title" id="productSelectionModalLabel">{{__('db.select_additional_products')}}</h5>
                                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                         <span aria-hidden="true">&times;</span>
                                     </button>
@@ -1534,9 +1721,9 @@ function addNewProduct(data){
                     const currentPrice = parseFloat(newRow.find('.product-price').text()) || 0;
                     let newPrice = currentPrice + totalAdditionalPrice;
                     newPrice -= product_discount[rowindex];
-                    newRow.find('.product-price').text(newPrice.toFixed({{$general_setting->decimal}}));
-                    newRow.find('.sub-total').text(newPrice.toFixed({{$general_setting->decimal}}));
-                    newRow.find('.topping-price').val(totalAdditionalPrice.toFixed({{$general_setting->decimal}}));
+                    newRow.find('.product-price').text(newPrice.toFixed({{gen_setting()->decimal}}));
+                    newRow.find('.sub-total').text(newPrice.toFixed({{gen_setting()->decimal}}));
+                    newRow.find('.topping-price').val(totalAdditionalPrice.toFixed({{gen_setting()->decimal}}));
                 }
 
                 $("#productSelectionModal").modal('hide');
@@ -1605,7 +1792,7 @@ function edit(){
         }
     @endif
 
-    $('input[name="edit_discount"]').val(parseFloat(product_discount[rowindex]).toFixed({{$general_setting->decimal}}));
+    $('input[name="edit_discount"]').val(parseFloat(product_discount[rowindex]).toFixed({{gen_setting()->decimal}}));
 
     var tax_name_all = <?php echo json_encode($tax_name_all) ?>;
     pos = tax_name_all.indexOf(tax_name[rowindex]);
@@ -1631,7 +1818,7 @@ function edit(){
         row_product_price = product_price[rowindex];
         $("#edit_unit").hide();
     }
-    $('input[name="edit_unit_price"]').val(row_product_price.toFixed({{$general_setting->decimal}}));
+    $('input[name="edit_unit_price"]').val(row_product_price.toFixed({{gen_setting()->decimal}}));
     $('.selectpicker').selectpicker('refresh');
 }
 
@@ -1672,86 +1859,97 @@ $(document).on("click", "table#imei-table tbody .imei-del", function() {
     calculateTotal();
 });
 
+/**
+ * checkDiscount — used only from the EDIT MODAL / qty-change path.
+ * NOT called during initial product add (discount now comes in server response).
+ * Converted from async:false to async:true to prevent UI thread blocking.
+ */
 function checkDiscount(qty, flag, price = 0) {
-    var customer_id = $('#customer_id').val();
-    var warehouse_id = $('#warehouse_id').val();
-    var product_id = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .product-id').val();
-
-    var rowclass = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').attr("class");
+    const capturedRowindex = rowindex; // capture before async gap
+    const customer_id  = $('#customer_id').val();
+    const warehouse_id = $('#warehouse_id').val();
+    const $row         = $('table.order-list tbody tr:nth-child(' + (capturedRowindex + 1) + ')');
+    const product_id   = $row.find('.product-id').val();
+    const rowclass     = $row.attr('class');
 
     $.ajax({
         type: 'GET',
-        async: false,
-        url: '{{url("/")}}/sales/check-discount?qty='+qty+'&customer_id='+customer_id+'&product_id='+product_id+'&warehouse_id='+warehouse_id,
+        async: true, // ✅ Never block the UI thread
+        url: '{{url("/")}}/sales/check-discount?qty=' + qty + '&customer_id=' + customer_id + '&product_id=' + product_id + '&warehouse_id=' + warehouse_id,
         success: function(data) {
-            if(product_price[rowindex].length == 0){
-                product_price[rowindex] = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .product_price').val();
+            rowindex = capturedRowindex;
+
+            if (String(product_price[rowindex]).length === 0) {
+                product_price[rowindex] = $row.find('.product_price').val();
             }
-            if(rowclass == 'old'){
-                product_price[rowindex] = parseFloat(product_price[rowindex]) + parseFloat(product_price[rowindex] * customer_group_rate);
-            } else {
-                product_price[rowindex] = parseFloat(product_price[rowindex] * currency['exchange_rate']) + parseFloat(product_price[rowindex] * currency['exchange_rate'] * ($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').attr('data-group-price') == 1 ? 0 : customer_group_rate));
+            // Preserve the old-row price calculation (already stored with customer_group_rate)
+            if (price > 0) {
+                if (rowclass === 'old') {
+                    product_price[rowindex] = parseFloat(price) + parseFloat(price * customer_group_rate);
+                } else {
+                    product_price[rowindex] = parseFloat(price * currency['exchange_rate'])
+                        + parseFloat(price * currency['exchange_rate'] * ($row.attr('data-group-price') == 1 ? 0 : customer_group_rate));
+                }
             }
 
-            var productDiscount = parseFloat($('#discount').text());
-
-            if(flag == true)
-                $('#discount').text(productDiscount+data[2]);
-            else if(flag == false)
-                $('#discount').text(productDiscount-data[2]*qty);
-            else if(flag == 'input')
-                $('#discount').text(productDiscount-data[2]*previousqty+data[2]*qty);
-            else
-                $('#discount').text(productDiscount-data[2]);
+            // Update stored discount then recalculate
+            product_discount[rowindex] = parseFloat(data[2] || 0);
+            $row.find('.qty').val(qty);
+            checkQuantity(String(qty), true);
         }
     });
-
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val(qty);
-    flag = true;
-    checkQuantity(String(qty), flag);
 }
 
 function checkQuantity(sale_qty, flag) {
-    var row_product_code = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product-code').val();
-    var qty = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').attr('max'));
-    var product_type = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product_type').val();
-    if(without_stock == 'no') {
-        if(product_type.trim() == 'standard' || product_type.trim() == 'combo') {
-            var operator = unit_operator[rowindex].split(',');
-            var operation_value = unit_operation_value[rowindex].split(',');
-            if(operator[0] == '*')
-                total_qty = sale_qty * operation_value[0];
-            else if(operator[0] == '/')
-                total_qty = sale_qty / operation_value[0];
-            if (total_qty > qty) {
-                if(imeiNumbers.length){
-                    // console.log(sale_qty);
-                    // sale_qty = (sale_qty + 1);
-                }else{
-                    alert('Quantity exceeds stock quantity!');
+    // Cache row reference once — avoid repeated nth-child DOM traversals
+    const $row        = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')');
+    const maxQty      = parseFloat($row.find('.qty').attr('max'));
+    const productType = $row.find('.product_type').val();
+    const imeiNumbers = $row.find('.imei-number').val();
+    sale_qty          = parseFloat(sale_qty);
 
+    if (without_stock == 'no') {
+        if (productType && (productType.trim() == 'standard' || productType.trim() == 'combo')) {
+            const operator        = unit_operator[rowindex].split(',');
+            const operation_value = unit_operation_value[rowindex].split(',');
+
+            let total_stock_qty = sale_qty;
+            if (operator[0] == '*')
+                total_stock_qty = sale_qty * operation_value[0];
+            else if (operator[0] == '/')
+                total_stock_qty = sale_qty / operation_value[0];
+
+            // ✅ Iterative clamp — replaces recursive call that risked stack overflow
+            if (total_stock_qty > maxQty && !isNaN(maxQty)) {
+                if (!imeiNumbers || !imeiNumbers.length) {
+                    SaleProToast.show('Quantity exceeds stock quantity!');
                     if (flag) {
-                        sale_qty = (sale_qty - 1);
-                        checkQuantity(sale_qty, true);
-                    }
-                    else {
+                        if (operator[0] == '*')
+                            sale_qty = Math.floor(maxQty / operation_value[0]);
+                        else if (operator[0] == '/')
+                            sale_qty = Math.floor(maxQty * operation_value[0]);
+                        else
+                            sale_qty = maxQty;
+                        sale_qty = Math.max(0, sale_qty);
+                    } else {
                         edit();
                         return;
                     }
                 }
 
-                if(sale_qty == 0) {
-                    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').remove();
+                if (sale_qty === 0) {
+                    $row.remove();
+                    calculateTotal();
+                    return;
                 }
             }
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val(sale_qty);
         }
     }
-    else
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val(sale_qty);
-    if(!flag) {
+
+    $row.find('.qty').val(sale_qty);
+
+    if (!flag) {
         $('#editModal').modal('hide');
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val(sale_qty);
     }
     calculateRowProductData(sale_qty);
 }
@@ -1768,47 +1966,49 @@ function unitConversion() {
 }
 
 function calculateRowProductData(quantity) {
+    quantity = parseFloat(quantity);
+
+    // Draft discount resolution (only applies when restoring a draft sale)
     if (product_discount[rowindex] < 1) {
-        cur_product_id = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .product-id').val();
+        const cur_product_id = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .product-id').val();
         @if (isset($draft_product_discount))
             if (product_discount[rowindex] < 1) {
-                draft_discounts = @json($draft_product_discount['discount']);
+                const draft_discounts = @json($draft_product_discount['discount']);
                 product_discount[rowindex] = draft_discounts[cur_product_id];
             }
         @endif
     }
 
-    if(product_type[pos] == 'standard')
+    // Cache row reference once — reused for all reads/writes below
+    const $row = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')');
+    const productTypeVal = $row.find('.product_type').val();
+    if (productTypeVal && productTypeVal.trim() == 'standard')
         unitConversion();
     else
         row_product_price = product_price[rowindex];
+
+    let net_unit_price, tax, sub_total, sub_total_unit;
+
     if (tax_method[rowindex] == 1) {
-        var net_unit_price = row_product_price - product_discount[rowindex];
-        var tax = net_unit_price * quantity * (tax_rate[rowindex] / 100);
-        var sub_total = (net_unit_price * quantity) + tax;
-
-        if(parseFloat(quantity))
-            var sub_total_unit = sub_total / quantity;
-        else
-            var sub_total_unit = sub_total;
-    }
-    else {
-        console.log(`${row_product_price} - ${product_discount[rowindex]} - ${tax_rate[rowindex]} -`);
-        var sub_total_unit = row_product_price - product_discount[rowindex];
-        var net_unit_price = (100 / (100 + tax_rate[rowindex])) * sub_total_unit;
-        var tax = (sub_total_unit - net_unit_price) * quantity;
-        var sub_total = sub_total_unit * quantity;
+        net_unit_price = row_product_price - product_discount[rowindex];
+        tax            = net_unit_price * quantity * (tax_rate[rowindex] / 100);
+        sub_total      = net_unit_price * quantity + tax;
+        sub_total_unit = quantity ? sub_total / quantity : sub_total;
+    } else {
+        sub_total_unit = row_product_price - product_discount[rowindex];
+        net_unit_price = (100 / (100 + tax_rate[rowindex])) * sub_total_unit;
+        tax            = (sub_total_unit - net_unit_price) * quantity;
+        sub_total      = sub_total_unit * quantity;
     }
 
-    var topping_price = ($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.topping-price').val() * quantity) || 0;
-
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount-value').val((product_discount[rowindex] * quantity).toFixed({{$general_setting->decimal}}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val(tax_rate[rowindex].toFixed({{$general_setting->decimal}}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_price').val(net_unit_price.toFixed({{$general_setting->decimal}}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed({{$general_setting->decimal}}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product-price').text(sub_total_unit.toFixed({{$general_setting->decimal}}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text((sub_total+topping_price).toFixed({{$general_setting->decimal}}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val((sub_total+topping_price).toFixed({{$general_setting->decimal}}));
+    const dp = {{gen_setting()->decimal}};
+    $row.find('.discount-value').val((product_discount[rowindex] * quantity).toFixed(dp));
+    $row.find('.tax-rate').val(tax_rate[rowindex].toFixed(dp));
+    $row.find('.net_unit_price').val(net_unit_price.toFixed(dp));
+    $row.find('.tax-value').val(tax.toFixed(dp));
+    $row.find('.product-price').text(sub_total_unit.toFixed(dp));
+    $row.find('.sub-total').text(sub_total.toFixed(dp));
+    $row.find('.subtotal-value').val(sub_total.toFixed(dp));
 
     calculateTotal();
 }
@@ -1831,24 +2031,24 @@ function calculateTotal() {
     $("table.order-list tbody .discount-value").each(function() {
         total_discount += parseFloat($(this).val());
     });
-    $("#total-discount").text(total_discount.toFixed({{$general_setting->decimal}}));
-    $('input[name="total_discount"]').val(total_discount.toFixed({{$general_setting->decimal}}));
+    $("#total-discount").text(total_discount.toFixed({{gen_setting()->decimal}}));
+    $('input[name="total_discount"]').val(total_discount.toFixed({{gen_setting()->decimal}}));
 
     //Sum of tax
     var total_tax = 0;
     $(".tax-value").each(function() {
         total_tax += parseFloat($(this).val());
     });
-    $("#total-tax").text(total_tax.toFixed({{$general_setting->decimal}}));
-    $('input[name="total_tax"]').val(total_tax.toFixed({{$general_setting->decimal}}));
+    $("#total-tax").text(total_tax.toFixed({{gen_setting()->decimal}}));
+    $('input[name="total_tax"]').val(total_tax.toFixed({{gen_setting()->decimal}}));
 
     //Sum of subtotal
     var total = 0;
     $(".sub-total").each(function() {
         total += parseFloat($(this).text());
     });
-    $("#total").text(total.toFixed({{$general_setting->decimal}}));
-    $('input[name="total_price"]').val(total.toFixed({{$general_setting->decimal}}));
+    $("#total").text(total.toFixed({{gen_setting()->decimal}}));
+    $('input[name="total_price"]').val(total.toFixed({{gen_setting()->decimal}}));
 
     calculateGrandTotal();
 }
@@ -1865,7 +2065,7 @@ function calculateGrandTotal() {
     var order_discount_value = parseFloat($('input[name="order_discount_value"]').val());
 
     if (!order_discount_value)
-        order_discount_value = {{number_format(0, $general_setting->decimal, '.', '')}};
+        order_discount_value = {{number_format(0, gen_setting()->decimal, '.', '')}};
 
     if(order_discount_type == 'Flat') {
         if(!currencyChange) {
@@ -1877,7 +2077,7 @@ function calculateGrandTotal() {
     else
         var order_discount = parseFloat(subtotal * (order_discount_value / 100));
 
-    $("#discount").text(order_discount_value.toFixed({{$general_setting->decimal}}));
+    $("#discount").text(order_discount_value.toFixed({{gen_setting()->decimal}}));
     $('input[name="order_discount"]').val(order_discount);
     $('#order-discount-val').val(order_discount_value);
     $('input[name="order_discount_type"]').val(order_discount_type);
@@ -1886,33 +2086,34 @@ function calculateGrandTotal() {
     else
         var shipping_cost = parseFloat($('input[name="shipping_cost"]').val() * currency['exchange_rate']);
     if (shipping_cost.length < 1)
-        shipping_cost = {{number_format(0, $general_setting->decimal, '.', '')}};
+        shipping_cost = {{number_format(0, gen_setting()->decimal, '.', '')}};
 
     item = ++item + '(' + total_qty + ')';
     order_tax = (subtotal - order_discount) * (order_tax / 100);
     var grand_total = (subtotal + order_tax + shipping_cost) - order_discount;
-    $('input[name="grand_total"]').val(grand_total.toFixed({{$general_setting->decimal}}));
+    $('input[name="grand_total"]').val(grand_total.toFixed({{gen_setting()->decimal}}));
 
     if(!currencyChange)
         var coupon_discount = parseFloat($('input[name="coupon_discount"]').val());
     else
         var coupon_discount = parseFloat($('input[name="coupon_discount"]').val() * currency['exchange_rate']);
     if (!coupon_discount)
-        coupon_discount = {{number_format(0, $general_setting->decimal, '.', '')}};
+        coupon_discount = {{number_format(0, gen_setting()->decimal, '.', '')}};
     grand_total -= coupon_discount;
 
     $('#item').text(item);
     $('input[name="item"]').val($('table.order-list tbody tr:last').index() + 1);
-    $('#subtotal').text(subtotal.toFixed({{$general_setting->decimal}}));
-    $('#order_tax').text(order_tax.toFixed({{$general_setting->decimal}}));
-    $('#tax').text(order_tax.toFixed({{$general_setting->decimal}}));
-    $('input[name="order_tax"]').val(order_tax.toFixed({{$general_setting->decimal}}));
-    $('#order_discount').text(order_discount.toFixed({{$general_setting->decimal}}));
-    $('#shipping_cost').text(shipping_cost.toFixed({{$general_setting->decimal}}));
+    $('#subtotal').text(subtotal.toFixed({{gen_setting()->decimal}}));
+    $('#order_tax').text(order_tax.toFixed({{gen_setting()->decimal}}));
+    $('#tax').text(order_tax.toFixed({{gen_setting()->decimal}}));
+    $('input[name="order_tax"]').val(order_tax.toFixed({{gen_setting()->decimal}}));
+    $('#order_discount').text(order_discount.toFixed({{gen_setting()->decimal}}));
+    $('#shipping_cost').text(shipping_cost.toFixed({{gen_setting()->decimal}}));
     $('input[name="shipping_cost"]').val(shipping_cost);
-    $('#grand_total').text(grand_total.toFixed({{$general_setting->decimal}}));
-    $('input[name="grand_total"]').val(grand_total.toFixed({{$general_setting->decimal}}));
+    $('#grand_total').text(grand_total.toFixed({{gen_setting()->decimal}}));
+    $('input[name="grand_total"]').val(grand_total.toFixed({{gen_setting()->decimal}}));
     currencyChange = false;
+    $(document).trigger('credit_limit_check_required');
 }
 
 function cancel(rownumber) {
@@ -1970,25 +2171,77 @@ $(window).keydown(function(e){
     }
 });
 
-$('#payment-form').on('submit',function(e){
-    var rownumber = $('table.order-list tbody tr:last').index();
-    $("table.order-list tbody .qty").each(function(index) {
-        if ($(this).val() == '') {
-            alert('One of products has no quantity!');
-            e.preventDefault();
+let editSaleSubmitting = false;
+
+$('#payment-form').on('submit', function(e) {
+    e.preventDefault();
+
+    if (editSaleSubmitting) {
+        return false;
+    }
+
+    if (window.SaleRequestFeedback) {
+        window.SaleRequestFeedback.clear();
+    }
+
+    let invalidQtyInput = null;
+    $('table.order-list tbody .qty').each(function () {
+        const rawVal = String($(this).val() === null ? '' : $(this).val()).trim();
+        const numVal = Number(rawVal);
+        $(this).removeClass('is-invalid');
+
+        if (rawVal === '' || !Number.isFinite(numVal) || numVal <= 0) {
+            invalidQtyInput = $(this);
+            return false;
         }
     });
+
+    if (invalidQtyInput) {
+        invalidQtyInput.addClass('is-invalid').focus();
+        SaleProToast.show('Quantity must be greater than zero!');
+        return false;
+    }
+
+    const rownumber = $('table.order-list tbody tr:last').index();
     if (rownumber < 0) {
-        alert("Please insert product to order table!")
-        e.preventDefault();
+        SaleProToast.show('Please insert product to order table!');
+        return false;
     }
-    else if(parseFloat($('input[name="total_qty"]').val()) <= 0) {
-        alert('Product quantity is 0');
-        e.preventDefault();
+
+    if (parseFloat($('input[name="total_qty"]').val()) <= 0) {
+        SaleProToast.show('Product quantity is 0');
+        return false;
     }
-    else {
-        $("#submit-button").prop('disabled', true);
-        $(".batch-no").prop('disabled', false);
+
+    const form = this;
+
+    const submitSale = function () {
+        editSaleSubmitting = true;
+        $('#submit-button').prop('disabled', true);
+        $('.batch-no').prop('disabled', false);
+
+        // Native submit avoids re-entering this async validation handler.
+        HTMLFormElement.prototype.submit.call(form);
+    };
+
+    if (window.SaleCreditLimit) {
+        window.SaleCreditLimit.validate({ focusError: true }).done(function (allowed) {
+            if (allowed) {
+                submitSale();
+            }
+        });
+    } else {
+        submitSale();
+    }
+
+    return false;
+});
+
+$(document).on('input change', 'table.order-list .qty', function() {
+    const rawVal = String($(this).val() === null ? '' : $(this).val()).trim();
+    const numVal = Number(rawVal);
+    if (rawVal !== '' && Number.isFinite(numVal) && numVal > 0) {
+        $(this).removeClass('is-invalid');
     }
 });
 

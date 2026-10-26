@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DamageStock extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, \App\Traits\WarehouseScoped;
 
     protected $fillable = [
         'reference_no',

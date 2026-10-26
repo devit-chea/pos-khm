@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <style type="text/css">
     .top-fields{margin-top:10px;position: relative;}
@@ -72,7 +76,7 @@
         </div>
         
         @can('transfers-add')
-            <a href="{{route('transfers.create')}}" class="btn btn-info"><i class="dripicons-plus"></i> {{__('db.Add Transfer')}}</a>&nbsp;
+            <a href="{{route('transfers.create')}}" class="btn btn-info"><i class="ti ti-plus"></i> {{__('db.Add Transfer')}}</a>&nbsp;
         @endcan
     </div>
     <div class="table-responsive">
@@ -112,13 +116,13 @@
         <div class="container mt-3 pb-2 border-bottom">
             <div class="row">
                 <div class="col-md-6 d-print-none">
-                    <button id="print-btn" type="button" class="btn btn-default btn-sm"><i class="dripicons-print"></i> {{__('db.Print')}}</button>
+                    <button id="print-btn" type="button" class="btn btn-default btn-sm"><i class="ti ti-printer"></i> {{__('db.print')}}</button>
                 </div>
                 <div class="col-md-6 d-print-none">
-                    <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="col-md-12">
-                    <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">{{$general_setting->site_title}}</h3>
+                    <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">{{gen_setting()->site_title}}</h3>
                 </div>
                 <div class="col-md-12 text-center">
                     <i style="font-size: 15px;">{{__('db.Transfer Details')}}</i>
@@ -149,6 +153,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
     $("ul#transfer").siblings('a').attr('aria-expanded','true');
     $("ul#transfer").addClass("show");
@@ -156,7 +161,7 @@
 
     var all_permission = <?php echo json_encode($all_permission) ?>;
     var transfer_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
     $.ajaxSetup({
         headers: {
@@ -164,17 +169,13 @@
         }
     });
 
-    function confirmDelete() {
-        if (confirm("Are you sure want to delete?")) {
-            return true;
-        }
-        return false;
-    }
+    function confirmDelete() { return true; }
     function confirmApprove() {
-        if (confirm("Are you sure want to Approve?")) {
-            return true;
-        }
-        return false;
+        return SaleProConfirm.open({
+            message: "Are you sure want to approve?",
+            confirmText: "{{__('db.Yes')}}",
+            type: "info"
+        });
     }
 
      $(document).on("click", "tr.transfer-link td:not(:first-child, :last-child)", function() {
@@ -242,8 +243,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         order:[['1', 'desc']],
@@ -274,7 +275,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -288,7 +289,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -302,7 +303,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -316,7 +317,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -329,7 +330,7 @@
                 footer:true
             },
             {
-                text: '<i title="delete" class="dripicons-cross"></i>',
+                text: '<i title="delete" class="ti ti-x"></i>',
                 className: 'buttons-delete',
                 action: function ( e, dt, node, config ) {
                     if(user_verified == '1') {
@@ -341,7 +342,7 @@
                                     transfer_id[i-1] = transfer[3];
                             }
                         });
-                        if(transfer_id.length && confirm("Are you sure want to delete?")) {
+                        if (transfer_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                             $.ajax({
                                 type:'POST',
                                 url:'transfers/deletebyselection',
@@ -349,22 +350,24 @@
                                     transferIdArray: transfer_id
                                 },
                                 success:function(data){
-                                    alert(data);
+                                    SaleProToast.show(data);
                                     //dt.rows({ page: 'current', selected: true }).deselect();
                                     dt.rows({ page: 'current', selected: true }).remove().draw(false);
                                 }
                             });
                         }
+                        });
+                        }
                         else if(!transfer_id.length)
-                            alert('Nothing is selected!');
+                            SaleProToast.show('Nothing is selected!');
                     }
                     else
-                        alert('This feature is disable for demo!');
+                        SaleProToast.show('This feature is disable for demo!');
                 }
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],
@@ -389,14 +392,14 @@
         if (dt_selector.rows( '.selected' ).any() && is_calling_first) {
             var rows = dt_selector.rows( '.selected' ).indexes();
 
-            $( dt_selector.column( 5 ).footer() ).html(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 6 ).footer() ).html(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            // $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 5 ).footer() ).html(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
+            $( dt_selector.column( 6 ).footer() ).html(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
+            // $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
         else {
-            $( dt_selector.column( 5 ).footer() ).html(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 6 ).footer() ).html(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            // $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 5 ).footer() ).html(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
+            $( dt_selector.column( 6 ).footer() ).html(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
+            // $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
     }
 
@@ -462,7 +465,7 @@
              $("table.product-transfer-list").append(newBody);
         });
 
-        var htmlfooter = '<p><strong>{{__("db.Note")}}:</strong> '+transfer[14]+'</p><strong>{{__("db.Created By")}}:</strong><br>'+transfer[15]+'<br>'+transfer[16];
+        var htmlfooter = '<p><strong>{{__("db.note")}}:</strong> '+transfer[14]+'</p><strong>{{__("db.Created By")}}:</strong><br>'+transfer[15]+'<br>'+transfer[16];
 
         $('#transfer-content').html(htmltext);
         $('#transfer-footer').html(htmlfooter);

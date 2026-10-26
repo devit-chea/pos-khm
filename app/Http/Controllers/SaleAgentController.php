@@ -39,6 +39,15 @@ class SaleAgentController extends Controller
             $lims_sale_agent_all = Employee::with('user')
                 ->where('is_active', true)
                 ->where('is_sale_agent', 1)
+                ->withCount(['sales as assigned_sales_count' => function ($query) {
+                    $query->whereNull('deleted_at')->whereIn('sale_status', [1, 5, 6]);
+                }])
+                ->withSum(['sales as assigned_sales_total' => function ($query) {
+                    $query->whereNull('deleted_at')->whereIn('sale_status', [1, 5, 6]);
+                }], 'grand_total')
+                ->withSum(['sales as assigned_sales_paid' => function ($query) {
+                    $query->whereNull('deleted_at')->whereIn('sale_status', [1, 5, 6]);
+                }], 'paid_amount')
                 ->get();
 
             // Auxiliary lists used by the blade (create / edit forms)
@@ -79,16 +88,8 @@ class SaleAgentController extends Controller
             $numberOfEmployee = Employee::where('is_active', true)->count();
             $numberOfUserAccount = User::where('is_active', true)->count();
 
-            $general_setting = \App\Models\GeneralSetting::first();
 
-            if(in_array('project',explode(',',$general_setting->modules))){
-                $companies = \Modules\Project\Entities\Company::where('is_active', true)->get();
-            } else {
-                $companies = [];
-            }
-
-
-            return view('backend.hrm.sale_agent.create', compact('lims_role_list', 'lims_warehouse_list', 'lims_biller_list', 'lims_department_list', 'numberOfEmployee', 'numberOfUserAccount','companies'));
+            return view('backend.hrm.sale_agent.create', compact('lims_role_list', 'lims_warehouse_list', 'lims_biller_list', 'lims_department_list', 'numberOfEmployee', 'numberOfUserAccount'));
         }
         else
             return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
@@ -123,9 +124,10 @@ class SaleAgentController extends Controller
                 $data['password'] = bcrypt($data['password']);
                 $data['phone'] = $data['phone_number'];
 
-                if (isset($data['company'])) {
-                    $data['company_name'] = $data['company'];
-                }
+                app(\App\Services\WarehouseAccessService::class)->assertValidUserAssignment(
+                    (int) $data['role_id'],
+                    $data['warehouse_id'] ?? null
+                );
 
                 $user = User::create($data);
                 $user = User::latest()->first();
@@ -214,6 +216,15 @@ class SaleAgentController extends Controller
         ]);
 
         $data = $request->except('image');
+        if ($lims_employee_data->user_id) {
+            $linkedUser = User::find($lims_employee_data->user_id);
+            $warehouseId = $data['warehouse_id'] ?? $lims_employee_data->warehouse_id;
+            $roleId = (int) ($data['role_id'] ?? $linkedUser->role_id);
+            app(\App\Services\WarehouseAccessService::class)->assertValidUserAssignment($roleId, $warehouseId, false, $linkedUser);
+            $linkedUser->warehouse_id = $warehouseId;
+            $linkedUser->role_id = $roleId;
+            $linkedUser->save();
+        }
         $image = $request->image;
         if ($image) {
             $this->fileDelete(public_path('images/employee/'), $lims_employee_data->image);

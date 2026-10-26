@@ -20,9 +20,16 @@ use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use Auth;
 use Carbon\Carbon;
+use App\Services\AccountingService;
+use App\Services\AccountingModeService;
+use App\Services\PaymentAccountService;
 
 class AccountsController extends Controller
 {
+    public function __construct(public AccountingService $accountingService, public AccountingModeService $accountingMode, public PaymentAccountService $paymentAccounts)
+    {
+    }
+
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
@@ -31,6 +38,12 @@ class AccountsController extends Controller
         }
 
         $lims_account_all = Account::where('is_active', true)->get();
+        $doubleEntryAccounting = $this->accountingMode->isDoubleEntryAuthoritative();
+
+        if ($doubleEntryAccounting) {
+            $this->paymentAccounts->decorate($lims_account_all);
+            return view('backend.account.index', $this->accountIndexViewData($lims_account_all, $doubleEntryAccounting));
+        }
 
         foreach ($lims_account_all as $account) {
 
@@ -38,12 +51,13 @@ class AccountsController extends Controller
             // CREDIT
             // -------------------
             $payment_received = Payment::whereNotNull('sale_id')
+                ->whereNull('return_id')
                 ->where('account_id', $account->id)
                 ->sum('amount');
 
-            $return_purchase = DB::table('return_purchases')
+            $purchase_return = $this->purchaseReturnPaymentQuery()
                 ->where('account_id', $account->id)
-                ->sum('grand_total');
+                ->sum('amount');
 
             $recieved_money_via_transfer = MoneyTransfer::where('to_account_id', $account->id)
                 ->sum('amount');
@@ -51,35 +65,20 @@ class AccountsController extends Controller
             $income = Income::where('account_id', $account->id)
                 ->sum('amount');
 
-            $credit = $payment_received + $return_purchase + $recieved_money_via_transfer + ($account->initial_balance ?? 0) + $income;
+            $credit = $payment_received + $purchase_return + $recieved_money_via_transfer + ($account->initial_balance ?? 0) + $income;
 
             // -------------------
             // DEBIT
             // -------------------
             // Sales Return → due adjust + refund logic
-            $sales_returns = Returns::with('sale')
+            $refund = Payment::whereNotNull('sale_id')
+                ->whereNotNull('return_id')
                 ->where('account_id', $account->id)
-                ->get();
-
-            $total_sales_return_debit = 0;
-            foreach ($sales_returns as $return) {
-                $sale = $return->sale;
-                if (!$sale) continue;
-
-                $sale_total  = $sale->grand_total;
-                $paid        = $sale->paid_amount;
-                $return_amt  = $return->grand_total;
-                $due         = $sale_total - $paid;
-
-                $due_adjust  = min($due, $return_amt);
-                $refund      = $return_amt - $due_adjust;
-
-                if ($refund > 0) {
-                    $total_sales_return_debit += $refund;
-                }
-            }
+                ->sum('amount');
 
             $payment_sent = Payment::whereNotNull('purchase_id')
+                ->whereNull('return_id')
+                ->whereNull('purchase_return_id')
                 ->where('account_id', $account->id)
                 ->sum('amount');
 
@@ -94,7 +93,7 @@ class AccountsController extends Controller
             $sent_money_via_transfer = MoneyTransfer::where('from_account_id', $account->id)
                 ->sum('amount');
 
-            $debit = $total_sales_return_debit + $payment_sent + $expenses + $payrolls + $sent_money_via_transfer;
+            $debit = $refund + $payment_sent + $expenses + $payrolls + $sent_money_via_transfer;
 
             // -------------------
             // FINAL BALANCE
@@ -102,7 +101,15 @@ class AccountsController extends Controller
             $account->balance = $credit - $debit;
         }
 
-        return view('backend.account.index', compact('lims_account_all'));
+        return view('backend.account.index', $this->accountIndexViewData($lims_account_all, $doubleEntryAccounting));
+    }
+
+    private function accountIndexViewData(Collection $lims_account_all, bool $doubleEntryAccounting): array
+    {
+        return [
+            'lims_account_all' => $lims_account_all,
+            'doubleEntryAccounting' => $doubleEntryAccounting,
+        ];
     }
 
 
@@ -120,19 +127,29 @@ class AccountsController extends Controller
 
         $lims_account_data = Account::where('is_active', true)->first();
         $data = $request->all();
-        if ($data['initial_balance'])
-            $data['total_balance'] = $data['initial_balance'];
-        else
-            $data['total_balance'] = 0;
+        $data['initial_balance'] = $this->accountingMode->isDoubleEntryAuthoritative() ? 0 : ($data['initial_balance'] ?? 0);
+        // Keep the legacy NOT NULL column populated while account balances are calculated dynamically.
+        $data['total_balance'] = $data['initial_balance'];
+
         if (!$lims_account_data)
             $data['is_default'] = 1;
         $data['is_active'] = true;
-        Account::create($data);
+        $account = Account::create($data);
+
+        if ($this->accountingMode->isDoubleEntryAuthoritative()) {
+            $this->paymentAccounts->ensureMapping($account);
+        }
+
+        if ($account->initial_balance > 0) {
+            $this->accountingService->recordAccountOpeningBalance($account);
+        }
+
         return redirect('accounts')->with('message', __('db.Account created successfully'));
     }
 
     public function makeDefault($id)
     {
+        if ($this->accountingMode->isDoubleEntryAuthoritative()) $this->paymentAccounts->assertValidId((int) $id);
         $lims_account_data = Account::where('is_default', true)->first();
         $lims_account_data->is_default = false;
         $lims_account_data->save();
@@ -156,27 +173,37 @@ class AccountsController extends Controller
         ]);
 
         $data = $request->all();
-        $lims_account_data = Account::find($data['account_id']);
-        if ($data['initial_balance'])
-            $data['total_balance'] = $data['initial_balance'];
-        else
-            $data['total_balance'] = 0;
-        $lims_account_data->update($data);
+        $account = Account::find($data['account_id']);
+        if ($this->accountingMode->isDoubleEntryAuthoritative()) unset($data['initial_balance'], $data['total_balance']);
+        // total_balance logic deprecated
+
+        $old_initial_balance = $account->initial_balance;
+        
+        $account->update($data);
+
+        if ($old_initial_balance != $account->initial_balance) {
+            $this->accountingService->reverseTransaction(get_class($account), $account->id);
+            if ($account->initial_balance > 0) {
+                $this->accountingService->recordAccountOpeningBalance($account, 'account_opening_balance_updated');
+            }
+        }
+
         return redirect('accounts')->with('message', __('db.Account updated successfully'));
     }
 
     public function balanceSheet()
     {
+        if ($this->accountingMode->isDoubleEntryAuthoritative()) return redirect()->route('accounting.balanceSheet');
         $role = Role::find(Auth::user()->role_id);
         if ($role->hasPermissionTo('balance-sheet')) {
             $lims_account_list = Account::where('is_active', true)->get();
             $debit = [];
             $credit = [];
             foreach ($lims_account_list as $account) {
-                $payment_recieved = Payment::whereNotNull('sale_id')->where('account_id', $account->id)->sum('amount');
-                $payment_sent = Payment::whereNotNull('purchase_id')->where('account_id', $account->id)->sum('amount');
-                $returns = DB::table('returns')->where('account_id', $account->id)->sum('grand_total');
-                $return_purchase = DB::table('return_purchases')->where('account_id', $account->id)->sum('grand_total');
+                $payment_recieved = Payment::whereNotNull('sale_id')->whereNull('return_id')->where('account_id', $account->id)->sum('amount');
+                $payment_sent = Payment::whereNotNull('purchase_id')->whereNull('return_id')->whereNull('purchase_return_id')->where('account_id', $account->id)->sum('amount');
+                $returns = Payment::whereNotNull('sale_id')->whereNotNull('return_id')->where('account_id', $account->id)->sum('amount');
+                $return_purchase = $this->purchaseReturnPaymentQuery()->where('account_id', $account->id)->sum('amount');
                 $expenses = DB::table('expenses')->where('account_id', $account->id)->sum('amount');
                 $payrolls = DB::table('payrolls')->where('account_id', $account->id)->sum('amount');
                 $sent_money_via_transfer = MoneyTransfer::where('from_account_id', $account->id)->sum('amount');
@@ -192,25 +219,37 @@ class AccountsController extends Controller
 
     public function accountStatement(Request $request)
     {
-        $data = $request->all();
+        if ($this->accountingMode->isDoubleEntryAuthoritative()) return redirect()->route('accounting.generalLedger');
+        $data = $request->validate([
+            'account_id' => ['required', 'integer', 'min:1'],
+            'type' => ['nullable', 'in:0,1,2'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date'],
+        ]);
 
-        $lims_account_data = Account::find($data['account_id']);
+        $lims_account_data = Account::where('is_active', true)->find($data['account_id']);
+        if (!$lims_account_data) {
+            return redirect('accounts')->with('not_permitted', __('db.account_not_found'));
+        }
         $initial_balance =  $lims_account_data;
 
         $start_date = Carbon::parse($data['start_date'])->startOfDay();
         $end_date   = Carbon::parse($data['end_date'])->endOfDay();
+        $type = $data['type'] ?? '0';
 
-        $balance = $initial_balance->initial_balance ?? 0;
+        $opening_balance = $this->accountOpeningBalanceBefore($lims_account_data, $start_date);
+        $balance = $opening_balance;
 
         $account_statement_array = collect();
 
         // -----------------------------
         // CREDIT TRANSACTIONS
         // -----------------------------
-        if ($data['type'] == '0' || $data['type'] == '2') {
+        if ($type == '0' || $type == '2') {
 
             // Sale Payment
             $sale_payments = Payment::whereNotNull('sale_id')
+                ->whereNull('return_id')
                 ->where('account_id', $data['account_id'])
                 ->whereBetween('created_at', [$start_date, $end_date])
                 ->get()
@@ -229,12 +268,12 @@ class AccountsController extends Controller
                 });
 
             // Purchase Return
-            $purchase_return = ReturnPurchase::where('account_id', $data['account_id'])
+            $purchase_return = $this->purchaseReturnPaymentQuery()
+                ->where('account_id', $data['account_id'])
                 ->whereBetween('created_at', [$start_date, $end_date])
                 ->get()
                 ->map(function ($item) {
                     $item->type = 'credit';
-                    $item->amount = $item->grand_total;
                     return $item;
                 });
 
@@ -257,10 +296,12 @@ class AccountsController extends Controller
         // -----------------------------
         // DEBIT TRANSACTIONS
         // -----------------------------
-        if ($data['type'] == '0' || $data['type'] == '1') {
+        if ($type == '0' || $type == '1') {
 
             // Purchase Payment
             $purchase_payment = Payment::whereNotNull('purchase_id')
+                ->whereNull('return_id')
+                ->whereNull('purchase_return_id')
                 ->where('account_id', $data['account_id'])
                 ->whereBetween('created_at', [$start_date, $end_date])
                 ->get()
@@ -297,32 +338,15 @@ class AccountsController extends Controller
                 });
 
             // Sales Return → DEBIT calculation
-            $sales_returns = Returns::with('sale')
+            $sales_returns = Payment::whereNotNull('sale_id')
+                ->whereNotNull('return_id')
                 ->where('account_id', $data['account_id'])
                 ->whereBetween('created_at', [$start_date, $end_date])
                 ->get()
-                ->map(function ($return) {
-                    $sale = $return->sale;
-                    if (!$sale) return null;
-
-                    $sale_total = $sale->grand_total;
-                    $paid       = $sale->paid_amount;
-                    $return_amt = $return->grand_total;
-                    $due        = $sale_total - $paid;
-
-                    $due_adjust = min($due, $return_amt);
-                    $refund     = $return_amt - $due_adjust;
-
-                    if ($refund > 0) {
-                        $obj = new \stdClass();
-                        $obj->reference_no = $return->reference_no;
-                        $obj->amount       = $refund;
-                        $obj->created_at   = $return->created_at;
-                        $obj->type         = 'debit';
-                        return $obj;
-                    }
-                    return null;
-                })->filter();
+                ->map(function ($item) {
+                    $item->type = 'debit';
+                    return $item;
+                });
 
             $account_statement_array = $account_statement_array
                 ->concat($purchase_payment)
@@ -358,7 +382,7 @@ class AccountsController extends Controller
 
             $final_array[] = [
                 $data->created_at,
-                $data->reference_no,
+                $data->reference_no ?? $data->payment_reference ?? '',
                 $transaction_ref,
                 $credit,
                 $debit,
@@ -369,22 +393,85 @@ class AccountsController extends Controller
             'lims_account_data',
             'final_array',
             'balance_tracker',
-            'initial_balance'
+            'initial_balance',
+            'opening_balance'
         ));
     }
 
+    private function accountOpeningBalanceBefore(Account $account, Carbon $startDate): float
+    {
+        $paymentReceived = Payment::whereNotNull('sale_id')
+            ->whereNull('return_id')
+            ->where('account_id', $account->id)
+            ->where('created_at', '<', $startDate)
+            ->sum('amount');
 
+        $purchaseReturn = $this->purchaseReturnPaymentQuery()
+            ->where('account_id', $account->id)
+            ->where('created_at', '<', $startDate)
+            ->sum('amount');
+
+        $receivedMoneyViaTransfer = MoneyTransfer::where('to_account_id', $account->id)
+            ->where('created_at', '<', $startDate)
+            ->sum('amount');
+
+        $income = Income::where('account_id', $account->id)
+            ->where('created_at', '<', $startDate)
+            ->sum('amount');
+
+        $refund = Payment::whereNotNull('sale_id')
+            ->whereNotNull('return_id')
+            ->where('account_id', $account->id)
+            ->where('created_at', '<', $startDate)
+            ->sum('amount');
+
+        $paymentSent = Payment::whereNotNull('purchase_id')
+            ->whereNull('return_id')
+            ->whereNull('purchase_return_id')
+            ->where('account_id', $account->id)
+            ->where('created_at', '<', $startDate)
+            ->sum('amount');
+
+        $expenses = Expense::where('account_id', $account->id)
+            ->where('created_at', '<', $startDate)
+            ->sum('amount');
+
+        $payrolls = Payroll::where('account_id', $account->id)
+            ->where('created_at', '<', $startDate)
+            ->sum('amount');
+
+        $sentMoneyViaTransfer = MoneyTransfer::where('from_account_id', $account->id)
+            ->where('created_at', '<', $startDate)
+            ->sum('amount');
+
+        $credit = $paymentReceived + $purchaseReturn + $receivedMoneyViaTransfer + ($account->initial_balance ?? 0) + $income;
+        $debit = $refund + $paymentSent + $expenses + $payrolls + $sentMoneyViaTransfer;
+
+        return (float) ($credit - $debit);
+    }
+
+
+    private function purchaseReturnPaymentQuery()
+    {
+        return Payment::whereNotNull('purchase_id')
+            ->where(function ($query) {
+                $query->whereNotNull('purchase_return_id')
+                    ->orWhere(function ($legacyQuery) {
+                        $legacyQuery->whereNotNull('return_id')
+                            ->whereNull('sale_id');
+                    });
+            });
+    }
 
 
 
     public function destroy($id)
     {
-        if (!env('USER_VERIFIED'))
+        if (!config('app.user_verified'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
         $lims_account_data = Account::find($id);
         if (!$lims_account_data->is_default) {
-            $lims_account_data->is_active = false;
-            $lims_account_data->save();
+            $this->paymentAccounts->deactivate($lims_account_data);
             return redirect('accounts')->with('not_permitted', __('db.Account deleted successfully!'));
         } else
             return redirect('accounts')->with('not_permitted', __('db.Please make another account default first!'));

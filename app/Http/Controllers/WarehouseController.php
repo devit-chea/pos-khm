@@ -16,9 +16,97 @@ class WarehouseController extends Controller
     use CacheForget;
     public function index()
     {
-        $lims_warehouse_all = Warehouse::where('is_active', true)->get();
+        $lims_warehouse_list = Warehouse::where('is_active', true)->get();
         $numberOfWarehouse = Warehouse::where('is_active', true)->count();
-        return view('backend.warehouse.create', compact('lims_warehouse_all', 'numberOfWarehouse'));
+        return view('backend.warehouse.create', compact('lims_warehouse_list', 'numberOfWarehouse'));
+    }
+
+    public function warehouseData(Request $request)
+    {
+        $columns = [
+            1 => 'warehouses.name',
+            2 => 'warehouses.phone',
+            3 => 'warehouses.email',
+            4 => 'warehouses.address',
+            5 => 'number_of_product',
+            6 => 'stock_qty',
+        ];
+    
+        $totalData = Warehouse::where('is_active', true)->count();
+        $totalFiltered = $totalData;
+    
+        $limit = $request->input('length');
+        $start = $request->input('start');
+        $order = $columns[$request->input('order.0.column')] ?? 'warehouses.id';
+        $dir = $request->input('order.0.dir', 'asc');
+    
+        $query = Warehouse::select('warehouses.*')
+                // Subquery 1: Count of active products in this warehouse
+                ->selectRaw('(
+                    SELECT COUNT(DISTINCT product_id) 
+                    FROM product_warehouse 
+                    JOIN products ON product_warehouse.product_id = products.id 
+                    WHERE product_warehouse.warehouse_id = warehouses.id 
+                    AND products.is_active = 1
+                ) as number_of_product')
+                // Subquery 2: Sum of stock quantity in this warehouse
+                ->selectRaw('(
+                    SELECT COALESCE(SUM(qty), 0) 
+                    FROM product_warehouse 
+                    WHERE product_warehouse.warehouse_id = warehouses.id
+                ) as stock_qty')
+                ->where('warehouses.is_active', true);
+    
+        if ($search = $request->input('search.value')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('warehouses.name', 'LIKE', "%{$search}%")
+                  ->orWhere('warehouses.phone', 'LIKE', "%{$search}%")
+                  ->orWhere('warehouses.email', 'LIKE', "%{$search}%")
+                  ->orWhere('warehouses.address', 'LIKE', "%{$search}%");
+            });
+    
+            $totalFiltered = (clone $query)->count();
+        }
+    
+        $warehouses = $query
+            ->orderBy($order, $dir)
+            ->offset($start)
+            ->limit($limit)
+            ->get();
+    
+        $data = [];
+    
+        foreach ($warehouses as $warehouse) {
+    
+            $action = view('backend.warehouse.partials.action-buttons', compact('warehouse'))->render();
+
+            if ($warehouse->pos_type === 'restaurant') {
+                $pos_type = '<span class="badge badge-success">'.__('db.Restaurant POS').'</span>';
+            } elseif ($warehouse->pos_type === 'both') {
+                $pos_type = '<span class="badge badge-info">'.__('db.Regular + Restaurant').'</span>';
+            } else {
+                $pos_type = '<span class="badge badge-secondary">'.__('db.Regular POS').'</span>';
+            }
+    
+            $data[] = [
+                'id' => $warehouse->id,
+                'name' => $warehouse->name,
+                'phone' => $warehouse->phone,
+                'email' => $warehouse->email,
+                'address' => $warehouse->address,
+                'number_of_product' => $warehouse->number_of_product,
+                'stock_qty' => $warehouse->stock_qty,
+                'pos_type' => $pos_type,
+                'action' => $action,
+            ];
+        }
+    
+        return response()->json([
+            "draw" => intval($request->input('draw')),
+            "recordsTotal" => $totalData,
+            "recordsFiltered" => $totalFiltered,
+            "data" => $data,
+        ]);
     }
 
     public function store(Request $request)
@@ -30,8 +118,10 @@ class WarehouseController extends Controller
                     return $query->where('is_active', 1);
                 }),
             ],
+            'pos_type' => 'nullable|in:regular,restaurant,both',
         ]);
         $input = $request->all();
+        $input['pos_type'] = in_array($request->input('pos_type'), ['regular', 'restaurant', 'both'], true) ? $request->input('pos_type') : 'regular';
         $input['is_active'] = true;
 
         $lims_warehouse_data = Warehouse::create($input);
@@ -45,6 +135,16 @@ class WarehouseController extends Controller
             ]);
         }
         $this->cacheForget('warehouse_list');
+
+        // if ajax - from create purchase page
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'id'      => $lims_warehouse_data->id,
+                'name'    => $lims_warehouse_data->name, // Make sure 'name' exists on your model
+            ]);
+        }
+        
         return redirect('warehouse')->with('message', __('db.Data inserted successfully'));
     }
 
@@ -63,8 +163,12 @@ class WarehouseController extends Controller
                     return $query->where('is_active', 1);
                 }),
             ],
+            'pos_type' => 'nullable|in:regular,restaurant,both',
         ]);
         $input = $request->all();
+        if (isset($input['pos_type'])) {
+            $input['pos_type'] = in_array($input['pos_type'], ['regular', 'restaurant', 'both'], true) ? $input['pos_type'] : 'regular';
+        }
         $lims_warehouse_data = Warehouse::find($input['warehouse_id']);
         $lims_warehouse_data->update($input);
         $this->cacheForget('warehouse_list');
@@ -117,6 +221,7 @@ class WarehouseController extends Controller
     {
         $warehouse_id = $request['warehouseIdArray'];
         foreach ($warehouse_id as $id) {
+            $this->assertNoActiveOperationalUsers($id);
             $lims_warehouse_data = Warehouse::find($id);
             $lims_warehouse_data->deactivate();
         }
@@ -126,10 +231,24 @@ class WarehouseController extends Controller
 
     public function destroy($id)
     {
+        $this->assertNoActiveOperationalUsers($id);
         $lims_warehouse_data = Warehouse::find($id);
         $lims_warehouse_data->deactivate();
         $this->cacheForget('warehouse_list');
         return redirect('warehouse')->with('not_permitted', __('db.Data deleted successfully'));
+    }
+
+    private function assertNoActiveOperationalUsers(int $warehouseId): void
+    {
+        $assigned = \App\Models\User::where('warehouse_id', $warehouseId)
+            ->where('is_active', true)->where('is_deleted', false)
+            ->where('role_id', '>', 2)->where('role_id', '!=', 5)->count();
+
+        if ($assigned) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'warehouse_id' => "Reassign {$assigned} active operational user(s) before deactivating this warehouse.",
+            ]);
+        }
     }
 
     public function warehouseAll()

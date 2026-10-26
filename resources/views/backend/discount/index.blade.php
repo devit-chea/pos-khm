@@ -1,11 +1,15 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <x-success-message key="message" />
 <x-error-message key="not_permitted" />
 
 <section>
     <div class="container-fluid">
-        <a href="{{route('discounts.create')}}" class="btn btn-info"><i class="dripicons-plus"></i> {{__('db.Create Discount')}}</a>&nbsp;
+        <a href="{{route('discounts.create')}}" class="btn btn-info"><i class="ti ti-plus"></i> {{__('db.Create Discount')}}</a>&nbsp;
     </div>
     <div class="table-responsive">
         <table id="discount-table" class="table">
@@ -37,7 +41,7 @@
                             @endif
                         @endforeach
                     </td>
-                    <td>{{date($general_setting->date_format, strtotime($discount->valid_from)).'-'.date($general_setting->date_format, strtotime($discount->valid_till))}}</td>
+                    <td>{{date(gen_setting()->date_format, strtotime($discount->valid_from)).'-'.date(gen_setting()->date_format, strtotime($discount->valid_till))}}</td>
                     <td>{{ $discount->days }}</td>
                     <td>
                         @if($discount->product_list)
@@ -66,7 +70,7 @@
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                                 <li>
-                                    <a href="{{ route('discounts.edit', $discount->id) }}" class="btn btn-link"><i class="dripicons-document-edit"></i> {{__('db.edit')}}</a>
+                                    <a href="{{ route('discounts.edit', $discount->id) }}" class="btn btn-link"><i class="ti ti-edit"></i> {{__('db.edit')}}</a>
                                 </li>
                             </ul>
                         </div>
@@ -84,6 +88,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $("ul#setting").siblings('a').attr('aria-expanded','true');
@@ -91,7 +96,7 @@
     $("ul#setting #discount-list-menu").addClass("active");
 
     var biller_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
     $.ajaxSetup({
         headers: {
@@ -99,12 +104,7 @@
         }
     });
 
-    function confirmDelete() {
-        if (confirm("Are you sure want to delete?")) {
-            return true;
-        }
-        return false;
-    }
+    function confirmDelete() { return true; }
     var table = $('#discount-table').DataTable( {
         "order": [],
         'language': {
@@ -112,8 +112,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -142,7 +142,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -151,7 +151,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -159,7 +159,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -167,7 +167,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -176,7 +176,7 @@
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],

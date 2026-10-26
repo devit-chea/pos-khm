@@ -12,7 +12,7 @@
                         <h4>Finalize Challan</h4>
                     </div>
                     <div class="card-body">
-                        <p class="italic"><small>The field labels marked with are required input fields.</small></p>
+                        <p class="italic"><small>The field labels marked with are required input fields</small></p>
                         <form action="{{route('challan.update', $challan->id)}}" method="post">
                         @csrf
                             <div class="row">

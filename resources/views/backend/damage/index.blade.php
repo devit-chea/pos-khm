@@ -1,4 +1,8 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
 
 <x-success-message key="message" />
@@ -7,7 +11,7 @@
 <section>
     <div class="container-fluid">
         <a href="{{ route('damage-stock.create') }}" class="btn btn-info">
-            <i class="dripicons-plus"></i> {{ __('db.Add Damage Stock') }}
+            <i class="ti ti-plus"></i> {{ __('db.Add Damage Stock') }}
         </a>
     </div>
     <div class="table-responsive">
@@ -19,7 +23,7 @@
                     <th>{{ __('db.reference') }}</th>
                     <th>{{ __('db.Warehouse') }}</th>
                     <th>{{ __('db.product') }}s</th>
-                    <th>{{ __('db.Note') }}</th>
+                    <th>{{ __('db.note') }}</th>
                     <th class="not-exported">{{ __('db.action') }}</th>
                 </tr>
             </thead>
@@ -62,7 +66,7 @@
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                                 <li>
                                     <a href="{{ route('damage-stock.edit', $damage->id) }}" class="btn btn-link">
-                                        <i class="dripicons-document-edit"></i> {{ __('db.edit') }}
+                                        <i class="ti ti-edit"></i> {{ __('db.edit') }}
                                     </a>
                                 </li>
                                 <li class="divider"></li>
@@ -70,8 +74,8 @@
                                     @csrf
                                     @method('DELETE')
                                     <li>
-                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()">
-                                            <i class="dripicons-trash"></i> {{ __('db.delete') }}
+                                        <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}">
+                                            <i class="ti ti-trash"></i> {{ __('db.delete') }}
                                         </button>
                                     </li>
                                 </form>
@@ -88,20 +92,16 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
     $("ul#product").siblings('a').attr('aria-expanded', 'true');
     $("ul#product").addClass("show");
     $("ul#product #damage-stock-menu").addClass("active");
 
-    function confirmDelete() {
-        if (confirm("Are you sure want to delete?")) {
-            return true;
-        }
-        return false;
-    }
+    function confirmDelete() { return true; }
 
     var damage_id    = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
     $.ajaxSetup({
         headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') }
@@ -114,8 +114,8 @@
             "info":       '<small>{{ __("db.Showing") }} _START_ - _END_ (_TOTAL_)</small>',
             "search":     '{{ __("db.Search") }}',
             'paginate': {
-                'previous': '<i class="dripicons-chevron-left"></i>',
-                'next':     '<i class="dripicons-chevron-right"></i>'
+                'previous': '<i class="ti ti-chevron-left"></i>',
+                'next':     '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -128,30 +128,30 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                 footer: true
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                 footer: true
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                 footer: true
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                 footer: true
             },
             {
-                text: '<i title="delete" class="dripicons-cross"></i>',
+                text: '<i title="delete" class="ti ti-x"></i>',
                 className: 'buttons-delete',
                 action: function (e, dt, node, config) {
                     if (user_verified == '1') {
@@ -161,25 +161,27 @@
                                 damage_id[i - 1] = $(this).closest('tr').data('id');
                             }
                         });
-                        if (damage_id.length && confirm("Are you sure want to delete?")) {
+                        if (damage_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                             $.ajax({
                                 type: 'POST',
                                 url: 'damage-stock/deletebyselection',
                                 data: { damageIdArray: damage_id },
-                                success: function (data) { alert(data); }
+                                success: function (data) { SaleProToast.show(data); }
                             });
                             dt.rows({ page: 'current', selected: true }).remove().draw(false);
+                        }
+                        });
                         } else if (!damage_id.length) {
-                            alert('Nothing is selected!');
+                            SaleProToast.show('Nothing is selected!');
                         }
                     } else {
-                        alert('This feature is disable for demo!');
+                        SaleProToast.show('This feature is disable for demo!');
                     }
                 }
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],

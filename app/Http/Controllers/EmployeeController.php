@@ -11,16 +11,16 @@ use App\Models\User;
 use App\Models\Department;
 use App\Models\Designation;
 use App\Models\Shift;
-use Auth;
 use Illuminate\Validation\Rule;
 use App\Traits\TenantInfo;
-use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\Concerns\AuthorizesHrmWarehouse;
 
 class EmployeeController extends Controller
 {
-    use TenantInfo;
+    use TenantInfo, AuthorizesHrmWarehouse;
 
-    public function index()
+    public function index(Request $request)
     {
         $role = Role::find(Auth::user()->role_id);
         if($role->hasPermissionTo('employees-index')){
@@ -30,12 +30,14 @@ class EmployeeController extends Controller
             if(empty($all_permission))
                 $all_permission[] = 'dummy text';
 
-            $lims_employee_all = Employee::with('user')->where('is_active', true)->get();
+
+            $employeeQuery = Employee::where('is_active', true)->with(['user', 'warehouse', 'department', 'designation']);
+            $lims_employee_all = $this->applyWarehouseFilter($employeeQuery, $request)->get();
             $lims_department_list = Department::where('is_active', true)->get();
-            $numberOfEmployee = Employee::where('is_active', true)->count();
+            $numberOfEmployee = $lims_employee_all->count();
             $lims_shift_list = Shift::where('is_active', true)->get();
             $lims_designation_list = Designation::active()->get();
-            $lims_role_list = Role::where('is_active', true)->get();
+            $lims_role_list = $this->assignableRoles();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_biller_list = Biller::where('is_active', true)->get();
 
@@ -60,7 +62,7 @@ class EmployeeController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         if($role->hasPermissionTo('employees-add')){
-            $lims_role_list = Role::where('is_active', true)->get();
+            $lims_role_list = $this->assignableRoles();
             $lims_warehouse_list = Warehouse::where('is_active', true)->get();
             $lims_biller_list = Biller::where('is_active', true)->get();
             $lims_department_list = Department::where('is_active', true)->get();
@@ -70,13 +72,6 @@ class EmployeeController extends Controller
             $numberOfEmployee = Employee::where('is_active', true)->count();
             $numberOfUserAccount = User::where('is_active', true)->count();
 
-            $general_setting = \App\Models\GeneralSetting::first();
-            if(in_array('project', explode(',', $general_setting->modules))){
-                $companies = \Modules\Project\Entities\Company::where('is_active', true)->get();
-            } else {
-                $companies = [];
-            }
-
             return view('backend.employee.create', compact(
                 'lims_role_list',
                 'lims_warehouse_list',
@@ -84,7 +79,6 @@ class EmployeeController extends Controller
                 'lims_department_list',
                 'numberOfEmployee',
                 'numberOfUserAccount',
-                'companies',
                 'lims_shift_list',
                 'lims_designation_list'
             ));
@@ -98,9 +92,23 @@ class EmployeeController extends Controller
     {
         $data = $request->except('image');
         $message = 'Employee created successfully';
+        $warehouseId = $this->authorizedWarehouseId($request);
+
+        $request->validate([
+            'department_id' => [
+                'required',
+                Rule::exists('departments', 'id')->where(fn ($query) => $query
+                    ->where('warehouse_id', $warehouseId)->where('is_active', true)),
+            ],
+            'designation_id' => [
+                'required',
+                Rule::exists('designations', 'id')->where(fn ($query) => $query
+                    ->where('warehouse_id', $warehouseId)->where('is_active', true)),
+            ],
+        ]);
 
         $data['name'] = $data['employee_name'];
-        $data['is_active'] = true;
+        $data['is_active'] = $request->is_active ?? true;
 
         // Handle user creation if checkbox selected
         if(isset($data['user'])){
@@ -123,8 +131,11 @@ class EmployeeController extends Controller
             $data['is_deleted'] = false;
             $data['password'] = bcrypt($data['password']);
             $data['phone'] = $data['phone_number'];
-            if(isset($data['company']))
-                $data['company_name'] = $data['company'];
+
+            app(\App\Services\WarehouseAccessService::class)->assertValidUserAssignment(
+                (int) ($data['role_id'] ?? 0),
+                $data['warehouse_id'] ?? null
+            );
 
             User::create($data);
             $user = User::latest()->first();
@@ -161,7 +172,7 @@ class EmployeeController extends Controller
 
         $isSaleAgent = $data['is_sale_agent'] ?? 0;
 
-        Employee::create([
+        $employee = Employee::create([
             'name'                  => $data['name'],
             'email'                 => $data['email'] ?? null,
             'phone_number'          => $data['phone_number'] ?? null,
@@ -174,14 +185,22 @@ class EmployeeController extends Controller
             'shift_id'              => $data['shift_id'] ?? null,
             'designation_id'        => $data['designation_id'] ?? null,
             'role_id'               => $data['role_id'] ?? null,
-            'warehouse_id'          => $data['warehouse_id'] ?? null, // ← warehouse_id
+            'warehouse_id'          => $warehouseId,
             'biller_id'             => $data['biller_id'] ?? null,
             'user_id'               => $data['user_id'] ?? null,
             'image'                 => $data['image'] ?? null,
-            'is_active'             => true,
+            'is_active'             => $request->is_active ?? true,
             'is_sale_agent'         => $isSaleAgent,
             'sales_target'          => $isSaleAgent == 1 ? ($data['sales_target'] ?? null) : null,
         ]);
+
+        if ($request->ajax()) {
+            return response()->json([
+                'id' => $employee->id,
+                'name' => $employee->name,
+                'message' => $message
+            ]);
+        }
 
         if($isSaleAgent){
             return redirect('sale-agents')->with('message', $message);
@@ -192,7 +211,21 @@ class EmployeeController extends Controller
 
     public function update(Request $request, $id)
     {
-        $lims_employee_data = Employee::find($request->employee_id);
+        $lims_employee_data = Employee::findOrFail($request->employee_id ?: $id);
+        $warehouseId = $this->authorizedWarehouseId($request);
+
+        $request->validate([
+            'department_id' => [
+                'required',
+                Rule::exists('departments', 'id')->where(fn ($query) => $query
+                    ->where('warehouse_id', $warehouseId)->where('is_active', true)),
+            ],
+            'designation_id' => [
+                'required',
+                Rule::exists('designations', 'id')->where(fn ($query) => $query
+                    ->where('warehouse_id', $warehouseId)->where('is_active', true)),
+            ],
+        ]);
 
         if($lims_employee_data->user_id){
             $this->validate($request, [
@@ -223,6 +256,14 @@ class EmployeeController extends Controller
         ]);
 
         $data = $request->except('image');
+        if ($lims_employee_data->user_id) {
+            $linkedUser = User::find($lims_employee_data->user_id);
+            $roleId = (int) ($data['role_id'] ?? $linkedUser->role_id);
+            app(\App\Services\WarehouseAccessService::class)->assertValidUserAssignment($roleId, $warehouseId, false, $linkedUser);
+            $linkedUser->warehouse_id = $warehouseId;
+            $linkedUser->role_id = $roleId;
+            $linkedUser->save();
+        }
         // Handle image update
         $image = $request->image;
         if ($image) {
@@ -252,10 +293,11 @@ class EmployeeController extends Controller
             'shift_id'       => $data['shift_id'] ?? $lims_employee_data->shift_id,
             'designation_id' => $data['designation_id'] ?? $lims_employee_data->designation_id,
             'role_id'        => $data['role_id'] ?? $lims_employee_data->role_id,
-            'warehouse_id'   => $data['warehouse_id'] ?? $lims_employee_data->warehouse_id, // ← warehouse_id
+            'warehouse_id'   => $warehouseId,
             'biller_id'      => $data['biller_id'] ?? $lims_employee_data->biller_id,
             'user_id'        => $data['user_id'] ?? $lims_employee_data->user_id,
             'image'          => $data['image'] ?? $lims_employee_data->image,
+            'is_active'      => $request->is_active ?? $lims_employee_data->is_active,
         ]);
         return redirect('employees')->with('message', __('db.Employee updated successfully'));
     }
@@ -263,8 +305,7 @@ class EmployeeController extends Controller
     public function deleteBySelection(Request $request)
     {
         $employee_id = $request['employeeIdArray'];
-        foreach ($employee_id as $id) {
-            $lims_employee_data = Employee::find($id);
+        foreach (Employee::whereIn('id', $employee_id)->get() as $lims_employee_data) {
             if($lims_employee_data->user_id){
                 $lims_user_data = User::find($lims_employee_data->user_id);
                 $lims_user_data->is_deleted = true;
@@ -280,7 +321,7 @@ class EmployeeController extends Controller
 
     public function destroy($id)
     {
-        $lims_employee_data = Employee::find($id);
+        $lims_employee_data = Employee::findOrFail($id);
         if($lims_employee_data->user_id){
             $lims_user_data = User::find($lims_employee_data->user_id);
             $lims_user_data->is_deleted = true;
@@ -292,5 +333,16 @@ class EmployeeController extends Controller
         $lims_employee_data->is_active = false;
         $lims_employee_data->save();
         return redirect('employees')->with('not_permitted', __('db.Employee deleted successfully'));
+    }
+
+    private function assignableRoles()
+    {
+        $access = app(\App\Services\WarehouseAccessService::class);
+
+        return Role::where('is_active', true)
+            ->with('permissions')
+            ->get()
+            ->filter(fn (Role $role) => $access->canAssignRole($role))
+            ->values();
     }
 }

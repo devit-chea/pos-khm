@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use DB; 
 use App\Models\Barcode;
 use Illuminate\Http\Request;
-use Auth;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 
 class BarcodeController extends Controller
@@ -37,9 +37,10 @@ class BarcodeController extends Controller
         }
 
         $columns = array(
-            0 =>'id',
-            2 =>'name',
-            3=> 'description',
+            0 => 'id',
+            1 => 'name',
+            2 => 'name',
+            3 => 'description',
         );
 
         $totalData = DB::table('barcodes')->where('is_custom',true)->count();
@@ -50,7 +51,7 @@ class BarcodeController extends Controller
         else
             $limit = $totalData;
         $start = $request->input('start');
-        $order = $columns[$request->input('order.0.column')];
+        $order = $columns[$request->input('order.0.column')] ?? 'id';
         $dir = $request->input('order.0.dir');
         if(empty($request->input('search.value')))
             $barcodes = Barcode::offset($start)
@@ -90,12 +91,12 @@ class BarcodeController extends Controller
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                                 <li>
-                                    <a  href="'.route('barcodes.edit', $barcode->id).'" class="btn btn-link"><i class="dripicons-document-edit"></i> '. __('db.edit') .'</a>
+                                    <a  href="'.route('barcodes.edit', $barcode->id).'" class="btn btn-link"><i class="ti ti-edit"></i> '. __('db.edit') .'</a>
                                 </li>
                                 <li class="divider"></li>
                                 <form action="' . route("barcodes.destroy", $barcode->id) . '" method="POST">'.csrf_field().'' . method_field("DELETE") . '
                                 <li>
-                                <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> '. __('db.delete') .'</button>
+                                <button type="submit" class="btn btn-link" data-confirm-message="' . __('db.Are you sure want to delete?') . '"><i class="ti ti-trash"></i> '. __('db.delete') .'</button>
                                 </li></form>
                             </ul>
                         </div>';
@@ -137,7 +138,7 @@ class BarcodeController extends Controller
         try {
             $input = $request->only(['name', 'description', 'width', 'height', 'top_margin',
                 'left_margin', 'row_distance', 'col_distance',
-                'stickers_in_one_row', 'paper_width','is_custom' ]);
+                'stickers_in_one_row', 'paper_width','is_custom', 'layout_type' ]);
 
             if (! empty($request->input('is_default'))) {
                 //get_default
@@ -145,12 +146,20 @@ class BarcodeController extends Controller
                                 ->update(['is_default' => 0]);
                 $input['is_default'] = 1;
             }
-            if (! empty($request->input('is_continuous'))) {
+            if ($request->layout_type === 'continuous') {
                 $input['is_continuous'] = 1;
                 $input['stickers_in_one_sheet'] = 28;
+                $input['paper_height'] = 0;
             } else {
+                $input['is_continuous'] = 0;
                 $input['stickers_in_one_sheet'] = $request->input('stickers_in_one_sheet');
-                $input['paper_height'] = $request->input('paper_height');
+
+                // Dumbbell uses its own label height
+                if ($request->layout_type === 'dumbbell') {
+                    $input['paper_height'] = 0;
+                } else {
+                    $input['paper_height'] = $request->input('paper_height');
+                }
             }
             $barcode = Barcode::create($input);
             $output = ['success' => 1,
@@ -200,40 +209,58 @@ class BarcodeController extends Controller
                 ->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
         }
 
-        // return dd($request->all());
         try {
-            $input = $request->only(['name', 'description', 'width', 'height', 'top_margin',
-                'left_margin', 'row_distance', 'col_distance',
-                'stickers_in_one_row', 'paper_width', 'is_custom' ]);
+            $input = $request->only([
+                'name',
+                'description',
+                'width',
+                'height',
+                'top_margin',
+                'left_margin',
+                'row_distance',
+                'col_distance',
+                'stickers_in_one_row',
+                'paper_width',
+                'is_custom',
+                'layout_type',
+            ]);
 
-            if (! empty($request->input('is_continuous'))) {
+            if ($request->layout_type === 'continuous') {
                 $input['is_continuous'] = 1;
                 $input['stickers_in_one_sheet'] = 28;
                 $input['paper_height'] = 0;
             } else {
                 $input['is_continuous'] = 0;
-                $input['stickers_in_one_sheet'] = $request->input('stickers_in_one_sheet');
-                $input['paper_height'] = $request->input('paper_height');
+                $input['stickers_in_one_sheet'] = $request->stickers_in_one_sheet;
+
+                // Dumbbell uses its own label height
+                if ($request->layout_type === 'dumbbell') {
+                    $input['paper_height'] = 0;
+                } else {
+                    $input['paper_height'] = $request->paper_height;
+                }
             }
 
-            if (! empty($request->input('is_default'))) {
-                //get_default
-                $default = Barcode::where('is_default', 1)
-                                ->update(['is_default' => 0]);
+            if ($request->filled('is_default')) {
+                Barcode::where('is_default', 1)->update(['is_default' => 0]);
                 $input['is_default'] = 1;
-                Barcode::where('id', $id)->update($input);
-
             }
 
-                Barcode::where('id', $id)->update($input);
+            Barcode::where('id', $id)->update($input);
 
-            $output = ['success' => 1,
+            $output = [
+                'success' => 1,
                 'msg' => __('barcode.updated_success'),
             ];
         } catch (\Exception $e) {
-            \Log::emergency('File:'.$e->getFile().'Line:'.$e->getLine().'Message:'.$e->getMessage());
+            \Log::emergency(
+                'File:' . $e->getFile() .
+                ' Line:' . $e->getLine() .
+                ' Message:' . $e->getMessage()
+            );
 
-            $output = ['success' => 0,
+            $output = [
+                'success' => 0,
                 'msg' => __('messages.something_went_wrong'),
             ];
         }

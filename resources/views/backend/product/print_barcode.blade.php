@@ -40,7 +40,7 @@
                                         <div class="col-md-12">
                                             <label>{{__('db.add_product')}} *</label>
                                             <div class="search-box input-group">
-                                                <button type="button" class="btn btn-secondary btn-lg"><i class="fa fa-barcode"></i></button>
+                                                <button type="button" class="btn btn-secondary btn-lg"><i class="ti ti-barcode"></i></button>
                                                 <input type="text" name="product_code_name" id="lims_productcodeSearch" placeholder="{{__('db.Please type product code and select')}}" class="form-control" />
                                             </div>
                                         </div>
@@ -55,7 +55,7 @@
                                                             <th>{{__('db.Code')}}</th>
                                                             <th>{{__('db.Quantity')}}</th>
                                                             <th>{{__('db.Warehouse')}} / {{__('db.Price')}}</th>
-                                                            <th><i class="dripicons-trash"></i></th>
+                                                            <th><i class="ti ti-trash"></i></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -72,7 +72,7 @@
                                                                     @endforeach
                                                                 </select>
                                                             </td>
-                                                            <td><button type="button" class="ibtnDel btn btn-md btn-danger"><i class="dripicons-trash"></i></button></td>
+                                                            <td><button type="button" class="ibtnDel btn btn-md btn-danger"><i class="ti ti-trash"></i></button></td>
                                                             <td><input type="hidden" name="products[{{$key}}][product_id]" value="{{$preLoadedproduct[8]}}"></td>
                                                             <td><input type="hidden" name="products[{{$key}}][product_name]" value="{{$preLoadedproduct[0]}}"></td>
                                                             <td><input type="hidden" name="products[{{$key}}][sub_sku]" value="{{$preLoadedproduct[1]}}"></td>
@@ -152,7 +152,7 @@
                                             <div class="form-group mt-3">
 				                                <button type="button" id="labels_preview" class="btn btn-primary btn-big">{{ __('db.submit') }}</button>
 
-                                                <a href="{{route('barcodes.create')}}" class="btn btn-info add-sale-btn"><i class="dripicons-plus"></i> {{__('db.Add New Setting')}}</a>
+                                                <a href="{{route('barcodes.create')}}" class="btn btn-info add-sale-btn"><i class="ti ti-plus"></i> {{__('db.Add New Setting')}}</a>
                                             </div>
                                         </div>
                                     </div>
@@ -172,8 +172,8 @@
             <div class="modal-content">
                 <div class="modal-header">
                   <h5 id="modal_header" class="modal-title">{{__('db.Barcode')}}</h5>&nbsp;&nbsp;
-                  <button id="print-btn" type="button" class="btn btn-default btn-sm"><i class="dripicons-print"></i> {{__('db.Print')}}</button>
-                  <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                  <button id="print-btn" type="button" class="btn btn-default btn-sm"><i class="ti ti-printer"></i> {{__('db.print')}}</button>
+                  <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                     <div id="label-content">
@@ -237,8 +237,7 @@
 
                     $(".product-code").each(function() {
                         if ($(this).text() == data[1]) {
-                            alert('Duplicate input is not allowed!')
-                            flag = 0;
+                            SaleProToast.show('Duplicate input is not allowed!');flag = 0;
                         }
                     });
                     $("input[name='product_code_name']").val('');
@@ -265,7 +264,7 @@
                     }
                     cols += '</td>';
 
-                    cols += '<td><button type="button" class="ibtnDel btn btn-md btn-danger"><i class="dripicons-trash"></i></button></td>';
+                    cols += '<td><button type="button" class="ibtnDel btn btn-md btn-danger"><i class="ti ti-trash"></i></button></td>';
                     cols += '<td><input type="hidden" name="products['+ key +'][product_id]" value="'+data[8]+'"></td>';
                     cols += '<td><input type="hidden" name="products['+ key +'][product_name]" value="'+data[0]+'"></td>';
                     cols += '<td><input type="hidden" name="products['+ key +'][sub_sku]" value="'+data[1]+'"></td>';

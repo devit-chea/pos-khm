@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 <style type="text/css">
     .btn-icon i{margin-right:5px}
     .top-fields{margin-top:10px;position: relative;}
@@ -12,10 +16,10 @@
     <div class="container-fluid">
         
         @if(in_array("incomes-add", $all_permission))
-            <button class="btn btn-info" data-toggle="modal" data-target="#income-modal"><i class="dripicons-plus"></i> {{__('db.Add Income')}}</button>
+            <button class="btn btn-info" data-toggle="modal" data-target="#income-modal"><i class="ti ti-plus"></i> {{__('db.Add Income')}}</button>
         @endif
         <button type="button" class="btn btn-warning btn-icon" id="toggle-filter">
-            <i class="dripicons-experiment"></i> {{ __('db.Filter') }}
+            <i class="ti ti-filter"></i> {{ __('db.Filter') }}
         </button>
         <div class="card">
             <div class="card-body" id="filter-card" style="display: none;">
@@ -48,7 +52,7 @@
                             <div class="form-group  top-fields">
                                 <label>{{__('db.Income Category')}}</label>
                                 <select id="income_category_id" name="income_category_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" >
-                                    <option value="0">{{__('db.All Categories')}}</option>
+                                    <option value="0">{{__('db.all_categories')}}</option>
                                     @foreach($income_category_list as $income_category)
                                         @if($income_category->id == $income_category_id)
                                             <option selected value="{{$income_category->id}}">{{$income_category->name}}</option>
@@ -78,7 +82,7 @@
                     <th>{{__('db.Warehouse')}}</th>
                     <th>{{__('db.category')}}</th>
                     <th>{{__('db.Amount')}}</th>
-                    <th>{{__('db.Note')}}</th>
+                    <th>{{__('db.note')}}</th>
                     <th class="not-exported">{{__('db.action')}}</th>
                 </tr>
             </thead>
@@ -101,7 +105,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{__('db.Update Income')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
               <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -162,7 +166,7 @@
                         </div>
                     </div>
                   <div class="form-group">
-                      <label>{{__('db.Note')}}</label>
+                      <label>{{__('db.note')}}</label>
                       <textarea name="note" rows="3" class="form-control"></textarea>
                   </div>
                   <div class="form-group">
@@ -178,6 +182,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $('#toggle-filter').on('click', function() {
@@ -189,7 +194,7 @@
     $("ul#income #exp-list-menu").addClass("active");
 
     var income_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
     var all_permission = <?php echo json_encode($all_permission) ?>;
 
     $.ajaxSetup({
@@ -217,12 +222,7 @@
         });
     });
 
-    function confirmDelete() {
-    if (confirm("Are you sure want to delete?")) {
-        return true;
-    }
-    return false;
-    }
+    function confirmDelete() { return true; }
 
     var starting_date = $("input[name=starting_date]").val();
     var ending_date = $("input[name=ending_date]").val();
@@ -260,8 +260,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         order:[['1', 'desc']],
@@ -292,7 +292,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -306,7 +306,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -320,7 +320,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -334,7 +334,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -347,7 +347,7 @@
                 footer:true
             },
             {
-                text: '<i title="delete" class="dripicons-cross"></i>',
+                text: '<i title="delete" class="ti ti-x"></i>',
                 className: 'buttons-delete',
                 action: function ( e, dt, node, config ) {
                     if(user_verified == '1') {
@@ -357,7 +357,7 @@
                                 income_id[i-1] = $(this).closest('tr').data('income_id');
                             }
                         });
-                        if(income_id.length && confirm("Are you sure want to delete?")) {
+                        if (income_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                             $.ajax({
                                 type:'POST',
                                 url:'incomes/deletebyselection',
@@ -370,20 +370,22 @@
                                                  dt.row($(this).closest('tr')).remove().draw(false);
                                             }
                                         });
-                                    alert(data);
+                                    SaleProToast.show(data);
                                 }
                             });
                         }
+                        });
+                        }
                         else if(!income_id.length)
-                            alert('Nothing is selected!');
+                            SaleProToast.show('Nothing is selected!');
                     }
                     else
-                        alert('This feature is disable for demo!');
+                        SaleProToast.show('This feature is disable for demo!');
                 }
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],
@@ -396,10 +398,10 @@
     function datatable_sum(dt_selector, is_calling_first) {
         if (dt_selector.rows( '.selected' ).any() && is_calling_first) {
             var rows = dt_selector.rows( '.selected' ).indexes();
-            $( dt_selector.column( 5 ).footer() ).html(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 5 ).footer() ).html(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
         else {
-            $( dt_selector.column( 5 ).footer() ).html(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 5 ).footer() ).html(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
     }
 

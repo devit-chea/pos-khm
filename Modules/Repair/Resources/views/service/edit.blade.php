@@ -19,12 +19,12 @@
                             <h4>{{ __('db.edit_service_job') }} — <small class="text-muted">{{ $job->reference_no }}</small>
                             </h4>
                             <a href="{{ route('repair.service.show', $job->id) }}" class="btn btn-secondary btn-sm">
-                                <i class="fa fa-arrow-left"></i> {{ __('db.back_to_job') }}
+                                <i class="ti ti-arrow-left"></i> {{ __('db.back_to_job') }}
                             </a>
                         </div>
                         <div class="card-body">
 
-                            <form method="POST" action="{{ route('repair.service.update', $job->id) }}">
+                            <form id="service-form" method="POST" action="{{ route('repair.service.update', $job->id) }}" novalidate>
                                 @csrf
                                 @method('PUT')
 
@@ -41,9 +41,11 @@
                                                     <option value="{{ $customer->id }}"
                                                         {{ $job->customer_id == $customer->id ? 'selected' : '' }}>
                                                         {{ $customer->name }}
+                                                        @if($customer->phone_number) — {{ $customer->phone_number }} @endif
                                                     </option>
                                                 @endforeach
                                             </select>
+                                            @error('customer_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                         </div>
                                     </div>
 
@@ -59,6 +61,7 @@
                                                     </option>
                                                 @endforeach
                                             </select>
+                                            @error('warehouse_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                         </div>
                                     </div>
 
@@ -74,7 +77,8 @@
                                         <div class="form-group">
                                             <label>{{ __('db.job_title') }} *</label>
                                             <input type="text" required name="title" class="form-control"
-                                                value="{{ $job->title }}" />
+                                                value="{{ old('title', $job->title) }}" />
+                                            @error('title')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                         </div>
                                     </div>
 
@@ -163,17 +167,17 @@
                                             <div class="col-md-3">
                                                 <div class="form-group">
                                                     <label>{{ __('db.device_type') }}</label>
-                                                    <select name="device_type" class="form-control">
-                                                        @foreach (['mobile', 'laptop', 'tablet', 'desktop', 'printer', 'other'] as $dtype)
-                                                            <option value="{{ $dtype }}"
-                                                                {{ $job->device->device_type === $dtype ? 'selected' : '' }}>
-                                                                {{ ucfirst($dtype) }}
+                                                    <select required name="device_type_id" class="selectpicker form-control" data-live-search="true" title="{{ __('db.Please select') }}">
+                                                        @foreach ($device_types as $type)
+                                                            <option value="{{ $type->id }}"
+                                                                {{ $job->device->device_type == $type->id ? 'selected' : '' }}>
+                                                                {{ $type->name }}
                                                             </option>
                                                         @endforeach
                                                     </select>
                                                 </div>
                                             </div>
-                                            <div class="col-md-4">
+                                            <div class="col-md-3">
                                                 <div class="form-group">
                                                     <label>{{ __('db.Brand') }}</label>
                                                     <select required name="device_brand" class="selectpicker form-control"
@@ -224,14 +228,14 @@
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="form-group">
-                                                    <label>{{ __('db.issue_reported') }}</label>
-                                                    <textarea name="issue_reported" rows="2" class="form-control no-tiny">{{ $job->device->issue_reported }}</textarea>
+                                                    <label>{{ __('db.issue_reported_by_customer') }}</label>
+                                                    <textarea name="device_issue_reported" rows="2" class="form-control no-tiny">{{ $job->device->issue_reported }}</textarea>
                                                 </div>
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="form-group">
-                                                    <label>{{ __('db.condition_notes') }}</label>
-                                                    <textarea name="condition_notes" rows="2" class="form-control no-tiny">{{ $job->device->condition_notes }}</textarea>
+                                                    <label>{{ __('db.condition_on_arrival') }}</label>
+                                                    <textarea name="device_condition_notes" rows="2" class="form-control no-tiny">{{ $job->device->condition_notes }}</textarea>
                                                 </div>
                                             </div>
                                         </div>
@@ -247,42 +251,55 @@
                                             <div class="col-md-3">
                                                 <div class="form-group">
                                                     <label>{{ __('db.vehicle_type') }}</label>
-                                                    <select name="vehicle_type" class="form-control">
-                                                        @foreach (['motorcycle', 'car', 'truck', 'bus', 'three_wheeler', 'other'] as $vtype)
-                                                            <option value="{{ $vtype }}"
-                                                                {{ $job->vehicle->vehicle_type === $vtype ? 'selected' : '' }}>
-                                                                {{ ucfirst(str_replace('_', ' ', $vtype)) }}
+                                                    <select required name="vehicle_type_id" class="selectpicker form-control" data-live-search="true" title="{{ __('db.Please select') }}">
+                                                        @foreach ($vehicle_types as $type)
+                                                            <option value="{{ $type->id }}"
+                                                                {{ $job->vehicle->vehicle_type == $type->id ? 'selected' : '' }}>
+                                                                {{ $type->name }}
                                                             </option>
                                                         @endforeach
                                                     </select>
                                                 </div>
                                             </div>
-                                            <div class="col-md-4">
+                                            <div class="col-md-3">
                                                 <div class="form-group">
                                                     <label>{{ __('db.Brand') }}</label>
-                                                    <select required name="device_brand" class="selectpicker form-control"
+                                                    <select required name="vehicle_brand" class="selectpicker form-control"
                                                         data-live-search="true" title="{{ __('db.select_brand') }}">
                                                         @foreach ($lims_brand_list as $brand)
                                                             <option value="{{ $brand->title }}"
-                                                                {{ $job->device?->brand == $brand->title ? 'selected' : '' }}>
+                                                                {{ $job->vehicle?->brand == $brand->title ? 'selected' : '' }}>
                                                                 {{ $brand->title }}
                                                             </option>
                                                         @endforeach
                                                     </select>
                                                 </div>
                                             </div>
-                                            <div class="col-md-3">
+                                            <div class="col-md-2">
                                                 <div class="form-group">
                                                     <label>{{ __('db.model') }}</label>
                                                     <input type="text" name="vehicle_model" class="form-control"
                                                         value="{{ $job->vehicle->model }}" />
                                                 </div>
                                             </div>
-                                            <div class="col-md-3">
+                                            <div class="col-md-2">
                                                 <div class="form-group">
                                                     <label>{{ __('db.year') }}</label>
                                                     <input type="number" name="vehicle_year" class="form-control"
                                                         value="{{ $job->vehicle->year }}" />
+                                                </div>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <div class="form-group">
+                                                    <label>{{ __('db.fuel_level') }}</label>
+                                                    <select name="fuel_level" class="form-control">
+                                                        @foreach (['empty', 'quarter', 'half', 'three_quarter', 'full'] as $fl)
+                                                            <option value="{{ $fl }}"
+                                                                {{ $job->vehicle->fuel_level === $fl ? 'selected' : '' }}>
+                                                                {{ ucfirst(str_replace('_', ' ', $fl)) }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
                                                 </div>
                                             </div>
                                             <div class="col-md-3">
@@ -313,23 +330,17 @@
                                                         value="{{ $job->vehicle->mileage }}" />
                                                 </div>
                                             </div>
-                                            <div class="col-md-3">
+
+                                            <div class="col-md-6">
                                                 <div class="form-group">
-                                                    <label>{{ __('db.fuel_level') }}</label>
-                                                    <select name="fuel_level" class="form-control">
-                                                        @foreach (['empty', 'quarter', 'half', 'three_quarter', 'full'] as $fl)
-                                                            <option value="{{ $fl }}"
-                                                                {{ $job->vehicle->fuel_level === $fl ? 'selected' : '' }}>
-                                                                {{ ucfirst(str_replace('_', ' ', $fl)) }}
-                                                            </option>
-                                                        @endforeach
-                                                    </select>
+                                                    <label>{{ __('db.issue_reported_by_customer') }}</label>
+                                                    <textarea name="vehicle_issue_reported" rows="2" class="form-control no-tiny">{{ $job->vehicle->issue_reported ?? '' }}</textarea>
                                                 </div>
                                             </div>
-                                            <div class="col-md-9">
+                                            <div class="col-md-6">
                                                 <div class="form-group">
-                                                    <label>{{ __('db.condition_notes') }}</label>
-                                                    <textarea name="condition_notes" rows="2" class="form-control no-tiny">{{ $job->vehicle->condition_notes }}</textarea>
+                                                    <label>{{ __('db.condition_on_arrival') }}</label>
+                                                    <textarea name="vehicle_condition_notes" rows="2" class="form-control no-tiny">{{ $job->vehicle->condition_notes }}</textarea>
                                                 </div>
                                             </div>
                                         </div>
@@ -338,11 +349,11 @@
 
                                 <div class="col-md-12 px-0 mt-3">
                                     <div class="form-group">
-                                        <label>{{ __('db.Note') }}</label>
+                                        <label>{{ __('db.note') }}</label>
                                         <textarea name="note" rows="2" class="form-control no-tiny">{{ $job->note }}</textarea>
                                     </div>
                                     <button type="submit" class="btn btn-primary">
-                                        <i class="dripicons-checkmark"></i> {{ __('db.save_changes') }}
+                                        <i class="ti ti-checkmark"></i> {{ __('db.save_changes') }}
                                     </button>
                                     <a href="{{ route('repair.service.show', $job->id) }}"
                                         class="btn btn-secondary ml-2">{{ __('db.Cancel') }}</a>
@@ -367,5 +378,57 @@
         $("ul#repair").siblings('a').attr('aria-expanded', 'true');
         $("ul#repair").addClass("show");
         $("ul#repair #service-list-menu").addClass("active");
+
+        // ══════════════════════════════════════════
+        // Real-time JS Validation
+        // ══════════════════════════════════════════
+        function validateField($field) {
+            if (!$field.prop('required') || !$field.closest('.form-group').is(':visible')) {
+                $field.removeClass('is-invalid');
+                if ($field.hasClass('selectpicker')) {
+                    $field.parent().css({'border': '', 'border-radius': ''});
+                }
+                $field.closest('.form-group').find('.custom-error-msg').remove();
+                return true;
+            }
+
+            var val = $field.val();
+            var isValid = val !== '' && val !== null;
+            if (!isValid) {
+                $field.addClass('is-invalid');
+                if ($field.hasClass('selectpicker')) {
+                    $field.parent().css({'border': '1px solid #dc3545', 'border-radius': '4px'});
+                }
+                if ($field.closest('.form-group').find('.custom-error-msg').length === 0) {
+                    $field.closest('.form-group').append('<div class="custom-error-msg text-danger" style="font-size: 12px; margin-top: 4px;">This field is required</div>');
+                }
+            } else {
+                $field.removeClass('is-invalid');
+                if ($field.hasClass('selectpicker')) {
+                    $field.parent().css({'border': '', 'border-radius': ''});
+                }
+                $field.closest('.form-group').find('.custom-error-msg').remove();
+            }
+            return isValid;
+        }
+
+        $(document).on('input change', 'input[required], select[required], textarea[required]', function() {
+            validateField($(this));
+        });
+
+        $('#service-form').on('submit', function(e) {
+            let isFormValid = true;
+            $(this).find('input, select, textarea').each(function() {
+                if ($(this).prop('required')) {
+                    if (!validateField($(this))) {
+                        isFormValid = false;
+                    }
+                }
+            });
+
+            if (!isFormValid) {
+                e.preventDefault();
+            }
+        });
     </script>
 @endpush

@@ -42,49 +42,22 @@ class StockCountController extends Controller
         }else{
             $data['type'] = "full";
         }
-        if( isset($data['brand_id']) && isset($data['category_id']) ){
-            $lims_product_list = DB::table('products')
-                ->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
-                ->whereIn('products.category_id', $data['category_id'] )
-                ->whereIn('products.brand_id', $data['brand_id'] )
-                ->where([ ['products.is_active', true], ['product_warehouse.warehouse_id', $data['warehouse_id']] ])
-                ->select('products.name', 'products.code', 'product_warehouse.imei_number', 'product_warehouse.qty')
-                ->get();
+        $productQuery = $this->stockCountProductQuery((int) $data['warehouse_id']);
 
-            $data['category_id'] = implode(",", $data['category_id']);
-            $data['brand_id'] = implode(",", $data['brand_id']);
+        if (isset($data['category_id'])) {
+            $productQuery->whereIn('products.category_id', $data['category_id']);
+            $data['category_id'] = implode(',', $data['category_id']);
         }
-        elseif( isset($data['category_id']) ){
-            $lims_product_list = DB::table('products')
-                ->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
-                ->whereIn('products.category_id', $data['category_id'])
-                ->where([ ['products.is_active', true], ['product_warehouse.warehouse_id', $data['warehouse_id']] ])
-                ->select('products.name', 'products.code', 'product_warehouse.imei_number', 'product_warehouse.qty')
-                ->get();
+        if (isset($data['brand_id'])) {
+            $productQuery->whereIn('products.brand_id', $data['brand_id']);
+            $data['brand_id'] = implode(',', $data['brand_id']);
+        }
 
-            $data['category_id'] = implode(",", $data['category_id']);
-        }
-        elseif( isset($data['brand_id']) ){
-            $lims_product_list = DB::table('products')
-                ->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
-                ->whereIn('products.brand_id', $data['brand_id'])
-                ->where([ ['products.is_active', true], ['product_warehouse.warehouse_id', $data['warehouse_id']] ])
-                ->select('products.name', 'products.code', 'product_warehouse.imei_number', 'product_warehouse.qty')
-                ->get();
-
-            $data['brand_id'] = implode(",", $data['brand_id']);
-        }
-        else{
-            $lims_product_list = DB::table('products')
-                ->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
-                ->where([ ['products.is_active', true], ['product_warehouse.warehouse_id', $data['warehouse_id']] ])
-                ->select('products.name', 'products.code', 'product_warehouse.imei_number', 'product_warehouse.qty')
-                ->get();
-        }
+        $lims_product_list = $productQuery->get();
         if( count($lims_product_list) ){
             $csvData=array('Product Name, Product Code, IMEI or Serial Numbers, Counted');
             foreach ($lims_product_list as $product) {
-                $csvData[]=$product->name.','.$product->code.','.str_replace(",","/",$product->imei_number);
+                $csvData[]=$product->name.','.$product->code.','.str_replace(',', '/', (string) ($product->imei_number ?? ''));
             }
             if (!file_exists(public_path().'/stock_count/')) {
                 mkdir(public_path().'/stock_count/', 0777, true);
@@ -146,6 +119,7 @@ class StockCountController extends Controller
         $counted = [];
         $difference = [];
         $cost = [];
+        $seenProductIds = [];
 
         while (($current_line = fgetcsv($file_handle)) !== false) {
 
@@ -160,23 +134,29 @@ class StockCountController extends Controller
                 continue;
             }
 
-            // Find product by code (exact or LIKE)
+            // Initial stock-count files persist the exact product code. Do not
+            // guess with LIKE because a partial code can resolve another item.
             $product_data = Product::select('id', 'code', 'cost')
                 ->where('code', $current_line[1])
-                ->orWhere('code', 'LIKE', "%{$current_line[1]}%")
                 ->first();
 
             if (!$product_data) {
                 continue;
             }
 
-            // Get warehouse quantity
-            $product_warehouse = Product_Warehouse::where([
+            // Older stock-count CSVs may already contain duplicate lines created
+            // from duplicate product_warehouse rows. Process each product once.
+            if (isset($seenProductIds[$product_data->id])) {
+                continue;
+            }
+            $seenProductIds[$product_data->id] = true;
+
+            // Stock Count is product-level, so use the warehouse total instead of
+            // whichever product_warehouse row happens to be returned first.
+            $expected_qty = (float) Product_Warehouse::where([
                 'warehouse_id' => $warehouse_id,
                 'product_id'   => $product_data->id,
-            ])->first();
-
-            $expected_qty = (float) ($product_warehouse->qty ?? 0);
+            ])->sum('qty');
 
             // Clean & cast counted quantity from CSV
             $counted_qty = 0;
@@ -225,41 +205,74 @@ class StockCountController extends Controller
     public function qtyAdjustment($id)
     {
         $lims_warehouse_list = Warehouse::where('is_active', true)->get();
-        $lims_stock_count_data = StockCount::find($id);
+        $lims_stock_count_data = StockCount::findOrFail($id);
         $warehouse_id = $lims_stock_count_data->warehouse_id;
-        $file_handle = fopen(public_path('stock_count/').$lims_stock_count_data->final_file, 'r');
+        $file_path = public_path('stock_count/').$lims_stock_count_data->final_file;
+
+        if (!is_file($file_path)) {
+            return redirect()->back()->with('not_permitted', __('db.Stock Count file not found'));
+        }
+
+        $file_handle = fopen($file_path, 'r');
         $i = 0;
+        $seenProductIds = [];
         $product_id = [];
-        while( !feof($file_handle) ) {
-            $current_line = fgetcsv($file_handle);
-            if( $current_line && $i > 0 ){
-                $product_data = Product::select('id','code','qty')->where('code', $current_line[1])->first();
-                $product_id[] = $product_data->id;
-                $names[] = $current_line[0];
-                $code[] = $current_line[1];
+        $names = [];
+        $code = [];
+        $qty = [];
+        $action = [];
 
-                $product_warehouse_data = Product_Warehouse::select('qty')->where([
-                    'warehouse_id' => $warehouse_id,
-                    'product_id' => $product_data->id,
-                ])->first();
+        while (($current_line = fgetcsv($file_handle)) !== false) {
+            if ($i++ === 0 || !isset($current_line[1])) {
+                continue;
+            }
 
-                if(isset($current_line[3])) {
-                    $temp_qty = $current_line[3] - $product_warehouse_data->qty;
-                } else {
-                    $temp_qty = $product_warehouse_data->qty * (-1);
-                }
+            $product_data = Product::select('id', 'code', 'qty')->where('code', $current_line[1])->first();
+            if (!$product_data || isset($seenProductIds[$product_data->id])) {
+                continue;
+            }
+            $seenProductIds[$product_data->id] = true;
 
-                if($temp_qty < 0){
-                    $qty[] = $temp_qty * (-1);
-                    $action[] = '-';
-                }
-                else{
-                    $qty[] = $temp_qty;
-                    $action[] = '+';
+            $warehouseQty = (float) Product_Warehouse::where([
+                'warehouse_id' => $warehouse_id,
+                'product_id' => $product_data->id,
+            ])->sum('qty');
+
+            $countedQty = 0.0;
+            if (isset($current_line[3])) {
+                $csvQty = str_replace(',', '', trim((string) $current_line[3]));
+                if (is_numeric($csvQty)) {
+                    $countedQty = (float) $csvQty;
                 }
             }
-            $i++;
+
+            $temp_qty = $countedQty - $warehouseQty;
+            $product_id[] = $product_data->id;
+            $names[] = $current_line[0];
+            $code[] = $current_line[1];
+            $qty[] = abs($temp_qty);
+            $action[] = $temp_qty < 0 ? '-' : '+';
         }
+
+        fclose($file_handle);
+
         return view('backend.stock_count.qty_adjustment', compact('lims_warehouse_list', 'warehouse_id', 'id', 'product_id', 'names', 'code', 'qty', 'action'));
     }
+
+    private function stockCountProductQuery(int $warehouseId)
+    {
+        return DB::table('products')
+            ->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
+            ->whereIn('products.is_active', [1, 3])
+            ->where('product_warehouse.warehouse_id', $warehouseId)
+            ->select(
+                'products.id',
+                'products.name',
+                'products.code',
+                DB::raw("GROUP_CONCAT(DISTINCT NULLIF(product_warehouse.imei_number, '') SEPARATOR ',') as imei_number"),
+                DB::raw('SUM(product_warehouse.qty) as qty')
+            )
+            ->groupBy('products.id', 'products.name', 'products.code');
+    }
+
 }

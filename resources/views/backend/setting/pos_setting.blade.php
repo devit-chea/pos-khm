@@ -1,4 +1,4 @@
-﻿@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main') @section('content')
 
 <x-success-message key="message" />
 <x-error-message key="not_permitted" />
@@ -181,6 +181,15 @@
                                 </div>
 
                                 <div class="form-group col-md-2">
+                                    @if(in_array("upi",$options))
+                                    <input class="mt-2" type="checkbox" name="options[]" value="upi" checked>
+                                    @else
+                                    <input class="mt-2" type="checkbox" name="options[]" value="upi">
+                                    @endif
+                                    <label class="mt-2">UPI</label>
+                                </div>
+
+                                <div class="form-group col-md-2">
                                     @if(in_array("razorpay",$options))
                                     <input class="mt-2" type="checkbox" name="options[]" value="razorpay" checked>
                                     @else
@@ -196,6 +205,51 @@
                                     <input class="mt-2" type="checkbox" name="options[]" value="pesapal">
                                     @endif
                                     <label class="mt-2">Pesapal</label>
+                                </div>
+
+                                <div class="form-group col-md-2">
+                                    @if(in_array("mpesa",$options))
+                                    <input class="mt-2" type="checkbox" name="options[]" value="mpesa" checked>
+                                    @else
+                                    <input class="mt-2" type="checkbox" name="options[]" value="mpesa">
+                                    @endif
+                                    <label class="mt-2">M-Pesa</label>
+                                </div>
+
+                                <div class="form-group col-md-2">
+                                    @if(in_array("mtnmomo",$options))
+                                    <input class="mt-2" type="checkbox" name="options[]" value="mtnmomo" checked>
+                                    @else
+                                    <input class="mt-2" type="checkbox" name="options[]" value="mtnmomo">
+                                    @endif
+                                    <label class="mt-2">MTN MoMo</label>
+                                </div>
+
+                                <div class="form-group col-md-2">
+                                    @if(in_array("payhere",$options))
+                                    <input class="mt-2" type="checkbox" name="options[]" value="payhere" checked>
+                                    @else
+                                    <input class="mt-2" type="checkbox" name="options[]" value="payhere">
+                                    @endif
+                                    <label class="mt-2">PayHere</label>
+                                </div>
+
+                                <div class="form-group col-md-2">
+                                    @if(in_array("stripe",$options))
+                                    <input class="mt-2" type="checkbox" name="options[]" value="stripe" checked>
+                                    @else
+                                    <input class="mt-2" type="checkbox" name="options[]" value="stripe">
+                                    @endif
+                                    <label class="mt-2">Stripe</label>
+                                </div>
+
+                                <div class="form-group col-md-2">
+                                    @if(in_array("moyasar",$options))
+                                    <input class="mt-2" type="checkbox" name="options[]" value="moyasar" checked>
+                                    @else
+                                    <input class="mt-2" type="checkbox" name="options[]" value="moyasar">
+                                    @endif
+                                    <label class="mt-2">Moyasar</label>
                                 </div>
 
                                 <div class="form-group col-md-2">
@@ -227,7 +281,7 @@
                             <div class="row mt-2">
                                 <div class="form-inline col-md-4 form-group mt-2" id="payment-options">
                                     @foreach($options as $option)
-                                    @if($option !== 'cash' && $option !== 'card' && $option !== 'credit' && $option !== 'cheque' && $option !== 'gift_card' && $option !== 'deposit' && $option !== 'paypal' && $option !== 'pesapal' && $option !== 'razorpay' && $option !== 'points' && $option !== 'installment')
+                                    @if($option !== 'cash' && $option !== 'card' && $option !== 'credit' && $option !== 'cheque' && $option !== 'gift_card' && $option !== 'deposit' && $option !== 'paypal' && $option !== 'pesapal' && $option !== 'razorpay' && $option !== 'points' && $option !== 'installment' && $option !== 'mpesa' && $option !== 'mtnmomo' && $option !== 'payhere' && $option !== 'stripe' && $option !== 'moyasar')
                                     <div>
                                         <input type="text" value="{{$option}}" class="form-control mt-2" placeholder="{{ __('db.Payment Options') }}" name="options[]">&nbsp;<button class="btn btn-danger remove">X</button>
                                     </div>

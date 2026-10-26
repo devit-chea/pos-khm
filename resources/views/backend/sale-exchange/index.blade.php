@@ -1,4 +1,8 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
     <x-success-message key="message" />
     <x-error-message key="not_permitted" />
@@ -81,7 +85,7 @@
             </div>
             @if (in_array('exchange-add', $all_permission))
                 <a href="#" data-toggle="modal" data-target="#add-exchange" class="btn btn-info"><i
-                        class="dripicons-plus"></i> {{ __('db.Add Exchange') }}</a>
+                        class="ti ti-plus"></i> {{ __('db.Add Exchange') }}</a>
             @endif
         </div>
         <div class="table-responsive">
@@ -124,18 +128,18 @@
                         <div class="row">
                             <div class="col-md-6 d-print-none">
                                 <button id="print-btn" type="button" class="btn btn-default btn-sm"><i
-                                        class="dripicons-print"></i> {{ __('db.Print') }}</button>
+                                        class="ti ti-printer"></i> {{ __('db.print') }}</button>
                             </div>
                             <div class="col-md-6 d-print-none">
                                 <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close"
-                                    class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                                    class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                             </div>
                             <div class="col-md-12">
                                 <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">
-                                    {{ $general_setting->site_title }}</h3>
+                                    {{ gen_setting()->site_title }}</h3>
                             </div>
                             <div class="col-md-12 text-center">
-                                <i style="font-size: 15px;">{{ __('db.Exchange Details') }}</i>
+                                <i style="font-size: 15px;">{{ __('db.exchange_details') }}</i>
                             </div>
                         </div>
                     </div>
@@ -146,7 +150,7 @@
                             <th>#</th>
                             <th>{{ __('db.product') }}</th>
                             <th>{{ __('db.Batch No') }}</th>
-                            <th>{{ __('db.Qty') }}</th>
+                            <th>{{ __('db.qty') }}</th>
                             <th>{{ __('db.Unit Price') }}</th>
                             <th>{{ __('db.Tax') }}</th>
                             <th>{{ __('db.Discount') }}</th>
@@ -162,6 +166,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
     <script type="text/javascript">
 
         var all_permission = <?php echo json_encode($all_permission); ?>;
@@ -174,12 +179,7 @@
             }
         });
 
-        function confirmDelete() {
-            if (confirm("Are you sure want to delete?")) {
-                return true;
-            }
-            return false;
-        }
+        function confirmDelete() { return true; }
 
         // Click on table row to view details
         $(document).on("click", "tr.return-link td:not(:first-child, :last-child)", function() {
@@ -270,8 +270,8 @@
                 "info": '<small>{{ __('db.Showing') }} _START_ - _END_ (_TOTAL_)</small>',
                 "search": '{{ __('db.Search') }}',
                 'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
                 }
             },
             order: [
@@ -308,7 +308,7 @@
             rowId: 'ObjectID',
             buttons: [{
                     extend: 'pdf',
-                    text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                    text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -322,7 +322,7 @@
                 },
                 {
                     extend: 'excel',
-                    text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                    text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -336,7 +336,7 @@
                 },
                 {
                     extend: 'csv',
-                    text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -350,7 +350,7 @@
                 },
                 {
                     extend: 'print',
-                    text: '<i title="print" class="fa fa-print"></i>',
+                    text: '<i title="print" class="ti ti-printer"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -363,48 +363,8 @@
                     footer: true
                 },
                 {
-                    text: '<i title="delete" class="dripicons-cross"></i>',
-                    className: 'buttons-delete',
-                    action: function(e, dt, node, config) {
-                        if (user_verified == '1') {
-                            return_id.length = 0;
-                            $(':checkbox:checked').each(function(i) {
-                                if (i) {
-                                    var exchangeData = $(this).closest('tr').data('return');
-                                    if (exchangeData) {
-                                        try {
-                                            var parsed = JSON.parse(exchangeData);
-                                            return_id[i - 1] = parsed[13]; // ID is at index 13
-                                        } catch (e) {
-                                            console.error('Parse error:', e);
-                                        }
-                                    }
-                                }
-                            });
-                            if (return_id.length && confirm("Are you sure want to delete?")) {
-                                $.ajax({
-                                    type: 'POST',
-                                    url: '{{ route('exchange.deletebyselection') }}',
-                                    data: {
-                                        returnIdArray: return_id
-                                    },
-                                    success: function(data) {
-                                        alert(data);
-                                        dt.rows({
-                                            page: 'current',
-                                            selected: true
-                                        }).remove().draw(false);
-                                    }
-                                });
-                            } else if (!return_id.length)
-                                alert('Nothing is selected!');
-                        } else
-                            alert('This feature is disable for demo!');
-                    }
-                },
-                {
                     extend: 'colvis',
-                    text: '<i title="column visibility" class="fa fa-eye"></i>',
+                    text: '<i title="column visibility" class="ti ti-eye"></i>',
                     columns: ':gt(0)'
                 },
             ],
@@ -420,11 +380,11 @@
                 $(dt_selector.column(8).footer()).html(
                     dt_selector.cells(rows, 8, {
                         page: 'current'
-                    }).data().sum().toFixed({{ $general_setting->decimal }})
+                    }).data().sum().toFixed({{ gen_setting()->decimal }})
                 );
             } else {
                 $(dt_selector.column(8).footer()).html(
-                    dt_selector.column(8).data().sum().toFixed({{ $general_setting->decimal }})
+                    dt_selector.column(8).data().sum().toFixed({{ gen_setting()->decimal }})
                 );
             }
         }
@@ -551,11 +511,11 @@
                 $("table.product-return-list").append(newBody);
             }).fail(function(xhr, status, error) {
                 console.error('Failed to load products:', error);
-                alert('Error loading product details. Please try again.');
+                SaleProToast.show('Error loading product details. Please try again.');
             });
 
             // Build footer
-            var htmlfooter = '<p><strong>{{ __('db.Exchange Note') }}:</strong> ' + (returns[20] || 'N/A') + '</p>';
+            var htmlfooter = '<p><strong>{{ __('db.exchange_note') }}:</strong> ' + (returns[20] || 'N/A') + '</p>';
             htmlfooter += '<p><strong>{{ __('db.Staff Note') }}:</strong> ' + (returns[21] || 'N/A') + '</p>';
             htmlfooter += '<strong>{{ __('db.Created By') }}:</strong><br>' + returns[22] + '<br>' + returns[23];
 

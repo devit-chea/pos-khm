@@ -46,6 +46,12 @@ return [
             'provider' => 'users',
             'hash' => false,
         ],
+
+        // ─── Affiliate portal guard ────────────────────────────────────────
+        'affiliate' => [
+            'driver'   => 'session',
+            'provider' => 'affiliates',
+        ],
     ],
 
     /*
@@ -69,6 +75,12 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => App\Models\User::class,
+        ],
+
+        // ─── Affiliate provider ────────────────────────────────────────────
+        'affiliates' => [
+            'driver' => 'eloquent',
+            'model'  => App\Models\landlord\Affiliate::class,
         ],
 
         // 'users' => [

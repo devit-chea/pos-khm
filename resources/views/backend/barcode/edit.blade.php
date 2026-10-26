@@ -28,13 +28,22 @@
                                     </div>
                                     </div>
                                     <div class="col-sm-12">
+
                                     <div class="form-group">
-                                        <div class="">
-                                        <label>
-                                            <input type="checkbox" name="is_continuous" value="1" {{ $barcode->is_continuous ? 'checked' : '' }} id="is_continuous"> @lang('db.Continuous feed or rolls')
-                                        </label>
-                                        </div>
+                                        <label>@lang('Label Layout')</label>
+                                        <select name="layout_type" id="layout_type" class="form-control">
+                                            <option value="sheet" {{ $barcode->layout_type == 'sheet' ? 'selected' : '' }}>
+                                                @lang('Sheet')
+                                            </option>
+                                            <option value="continuous" {{ $barcode->layout_type == 'continuous' ? 'selected' : '' }}>
+                                                @lang('Continuous Roll')
+                                            </option>
+                                            <option value="dumbbell" {{ $barcode->layout_type == 'dumbbell' ? 'selected' : '' }}>
+                                                @lang('Dumbbell')
+                                            </option>
+                                        </select>
                                     </div>
+
                                     </div>
                                     <div class="col-sm-6">
                                     <div class="form-group">
@@ -135,16 +144,6 @@
                                     </div>
                                     </div>
                                     <div class="clearfix"></div>
-                                    <div class="col-sm-6 stickers_per_sheet_div @if( $barcode->is_continuous ) {{ 'hide' }} @endif">
-                                        <div class="form-group">
-                                          <label for="stickers_in_one_sheet">{{ __('db.barcode_stickers_in_one_sheet') }}:*</label>
-                                          <div class="input-group">
-                                            <input type="number" name="stickers_in_one_sheet" value="{{ $barcode->stickers_in_one_sheet }}" class="form-control" placeholder="{{ __('db.Barcode Stickers In One Sheet') }}" min="1" required>
-                                            'placeholder' => __('db.Barcode Stickers In One Sheet'), 'min' => 1, 'required']); !!}
-                                          </div>
-                                        </div>
-                                    </div>
-                                    <div class="clearfix"></div>
                                     <div class="col-sm-6"></div>
                                     <div class="col-sm-6">
                                     <div class="form-group">
@@ -176,22 +175,40 @@
 @push('scripts')
 <script>
     $(document).ready(function () {
-        const isContinuousInput = $("input[name='is_continuous']");
-        const paperHeightSection = $("#paper-height-section");
-        const paperHeightInput = $("input[name='paper_height']");
+        const layoutTypeSelect = $("#layout_type");
 
-        const togglePaperHeight = () => {
-            if (isContinuousInput.is(":checked")) {
+        const toggleFields = () => {
+            const layoutType = layoutTypeSelect.val();
+            const paperHeightDiv = $(".paper_height_div");
+            const paperHeightInput = $("input[name='paper_height']");
+            const stickersPerSheetDiv = $(".stickers_per_sheet_div");
+            const stickersPerSheetInput = $("input[name='stickers_in_one_sheet']");
+
+            if (layoutType === 'continuous' || layoutType === 'dumbbell') {
                 paperHeightInput.val(0);
-                paperHeightInput.prop("disabled", true);
+                paperHeightInput.prop("disabled", true).prop("required", false);
+                paperHeightDiv.hide();
+
+                stickersPerSheetInput.val(0);
+                stickersPerSheetInput.prop("disabled", true).prop("required", false);
+                stickersPerSheetDiv.hide();
             } else {
-                paperHeightInput.prop("disabled", false);
+                paperHeightInput.prop("disabled", false).prop("required", true);
+                if (parseFloat(paperHeightInput.val()) === 0) {
+                    paperHeightInput.val('');
+                }
+                paperHeightDiv.show();
+
+                stickersPerSheetInput.prop("disabled", false).prop("required", true);
+                if (parseInt(stickersPerSheetInput.val()) === 0) {
+                    stickersPerSheetInput.val('');
+                }
+                stickersPerSheetDiv.show();
             }
         };
 
-        togglePaperHeight();
-
-        isContinuousInput.on("change", togglePaperHeight);
+        toggleFields();
+        layoutTypeSelect.on("change", toggleFields);
     });
 </script>
 @endpush

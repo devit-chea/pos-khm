@@ -79,39 +79,45 @@ use Illuminate\Support\Facades\Route;
 
 $middleware = ['api'];
 if (config('database.connections.saleprosaas_landlord')) {
-    $middleware[] = InitializeTenancyByDomain::class;
-    $middleware[] = PreventAccessFromCentralDomains::class;
+    $middleware[] = \Stancl\Tenancy\Middleware\InitializeTenancyByDomain::class;
+    $middleware[] = \Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains::class;
+    $middleware[] = \App\Http\Middleware\EnsureCommissionSubscriptionAccess::class;
 }
 
-Route::group(['middleware' => ['api']], function () {
-    Route::get('/setup', [SetupController::class, 'setup']);
+if (! is_dir(app_path('Http/Controllers/Api'))) {
+    return;
+}
+
+Route::group(['middleware' => ['api'], 'as' => 'api.'], function () {
+    Route::get('/setup', [SetupController::class, 'setup'])->name('setup');
 });
 
 Route::middleware($middleware)->name('api.')->group(function () {
-    Route::post('/check', [SetupController::class, 'checkLicense']);
-    Route::get('/offline-api-map', [RouteMapController::class, 'index']);
+    Route::post('/check', [SetupController::class, 'checkLicense'])->name('check');
 
+    Route::get('/offline-api-map', [RouteMapController::class, 'index'])->name('offline-api-map');
+
+    // Optional Mobile App: Authentication & Home Endpoints
     Route::middleware('validate_mobile_token')->group(function () {
         Route::get('/get-registration-form-data', [RegisterController::class, 'getRegistrationFormData']);
         Route::get('/register/create', [RegisterController::class, 'create']);
-        Route::get('/login/create', [LoginController::class, 'getLoginForm']);
-
         Route::post('/register', [RegisterController::class, 'register']);
+        Route::get('/login/create', [LoginController::class, 'getLoginForm']);
         Route::post('/login', [LoginController::class, 'login']);
-
-        Route::controller(HomeController::class)->middleware('auth:sanctum')->group(function () {
+        Route::controller(HomeController::class)->middleware(['auth:sanctum', 'warehouse.access'])->group(function () {
             Route::get('/get-user', 'getUser');
             Route::get('/dashboard', 'dashboard');
         });
     });
 
-    Route::controller(HomeController::class)->middleware('auth:sanctum')->group(function () {
+    Route::controller(HomeController::class)->middleware(['auth:sanctum', 'warehouse.access'])->group(function () {
         Route::get('/get-user', 'getUser');
         Route::get('/dashboard', 'dashboard');
         Route::get('/dashboard-filter/{start_date}/{end_date}/{warehouse_id}', 'dashboard');
     });
 
-    Route::group(['middleware' => ['auth:sanctum', 'common', 'validate_mobile_token']], function () {
+    // Optional Mobile App: Authenticated API Resources
+    Route::group(['middleware' => ['auth:sanctum', 'common', 'validate_mobile_token', 'warehouse.access']], function () {
         Route::get('test', [BrandController::class, 'test']);
         Route::resource('brands', BrandController::class);
         // Category import routes must come BEFORE resource route
@@ -134,7 +140,6 @@ Route::middleware($middleware)->name('api.')->group(function () {
         Route::get('currencies/import', [CurrencyController::class, 'import']);
         Route::post('currencies/import', [CurrencyController::class, 'import']);
         Route::resource('currencies', CurrencyController::class);
-        Route::get('get-all-units', [UnitController::class, 'getAllUnit']);
         // Warehouse import routes must come BEFORE resource route
         Route::get('warehouses/import', [WarehouseController::class, 'import']);
         Route::post('warehouses/import', [WarehouseController::class, 'import']);
@@ -142,7 +147,7 @@ Route::middleware($middleware)->name('api.')->group(function () {
         // Tax import routes must come BEFORE resource route
         Route::get('taxes/import', [TaxController::class, 'import']);
         Route::post('taxes/import', [TaxController::class, 'import']);
-        Route::resource('taxes', TaxController::class);
+        Route::resource('taxes', TaxController::class)->except(['show']);
         // Purchase import and payment routes must come BEFORE resource route
         Route::get('purchases/import', [PurchaseController::class, 'import']);
         Route::post('purchases/import', [PurchaseController::class, 'import']);
@@ -166,8 +171,6 @@ Route::middleware($middleware)->name('api.')->group(function () {
         Route::resource('sales', SaleController::class);
         Route::get('pos/create', [PosController::class, 'create']);
         Route::get('generate-code', [ProductController::class, 'generateCode']);
-        Route::post('pos-setting', [SettingController::class, 'posSettingStore'])->name('setting.posStore');
-        Route::post('general-setting', [SettingController::class, 'generalSettingStore'])->name('setting.generalStore');
         Route::resource('discount-plans', DiscountPlanController::class);
         Route::resource('discounts', DiscountController::class);
         Route::get('discounts/product-search/{code}', [DiscountController::class, 'productSearch']);
@@ -178,26 +181,19 @@ Route::middleware($middleware)->name('api.')->group(function () {
 
         Route::controller(ExpenseCategoryController::class)->group(function () {
             Route::get('expense-categories/gencode', 'generateCode');
-            Route::post('expense-categories/import', 'import')->name('expense_category.import');
             Route::post('expense-categories/deletebyselection', 'deleteBySelection');
-            Route::get('expense-categories/all', 'expenseCategoriesAll')->name('expense_category.all');
         });
 
         Route::controller(ExpenseController::class)->group(function () {
-            Route::post('expenses/expense-data', 'expenseData')->name('expenses.data');
-            Route::post('expenses/deletebyselection', 'deleteBySelection');
         });
 
         // IncomeCategory & Income Start
         Route::controller(IncomeCategoryController::class)->group(function () {
             Route::get('income-categories/gencode', 'generateCode');
-            Route::post('income-categories/import', 'import')->name('income_category.import');
             Route::post('income-categories/deletebyselection', 'deleteBySelection');
-            Route::get('income-categories/all', 'incomeCategoriesAll')->name('income_category.all');
         });
 
         Route::controller(IncomeController::class)->group(function () {
-            Route::post('incomes/income-data', 'incomeData')->name('incomes.data');
             Route::post('incomes/deletebyselection', 'deleteBySelection');
         });
 
@@ -286,49 +282,37 @@ Route::middleware($middleware)->name('api.')->group(function () {
             Route::prefix('notifications')->group(function () {
                 Route::get('/', 'index')->name('notifications.index');
                 Route::post('store', 'store')->name('notifications.store');
-                Route::get('mark-as-read', 'markAsRead');
+                Route::get('mark-as-read', 'markAsRead')->name('notifications.markAsRead');
             });
         });
 
-        Route::controller(AccountController::class)->group(function () {
-            Route::get('make-default/{id}', 'makeDefault');
-            Route::get('balancesheet', 'balanceSheet')->name('accounts.balancesheet');
-            Route::post('account-statement', 'accountStatement')->name('accounts.statement');
-            Route::get('accounts/all', 'accountsAll')->name('account.all');
+        Route::middleware('accounting.activated')->group(function () {
+            Route::controller(AccountController::class)->group(function () {
+                Route::get('make-default/{id}', 'makeDefault');
+                Route::get('balancesheet', 'balanceSheet')->name('accounts.balancesheet');
+                Route::post('account-statement', 'accountStatement')->name('accounts.statement');
+                Route::get('accounts/all', 'accountsAll')->name('account.all');
+            });
+            Route::resource('accounts', AccountController::class);
         });
-        Route::resource('accounts', AccountController::class);
 
         Route::resource('money-transfers', MoneyTransferController::class);
 
         // Return Sale & Purchase
         Route::controller(ReturnSaleController::class)->group(function () {
             Route::prefix('return-sale')->group(function () {
-                Route::post('return-data', 'returnData');
-                Route::get('getcustomergroup/{id}', 'getCustomerGroup')->name('return-sale.getcustomergroup');
-                Route::post('sendmail', 'sendMail')->name('return-sale.sendmail');
-                Route::get('getproduct/{id}', 'getProduct')->name('return-sale.getproduct');
-                Route::get('lims_product_search', 'limsProductSearch')->name('product_return-sale.search');
-                Route::get('product_return/{id}', 'productReturnData');
-                Route::post('deletebyselection', 'deleteBySelection');
             });
         });
         // Generate route must come BEFORE resource route
         Route::get('generate/return-reference', [ReturnSaleController::class, 'generateReference']);
-        Route::resource('return-sale', ReturnSaleController::class);
+        Route::resource('return-sale', ReturnSaleController::class)->except(['show']);
 
 
         Route::controller(ReturnPurchaseController::class)->group(function () {
             Route::prefix('return-purchase')->group(function () {
-                Route::post('return-data', 'returnData');
-                Route::get('getcustomergroup/{id}', 'getCustomerGroup')->name('return-purchase.getcustomergroup');
-                Route::post('sendmail', 'sendMail')->name('return-purchase.sendmail');
-                Route::get('getproduct/{id}', 'getProduct')->name('return-purchase.getproduct');
-                Route::get('lims_product_search', 'limsProductSearch')->name('product_return-purchase.search');
-                Route::get('product_return/{id}', 'productReturnData');
-                Route::post('deletebyselection', 'deleteBySelection');
             });
         });
-        Route::resource('return-purchase', ReturnPurchaseController::class);
+        Route::resource('return-purchase', ReturnPurchaseController::class)->except(['show']);
         Route::resource('transfers', TransferController::class);
 
         Route::controller(PosController::class)->group(function () {
@@ -351,29 +335,18 @@ Route::middleware($middleware)->name('api.')->group(function () {
 
         Route::controller(QuotationController::class)->group(function () {
             Route::prefix('quotations')->group(function () {
-                Route::post('quotation-data', 'quotationData')->name('quotations.data');
-                Route::get('product_quotation/{id}', 'productQuotationData');
-                Route::get('lims_product_search', 'limsProductSearch')->name('product_quotation.search');
-                Route::get('getcustomergroup/{id}', 'getCustomerGroup')->name('quotation.getcustomergroup');
-                Route::get('getproduct/{id}', 'getProduct')->name('quotation.getproduct');
-                Route::get('{id}/create_sale', 'createSale')->name('quotation.create_sale');
-                Route::get('{id}/create_purchase', 'createPurchase')->name('quotation.create_purchase');
-                Route::post('sendmail', 'sendMail')->name('quotation.sendmail');
-                Route::post('deletebyselection', 'deleteBySelection');
             });
         });
 
-        Route::resource('quotations', QuotationController::class);
+        Route::resource('quotations', QuotationController::class)->except(['show']);
 
         // HRM Routes
         Route::resource('adjustments', AdjustmentController::class);
         Route::controller(AdjustmentController::class)->group(function () {
-            Route::post('adjustments/deletebyselection', 'deleteBySelection');
         });
 
         Route::resource('employees', EmployeeController::class);
         Route::controller(EmployeeController::class)->group(function () {
-            Route::post('employees/deletebyselection', 'deleteBySelection');
         });
 
         Route::resource('departments', DepartmentController::class);
@@ -386,7 +359,7 @@ Route::middleware($middleware)->name('api.')->group(function () {
             Route::post('payroll/deletebyselection', 'deleteBySelection');
         });
 
-        Route::resource('holidays', HolidayController::class);
+        Route::resource('holidays', HolidayController::class)->except(['show']);
         Route::controller(HolidayController::class)->group(function () {
             Route::get('holidays/{id}/approve', 'approve');
         });
@@ -394,7 +367,7 @@ Route::middleware($middleware)->name('api.')->group(function () {
         // Attendance import routes must come BEFORE resource route
         Route::get('attendances/import', [AttendanceController::class, 'import']);
         Route::post('attendances/import', [AttendanceController::class, 'import']);
-        Route::resource('attendances', AttendanceController::class);
+        Route::resource('attendances', AttendanceController::class)->except(['show', 'edit', 'update']);
         Route::controller(AttendanceController::class)->group(function () {
             Route::delete('attendances/{date}/{employee_id}', 'destroy');
             Route::post('attendances/deletebyselection', 'deleteBySelection');
@@ -415,32 +388,27 @@ Route::middleware($middleware)->name('api.')->group(function () {
             Route::post('coupons/deletebyselection', 'deleteBySelection');
         });
 
-        Route::resource('couriers', CourierController::class);
+        Route::resource('couriers', CourierController::class)->except(['show']);
 
         Route::controller(DeliveryController::class)->group(function () {
             Route::get('delivery/create/{saleId}', 'create');
-            Route::post('deliveries/deletebyselection', 'deleteBySelection');
         });
-        Route::resource('deliveries', DeliveryController::class);
+        Route::resource('deliveries', DeliveryController::class)->except(['destroy']);
 
-        Route::resource('packing-slips', PackingSlipController::class);
+        Route::resource('packing-slips', PackingSlipController::class)->only(['index']);
 
-        Route::resource('challans', ChallanController::class);
+        Route::resource('challans', ChallanController::class)->only(['index']);
 
         Route::resource('roles', RoleController::class);
         Route::controller(RoleController::class)->group(function () {
-            Route::get('roles/{id}/permissions', 'permissions');
-            Route::post('roles/{id}/permissions', 'updatePermissions');
         });
 
-        Route::resource('stock-counts', StockCountController::class);
+        Route::resource('stock-counts', StockCountController::class)->except(['edit', 'update', 'destroy']);
         Route::controller(StockCountController::class)->group(function () {
             Route::get('stock-counts/{id}/finalize', 'finalize');
             Route::post('stock-counts/{id}/finalize', 'storeFinalize');
             Route::get('stock-counts/{id}/download-initial', 'downloadInitial');
             Route::get('stock-counts/{id}/download-final', 'downloadFinal');
-            Route::get('stock-counts/{id}/report', 'stockDif');
-            Route::get('stock-counts/{id}/qty-adjustment', 'qtyAdjustment');
         });
 
         // Report Routes - Clean Form-Based Structure
@@ -542,27 +510,16 @@ Route::middleware($middleware)->name('api.')->group(function () {
                 Route::get('balance-sheet', 'balanceSheetReport');
 
                 // Account Statement Report
-                Route::get('account-statement/form', 'accountStatementForm');
-                Route::post('account-statement', 'accountStatementHandler');
-                Route::get('account-statement/table', 'accountStatementTable');
+                Route::middleware('accounting.activated')->group(function () {
+                    Route::get('account-statement/form', 'accountStatementForm');
+                    Route::post('account-statement', 'accountStatementHandler');
+                    Route::get('account-statement/table', 'accountStatementTable');
+                });
             });
         });
 
         Route::controller(UserController::class)->group(function () {
-            Route::get('user/profile/{id}', 'profile')->name('user.profile');
-            Route::put('user/update-profile/{id}', 'profileUpdate')->name('user.profileUpdate');
-            Route::put('user/changepass/{id}', 'changePassword')->name('user.password');
-            Route::get('user/genpass', 'generatePassword');
-            Route::post('user/deletebyselection', 'deleteBySelection');
-            Route::get('user/notification', 'notificationUsers')->name('user.notification');
-            Route::get('user/all', 'allUsers')->name('user.all');
         });
-
-        // Notifications Routes
-        Route::controller(NotificationController::class)->group(function () {
-            Route::get('notifications/mark-as-read', 'markAsRead')->name('notifications.markAsRead');
-        });
-        Route::resource('notifications', NotificationController::class);
 
         // SMS Templates Routes
         Route::controller(SMSController::class)->group(function () {
@@ -571,14 +528,14 @@ Route::middleware($middleware)->name('api.')->group(function () {
             Route::post('sms-templates/{id}/make-default', 'makeDefault')->name('sms-templates.makeDefault');
             Route::post('sms-templates/{id}/make-default-ecommerce', 'makeDefaultEcommerce')->name('sms-templates.makeDefaultEcommerce');
         });
-        Route::resource('sms-templates', SMSController::class);
+        Route::resource('sms-templates', SMSController::class)->except(['show']);
 
         // Manufacturing
-        Route::resource('productions', ProductionController::class);
-        Route::resource('recipes', RecipeController::class);
+        Route::resource('productions', ProductionController::class)->except(['show', 'edit', 'update']);
+        Route::resource('recipes', RecipeController::class)->except(['show', 'edit', 'update']);
 
         // People
-        Route::resource('sale-agents', SaleAgentController::class);
+        Route::resource('sale-agents', SaleAgentController::class)->except(['show', 'edit', 'update']);
 
         // Whatsapp
         Route::controller(WhatsappController::class)->group(function () {
@@ -593,6 +550,6 @@ Route::middleware($middleware)->name('api.')->group(function () {
         // Reports
         Route::get('reports/activity-log', [ActivityLogController::class, 'index']);
 
-        Route::resource('users', UserController::class);
+        Route::resource('users', UserController::class)->except(['show']);
     });
 });

@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class ServiceJob extends Model
 {
+    use \App\Traits\WarehouseScoped;
+
     protected $table = 'service_jobs';
 
     protected $fillable = [
@@ -104,6 +106,10 @@ class ServiceJob extends Model
      */
     public function syncToSale(): \App\Models\Sale
 {
+    // Repair's direct Sale writer has no reviewed Phase 2 pricing or document plan.
+    if (app(\App\Services\ZatcaIntegrationService::class)->isPhase2Configured()) {
+        throw new \App\Exceptions\ZatcaPhase2WorkflowUnavailable('Repair sale sync is not yet available in ZATCA Phase 2. No SalePro sale was created or updated.');
+    }
     $this->refresh();
 
     $parts_total = $this->items()->sum('total');
@@ -119,6 +125,12 @@ class ServiceJob extends Model
 
     // Sale status
     $sale_status = in_array($this->status, ['completed', 'delivered']) ? 1 : 2;
+
+    $currencyId = app(\App\Services\Accounting\CurrencyNormalizationService::class)->getBaseCurrencyId();
+    $saleCurrency = \App\Models\Currency::whereKey($currencyId)->where('is_active', 1)->first();
+    if (!$saleCurrency || (float) $saleCurrency->exchange_rate <= 0) {
+        throw new \RuntimeException('Repair Sale currency configuration is invalid.');
+    }
 
     $saleData = [
         'repair_id'      => $this->id,
@@ -141,35 +153,91 @@ class ServiceJob extends Model
         'grand_total'    => $this->total_amount,
         'paid_amount'    => $this->paid_amount,
         'biller_id'      => \App\Models\Biller::where('is_active', true)->value('id') ?? 1,
-        'currency_id'    => \App\Models\GeneralSetting::value('id') ?? 1,
-        'exchange_rate'  => 1,
+        'currency_id'    => $saleCurrency->id,
+        'exchange_rate'  => $saleCurrency->exchange_rate,
         'reference_no'   => $this->reference_no,
         'sale_note'      => $this->note,
     ];
+
+    $oldSale = \App\Models\Sale::where('repair_id', $this->id)->first();
+    $oldGrandTotal = $oldSale ? (float) $oldSale->grand_total : null;
 
     $sale = \App\Models\Sale::updateOrCreate(
         ['repair_id' => $this->id],
         $saleData
     );
 
+    $newGrandTotal = (float) $sale->grand_total;
+    $needsAccountingUpdate = !$oldSale || abs($oldGrandTotal - $newGrandTotal) > 0.001;
+
     // ─── Sync product_sales ───────────────────────────────────────────────
-    // Delete old product_sale rows for this sale, then re-insert fresh ones.
+    // product_sales is the persisted snapshot of quantities already deducted.
+    // Reconcile it to current Repair items before replacing the snapshot.
+    $oldQuantities = \App\Models\Product_Sale::where('sale_id', $sale->id)
+        ->selectRaw('product_id, SUM(qty) as quantity')
+        ->groupBy('product_id')
+        ->pluck('quantity', 'product_id');
+    $newQuantities = $this->items()
+        ->selectRaw('product_id, SUM(quantity) as quantity')
+        ->groupBy('product_id')
+        ->pluck('quantity', 'product_id');
+
+    foreach ($oldQuantities->keys()->merge($newQuantities->keys())->unique() as $productId) {
+        $delta = (float) ($newQuantities[$productId] ?? 0) - (float) ($oldQuantities[$productId] ?? 0);
+        if (abs($delta) < 0.0001) continue;
+
+        $product = \App\Models\Product::find($productId);
+        if ($product) {
+            $stockService = app(\App\Services\Domain\RepairDomainService::class);
+            $stockService->assertSupportedStockIdentity($product);
+            $warehouseStock = $stockService->soleWarehouseStock($product, (int) $this->warehouse_id);
+            $product->qty = (float) $product->qty - $delta;
+            $product->save();
+            $warehouseStock->qty = (float) $warehouseStock->qty - $delta;
+            $warehouseStock->save();
+        }
+    }
+
     \App\Models\Product_Sale::where('sale_id', $sale->id)->delete();
 
     foreach ($this->items as $item) {
         \App\Models\Product_Sale::create([
-            'sale_id'        => $sale->id,
-            'product_id'     => $item->product_id,
-            'qty'            => $item->quantity,
-            'sale_unit_id'   => 0,
+            'sale_id' => $sale->id,
+            'product_id' => $item->product_id,
+            'qty' => $item->quantity,
+            'sale_unit_id' => $item->product->sale_unit_id ?? null,
             'net_unit_price' => $item->unit_price,
-            'discount'       => $item->discount ?? 0,
-            'tax_rate'       => $item->tax ?? 0,
-            'tax'            => 0,
-            'total'          => $item->total,
+            'discount' => 0,
+            'tax_rate' => 0,
+            'tax' => 0,
+            'total' => $item->total,
         ]);
     }
     // ─────────────────────────────────────────────────────────────────────
+
+    if ($needsAccountingUpdate && class_exists(\App\Services\AccountingService::class)) {
+        $accService = app(\App\Services\AccountingService::class);
+        if (!$sale->wasRecentlyCreated) {
+            $reversal = $accService->reverseTransaction(
+                get_class($sale),
+                $sale->id,
+                '_updated_reversal',
+                ['points_earned', 'points_reversed'],
+            );
+            if (!$reversal->success) {
+                throw new \RuntimeException($reversal->error ?: 'Repair Sale accounting reversal failed.');
+            }
+            $posting = $accService->recordSale($sale, 'repair_invoice_updated');
+        } else {
+            $posting = $accService->recordSale($sale, 'repair_invoice_created');
+        }
+
+        if (!$posting->success) {
+            throw new \RuntimeException($posting->error ?: 'Repair Sale accounting posting failed.');
+        }
+    }
+
+    app(\App\Services\RewardPointService::class)->reconcileSale($sale);
 
     return $sale;
 }

@@ -7,15 +7,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Booking extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, \App\Traits\WarehouseScoped;
 
     protected $fillable = [
     'warehouse_id',
     'customer_id',
     'user_id',
     'created_by',
-    'product_id',  // ✅ যোগ করুন
-    'price',       // ✅ যোগ করুন
+    'product_id',
+    'price',
     'status',
     'start_date',
     'end_date',
@@ -57,5 +57,10 @@ class Booking extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class);
     }
 }

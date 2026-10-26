@@ -93,7 +93,7 @@
                             {{-- Email --}}
                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label>{{__('db.Email')}} *</label>
+                                    <label>{{__('db.email')}} *</label>
                                     <input type="email" name="email" value="{{$lims_supplier_data->email}}" required class="form-control">
                                     @if($errors->has('email'))
                                         <span><strong>{{ $errors->first('email') }}</strong></span>

@@ -1,5 +1,14 @@
-@extends('backend.layout.main') @section('content')
-
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
+<style type="text/css">
+    .top-fields{margin-top:10px;position: relative;}
+    .top-fields label {font-size:11px;font-weight:600;margin-left:10px;padding:0 3px;position:absolute;top:-8px;z-index:9;}
+    .top-fields input{font-size:13px;height:45px}
+    .dt-buttons{width: 100%}
+</style>
 <x-error-message key="not_permitted" />
 
 <section class="forms">
@@ -12,7 +21,7 @@
                 <div class="row mb-3 product-report-filter">
                     <div class="col-md-3 offset-md-2 mt-3">
                         <div class="form-group top-fields">
-                            <label class="d-tc mt-2"><strong>{{__('db.Choose Your Date')}}</strong> &nbsp;</label>
+                            <label>{{__('db.Choose Your Date')}}</label>
                             <div class="d-tc">
                                 
                                 <div class="input-group">
@@ -25,7 +34,7 @@
                     </div>
                     <div class="col-md-3 mt-3">
                         <div class="form-group top-fields">
-                            <label class="d-tc mt-2"><strong>{{__('db.Choose Warehouse')}}</strong> &nbsp;</label>
+                            <label>{{__('db.Choose Warehouse')}}</label>
                             <div class="d-tc">
                                 <select name="warehouse_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" >
                                     <option value="0">{{__('db.All Warehouse')}}</option>
@@ -38,11 +47,11 @@
                     </div>
                     <div class="col-md-3 mt-3">
                         <div class="form-group top-fields">
-                            <label class="d-tc mt-2"><strong>{{__('db.category')}}</strong> &nbsp;</label>
+                            <label>{{__('db.category')}}</label>
                             <div class="d-tc">
                                 <select name="category_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" >
                                     <option value="0">All Category</option>
-                                    @foreach($categories_list as $category)
+                                    @foreach (get_active_categories() as $category)
                                     <option value="{{$category->id}}">{{$category->name}}</option>
                                     @endforeach
                                 </select>
@@ -61,24 +70,32 @@
                     <th>{{__('db.Product Name')}}</th>
                     <th>{{__('db.category')}}</th>
                     <th>{{__('db.Sold Amount')}}</th>
+                    <th>{{__('db.Tax')}} ({{ config('currency') }})</th>
                     <th>{{__('db.Sold')}} {{__('db.qty')}}</th>
                     <th>{{__('db.In Stock')}}</th>
+                    @if(isset($custom_fields))
                     @foreach($custom_fields as $field)
                         <th>{{ $field }}</th>
                     @endforeach
+                    @endif
                 </tr>
             </thead>
 
             <tfoot class="tfoot active">
-                <th></th>
-                <th>{{__('db.Total')}}</th>
-                <th></th>
-                <th></th>
-                <th></th>
-                <th></th>
-                @foreach($custom_fields as $field)
+                <tr>
                     <th></th>
-                @endforeach
+                    <th>{{__('db.Total')}}</th>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    @if(isset($custom_fields))
+                    @foreach($custom_fields as $field)
+                        <th></th>
+                    @endforeach
+                    @endif
+                </tr>
             </tfoot>
         </table>
     </div>
@@ -87,6 +104,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
     $.ajaxSetup({
         headers: {
@@ -105,14 +123,17 @@
             {"data": "name"},
             {"data": "category"},
             {"data": "sold_amount"},
+            {"data": "tax"},
             {"data": "sold_qty"},
             {"data": "in_stock"},
     ];
     let nonSortable = [0];
+    @if(isset($field_names))
     @foreach($field_names as $key => $field)
         columns.push({"data": "{{ $field }}"});
-        nonSortable.push({{ $key + 6 }});
+        nonSortable.push({{ $key + 7 }});
     @endforeach
+    @endif
 
     var datatable = $('#product-report-table').DataTable( {
         "processing": true,
@@ -142,8 +163,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         order:[['1', 'desc']],
@@ -173,7 +194,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -187,7 +208,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:not(.not-exported)',
                     rows: ':visible'
@@ -201,7 +222,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:not(.not-exported)',
                     rows: ':visible'
@@ -215,7 +236,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:not(.not-exported)',
                     rows: ':visible'
@@ -229,7 +250,7 @@
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],
@@ -260,15 +281,17 @@
             var rows = dt_selector.rows( '.selected' ).indexes();
 
 
-            $( dt_selector.column( 3 ).footer() ).html(dt_selector.cells( rows, 3, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 4 ).footer() ).html(dt_selector.cells( rows, 4, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 5 ).footer() ).html(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 3 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 3, { page: 'current' } ).data().sum()));
+            $( dt_selector.column( 4 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 4, { page: 'current' } ).data().sum()));
+            $( dt_selector.column( 5 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum()));
+            $( dt_selector.column( 6 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum()));
 
         }
         else {
-            $( dt_selector.column( 3 ).footer() ).html(dt_selector.column( 3, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 4 ).footer() ).html(dt_selector.column( 4, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 5 ).footer() ).html(dt_selector.column( 5, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 3 ).footer() ).html(formatCurrency(dt_selector.column( 3, {page:'current'} ).data().sum()));
+            $( dt_selector.column( 4 ).footer() ).html(formatCurrency(dt_selector.column( 4, {page:'current'} ).data().sum()));
+            $( dt_selector.column( 5 ).footer() ).html(formatCurrency(dt_selector.column( 5, {page:'current'} ).data().sum()));
+            $( dt_selector.column( 6 ).footer() ).html(formatCurrency(dt_selector.column( 6, {page:'current'} ).data().sum()));
         }
     }
 </script>

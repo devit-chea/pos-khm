@@ -58,10 +58,10 @@
                                         <table id="product-table" class="table">
                                             <thead>
                                                 <tr>
-                                                    <th><i class="dripicons-view-apps"></i></th>
+                                                    <th><i class="ti ti-view-apps"></i></th>
                                                     <th>{{__('db.name')}}</th>
                                                     <th>{{__('db.Code')}}</th>
-                                                    <th><i class="dripicons-trash"></i></th>
+                                                    <th><i class="ti ti-trash"></i></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -83,11 +83,11 @@
                                 </div>
                                 <div class="col-md-4 form-group">
                                 	<label>{{__('db.Valid From')}} *</label>
-                                    <input type="text" name="valid_from" value="{{date($general_setting->date_format, strtotime($lims_discount_data->valid_from))}}" required class="form-control date">
+                                    <input type="text" name="valid_from" value="{{date(gen_setting()->date_format, strtotime($lims_discount_data->valid_from))}}" required class="form-control date">
                                 </div>
                                 <div class="col-md-4 form-group">
                                 	<label>{{__('db.Valid Till')}} *</label>
-                                    <input type="text" name="valid_till" value="{{date($general_setting->date_format, strtotime($lims_discount_data->valid_till))}}" required class="form-control date">
+                                    <input type="text" name="valid_till" value="{{date(gen_setting()->date_format, strtotime($lims_discount_data->valid_till))}}" required class="form-control date">
                                 </div>
                                 <div class="col-md-4 form-group">
                                 	<label>{{__('db.Discount Type')}} *</label>

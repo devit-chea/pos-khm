@@ -6,5 +6,11 @@
     "Restaurant": true,
     "Project": true,
     "Gym": true,
-    "Repair": true
+    "Repair": true,
+    "AIAssistant": true,
+    "Tailoring": true,
+    "SocialCommerce": true,
+    "ZatcaIntegrationKsa": true,
+    "IndiaGST": true,
+    "VCardNfc": true
 }

@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Mail\UserNotification;
 use App\Models\Account;
 use App\Models\Currency;
+use App\Models\CashRegister;
 use App\Models\Payment;
 use App\Models\Product_Warehouse;
 use App\Models\Product;
@@ -25,12 +25,18 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
-use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class ReturnPurchaseController extends Controller
 {
     use TenantInfo;
+
+    protected $accountingService;
+
+    public function __construct(\App\Services\AccountingService $accountingService)
+    {
+        $this->accountingService = $accountingService;
+    }
 
     public function index(Request $request)
     {
@@ -101,7 +107,7 @@ class ReturnPurchaseController extends Controller
         $order = 'return_purchases.'.$columns[$request->input('order.0.column')];
         $dir = $request->input('order.0.dir');
         if(empty($request->input('search.value'))) {
-            $q = ReturnPurchase::with('supplier', 'warehouse', 'user')
+            $q = ReturnPurchase::with('supplier', 'warehouse', 'user', 'refundPayments')
                 ->whereDate('created_at', '>=' ,$request->input('starting_date'))
                 ->whereDate('created_at', '<=' ,$request->input('ending_date'))
                 ->offset($start)
@@ -117,73 +123,6 @@ class ReturnPurchaseController extends Controller
         }
         else
         {
-            // $search = $request->input('search.value');
-            // $q = ReturnPurchase::leftJoin('suppliers', 'return_purchases.supplier_id', '=', 'suppliers.id')
-            //     ->whereDate('return_purchases.created_at', '=' , date('Y-m-d', strtotime(str_replace('/', '-', $search))))
-            //     ->offset($start)
-            //     ->limit($limit)
-            //     ->orderBy($order,$dir);
-            // if(Auth::user()->role_id > 2 && config('staff_access') == 'own') {
-            //     $returnss =  $q->select('return_purchases.*')
-            //                 ->with('supplier', 'warehouse', 'user')
-            //                 ->where('return_purchases.user_id', Auth::id())
-            //                 ->orwhere([
-            //                     ['return_purchases.reference_no', 'LIKE', "%{$search}%"],
-            //                     ['return_purchases.user_id', Auth::id()]
-            //                 ])
-            //                 ->orwhere([
-            //                     ['suppliers.name', 'LIKE', "%{$search}%"],
-            //                     ['return_purchases.user_id', Auth::id()]
-            //                 ])
-            //                 ->get();
-
-            //     $totalFiltered = $q->where('return_purchases.user_id', Auth::id())
-            //                     ->orwhere([
-            //                         ['return_purchases.reference_no', 'LIKE', "%{$search}%"],
-            //                         ['return_purchases.user_id', Auth::id()]
-            //                     ])
-            //                     ->orwhere([
-            //                         ['suppliers.name', 'LIKE', "%{$search}%"],
-            //                         ['return_purchases.user_id', Auth::id()]
-            //                     ])
-            //                     ->count();
-            // }
-            // elseif(Auth::user()->role_id > 2 && config('staff_access') == 'warehouse') {
-            //     $returnss =  $q->select('return_purchases.*')
-            //                 ->with('supplier', 'warehouse', 'user')
-            //                 ->where('return_purchases.user_id', Auth::id())
-            //                 ->orwhere([
-            //                     ['return_purchases.reference_no', 'LIKE', "%{$search}%"],
-            //                     ['return_purchases.warehouse_id', Auth::user()->warehouse_id]
-            //                 ])
-            //                 ->orwhere([
-            //                     ['suppliers.name', 'LIKE', "%{$search}%"],
-            //                     ['return_purchases.warehouse_id', Auth::user()->warehouse_id]
-            //                 ])
-            //                 ->get();
-
-            //     $totalFiltered = $q->where('return_purchases.user_id', Auth::id())
-            //                     ->orwhere([
-            //                         ['return_purchases.reference_no', 'LIKE', "%{$search}%"],
-            //                         ['return_purchases.warehouse_id', Auth::user()->warehouse_id]
-            //                     ])
-            //                     ->orwhere([
-            //                         ['suppliers.name', 'LIKE', "%{$search}%"],
-            //                         ['return_purchases.warehouse_id', Auth::user()->warehouse_id]
-            //                     ])
-            //                     ->count();
-            // }
-            // else {
-            //     $returnss =  $q->select('return_purchases.*')
-            //                 ->with('supplier', 'warehouse', 'user')
-            //                 ->orwhere('return_purchases.reference_no', 'LIKE', "%{$search}%")
-            //                 ->orwhere('suppliers.name', 'LIKE', "%{$search}%")
-            //                 ->get();
-
-            //     $totalFiltered = $q->orwhere('return_purchases.reference_no', 'LIKE', "%{$search}%")
-            //                     ->orwhere('suppliers.name', 'LIKE', "%{$search}%")
-            //                     ->count();
-            // }
             $search = $request->input('search.value');
 
             $q = ReturnPurchase::query()
@@ -220,7 +159,7 @@ class ReturnPurchaseController extends Controller
             $totalFiltered = $q->distinct('return_purchases.id')->count('return_purchases.id');
 
             $returnss = $q->select('return_purchases.*')
-                ->with('supplier', 'warehouse', 'user')
+                ->with('supplier', 'warehouse', 'user', 'refundPayments')
                 ->distinct('return_purchases.id')
                 ->offset($start)
                 ->limit($limit)
@@ -256,7 +195,7 @@ class ReturnPurchaseController extends Controller
                 }
                 if(!isset($returns->exchange_rate) || $returns->exchange_rate == 0)   
                     $returns->exchange_rate = 1;
-                $nestedData['grand_total'] = number_format($returns->grand_total / $returns->exchange_rate, config('decimal'));
+                $nestedData['grand_total'] = number_format($returns->display_grand_total / $returns->exchange_rate, config('decimal'));
                 $nestedData['options'] = '<div class="btn-group">
                             <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">'.__("db.action").'
                               <span class="caret"></span>
@@ -264,17 +203,17 @@ class ReturnPurchaseController extends Controller
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                                 <li>
-                                    <button type="button" class="btn btn-link view"><i class="fa fa-eye"></i> '.__('db.View').'</button>
+                                    <button type="button" class="btn btn-link view"><i class="ti ti-eye"></i> '.__('db.View').'</button>
                                 </li>';
                 if(in_array("returns-edit", $request['all_permission'])) {
                     $nestedData['options'] .= '<li>
-                        <a href="'.route('return-purchase.edit', $returns->id).'" class="btn btn-link"><i class="dripicons-document-edit"></i> '.__('db.edit').'</a>
+                        <a href="'.route('return-purchase.edit', $returns->id).'" class="btn btn-link"><i class="ti ti-edit"></i> '.__('db.edit').'</a>
                         </li>';
                 }
                 if(in_array("returns-delete", $request['all_permission']))
                     $nestedData['options'] .= '<form action="' . route("return-purchase.destroy", $returns->id) . '" method="POST">'.csrf_field().'' . method_field("DELETE") . '
                             <li>
-                              <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> '.__("db.delete").'</button>
+                              <button type="submit" class="btn btn-link" data-confirm-message="' . __('db.Are you sure want to delete?') . '"><i class="ti ti-trash"></i> '.__("db.delete").'</button>
                             </li></form>
                         </ul>
                     </div>';
@@ -297,21 +236,21 @@ class ReturnPurchaseController extends Controller
             "data"            => $data
         );
 
-        echo json_encode($json_data);
+        return response()->json($json_data);
     }
 
     public function create(Request $request)
     {
         $role = Role::find(Auth::user()->role_id);
         if($role->hasPermissionTo('purchase-return-add')) {
-            $lims_purchase_data = Purchase::select('id')->where('reference_no', $request->input('reference_no'))->first();
+            $lims_purchase_data = Purchase::select('id','paid_amount')->where('reference_no', $request->input('reference_no'))->first();
             if(!$lims_purchase_data)
                 return redirect()->back()->with('not_permitted', __('db.This reference no does not exist!'));
             $lims_product_purchase_data = ProductPurchase::where('purchase_id', $lims_purchase_data->id)->get();
             $lims_product_purchase_payment_acc_id = Payment::select('account_id')->where('purchase_id', $lims_purchase_data->id)->first();
             $lims_warehouse_list = Warehouse::where('is_active',true)->get();
             $lims_tax_list = Tax::where('is_active',true)->get();
-            $lims_account_list = Account::where('is_active',true)->get();
+            $lims_account_list = app(\App\Services\PaymentAccountService::class)->validOperationalAccounts();
             return view('backend.return_purchase.create', compact('lims_product_purchase_payment_acc_id','lims_warehouse_list', 'lims_tax_list', 'lims_account_list', 'lims_purchase_data', 'lims_product_purchase_data'));
         }
         else
@@ -461,16 +400,31 @@ class ReturnPurchaseController extends Controller
 
     public function store(Request $request)
     {
+        try {
+        DB::beginTransaction();
+
         $data = $request->except('document');
         //return dd($data);
         $data['reference_no'] = 'prr-' . date("Ymd") . '-'. date("his");
         $data['user_id'] = Auth::id();
-        $lims_purchase_data = Purchase::select('warehouse_id', 'supplier_id', 'currency_id', 'exchange_rate')->find($data['purchase_id']);
+        $lims_purchase_data = Purchase::select('id', 'warehouse_id', 'supplier_id', 'paid_amount', 'currency_id', 'exchange_rate', 'import_batch_id')->find($data['purchase_id']);
         $data['user_id'] = Auth::id();
         $data['supplier_id'] = $lims_purchase_data->supplier_id;
         $data['warehouse_id'] = $lims_purchase_data->warehouse_id;
         $data['currency_id'] = $lims_purchase_data->currency_id;
         $data['exchange_rate'] = $lims_purchase_data->exchange_rate;
+        $refundAmount = (float) ($request->refund_amount ?? 0);
+        $hasRefund = $lims_purchase_data->paid_amount > 0 && $refundAmount > 0;
+
+        if ($hasRefund) {
+            if (empty($data['account_id'])) {
+                $lims_account_data = Account::where('is_default', true)->first();
+                $data['account_id'] = $lims_account_data?->id;
+            }
+        } else {
+            $data['account_id'] = null;
+        }
+
         $document = $request->document;
         if ($document) {
             $v = Validator::make(
@@ -511,6 +465,45 @@ class ReturnPurchaseController extends Controller
             $mail_data['grand_total'] = $lims_return_data->grand_total;
         }
 
+        if($hasRefund) {
+
+            $cash_register_data = CashRegister::where([
+                ['user_id', $data['user_id']],
+                ['warehouse_id', $data['warehouse_id']],
+                ['status', true]
+            ])->first();
+
+            if($cash_register_data)
+                $data['cash_register_id'] = $cash_register_data->id;
+
+            // REFUND PAYMENT LOGIC
+            $paying_method = $request->paying_method ?? 'Cash';
+
+            // create payment reference
+            $payment_reference = 'sppr-' . date("Ymd") . '-' . date("his");
+
+            // create refund payment record
+            $payment_data = [
+                'payment_reference' => $payment_reference,
+                'purchase_id' => $lims_purchase_data->id,
+                'purchase_return_id' => $lims_return_data->id,
+                'cash_register_id' => $data['cash_register_id'] ?? null,
+                'user_id' => Auth::id(),
+                'account_id' => $data['account_id'],
+                'amount' => $refundAmount,
+                'paying_method' => $paying_method,
+                'created_at' => now(),
+                'updated_at' => now()
+            ];
+
+            $refundPayment = Payment::create($payment_data);
+            $result = $this->accountingService->recordPayment($refundPayment);
+            if (!$result->success) {
+                \Log::error('Accounting failed for Purchase Return Refund', ['payment_id' => $refundPayment->id, 'error' => $result->error]);
+                throw new \App\Exceptions\AccountingException($result->error);
+            }
+        }
+
         $product_purchase_ids = $data['is_return'];
         $imei_number = $data['imei_number'];
         $product_batch_id = $data['product_batch_id'];
@@ -529,6 +522,29 @@ class ReturnPurchaseController extends Controller
             //return $key;
             $lims_product_data = Product::find($pro_id);
             $variant_id = null;
+            $product_purchase_data = app(\App\Services\PurchaseReturnQuantityService::class)
+                ->lockLineById((int) $data['purchase_id'], (int) $product_purchase_id, (int) $pro_id);
+            $submittedVariantId = null;
+            if ($lims_product_data->is_variant) {
+                $submittedVariant = ProductVariant::select('variant_id')
+                    ->FindExactProductWithCode($pro_id, $product_code[$key])
+                    ->first();
+                if (!$submittedVariant) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'product_purchase_id' => 'The selected variant does not belong to the original purchase line.',
+                    ]);
+                }
+                $submittedVariantId = (int) $submittedVariant->variant_id;
+            }
+            app(\App\Services\PurchaseReturnQuantityService::class)->assertStockIdentity(
+                $product_purchase_data,
+                $submittedVariantId,
+                !empty($product_batch_id[$key]) ? (int) $product_batch_id[$key] : null
+            );
+            if (!$lims_purchase_data->import_batch_id) {
+                app(\App\Services\PurchaseReturnQuantityService::class)
+                    ->assertCanReturn($product_purchase_data, (float) $qty[$key]);
+            }
             if($purchase_unit[$key] != 'n/a') {
                 $lims_purchase_unit_data  = Unit::where('unit_name', $purchase_unit[$key])->first();
                 $purchase_unit_id = $lims_purchase_unit_data->id;
@@ -631,16 +647,37 @@ class ReturnPurchaseController extends Controller
 
             $mail_data['qty'][$key] = $qty[$key];
             $mail_data['total'][$key] = $total[$key];
-            PurchaseProductReturn::insert(
+            $createdReturnLine = PurchaseProductReturn::create(
                 ['return_id' => $lims_return_data->id, 'product_id' => $pro_id, 'product_batch_id' => $product_batch_id[$key], 'variant_id' => $variant_id, 'imei_number' => $imei_number[$key], 'qty' => $qty[$key], 'purchase_unit_id' => $purchase_unit_id, 'net_unit_cost' => $net_unit_cost[$key], 'discount' => $discount[$key], 'tax_rate' => $tax_rate[$key], 'tax' => $tax[$key], 'total' => $total[$key], 'created_at' => \Carbon\Carbon::now(),  'updated_at' => \Carbon\Carbon::now()]
             );
-            $product_purchase_data = ProductPurchase::where([
-                ['product_id', $pro_id],
-                ['purchase_id', $data['purchase_id']]
-            ])->select('id', 'return_qty')->first();
-            $product_purchase_data->return_qty += $qty[$key];
-            $product_purchase_data->save();
+            app(\App\Services\ImportCostAllocationService::class)->allocatePurchaseReturnCost(
+                $lims_return_data, $createdReturnLine, $product_purchase_data
+            );
+            if (!$lims_purchase_data->import_batch_id) {
+                app(\App\Services\PurchaseReturnQuantityService::class)
+                    ->addReturnedQty($product_purchase_data, (float) $qty[$key]);
+            }
         }
+
+        if (class_exists(\Modules\IndiaGST\Services\Calculation\IndiaGstPurchaseReturnTransactionService::class)) {
+            app(\Modules\IndiaGST\Services\Calculation\IndiaGstPurchaseReturnTransactionService::class)->recordPurchaseReturnSnapshot($lims_return_data, $data);
+        }
+
+        $res = $this->accountingService->recordPurchaseReturn($lims_return_data, 'purchase_return_created');
+        if (!$res->success) {
+            throw new \App\Exceptions\AccountingException($res->error);
+        }
+        $lims_return_data->accounting_status = $res->sourceStatus();
+        $lims_return_data->save();
+
+        DB::commit();
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Return purchase creation failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Return purchase creation failed: ' . $e->getMessage());
+        }
+
         $message = 'Return created successfully';
         if($mail_data['email']){
             try{
@@ -658,12 +695,14 @@ class ReturnPurchaseController extends Controller
 
     public function productReturnData($id)
     {
+        ReturnPurchase::findOrFail($id);
+
         $lims_product_return_data = PurchaseProductReturn::where('return_id', $id)->get();
         foreach ($lims_product_return_data as $key => $product_return_data) {
             $product = Product::find($product_return_data->product_id);
             if($product_return_data->purchase_unit_id != 0){
                 $unit_data = Unit::find($product_return_data->purchase_unit_id);
-                $unit = $unit_data->unit_code;
+                $unit = $unit_data ? $unit_data->unit_code : '';
             }
             else
                 $unit = '';
@@ -719,7 +758,7 @@ class ReturnPurchaseController extends Controller
 
                 if($product_return_data->purchase_unit_id){
                     $lims_unit_data = Unit::find($product_return_data->purchase_unit_id);
-                    $mail_data['unit'][$key] = $lims_unit_data->unit_code;
+                    $mail_data['unit'][$key] = $lims_unit_data ? $lims_unit_data->unit_code : '';
                 }
                 else
                     $mail_data['unit'][$key] = '';
@@ -746,13 +785,14 @@ class ReturnPurchaseController extends Controller
 
     public function edit($id)
     {
+        $lims_return_data = ReturnPurchase::findOrFail($id);
+
         $role = Role::find(Auth::user()->role_id);
         if($role->hasPermissionTo('purchase-return-edit')){
             $lims_supplier_list = Supplier::where('is_active',true)->get();
             $lims_warehouse_list = Warehouse::where('is_active',true)->get();
-            $lims_account_list = Account::where('is_active',true)->get();
+            $lims_account_list = app(\App\Services\PaymentAccountService::class)->validOperationalAccounts();
             $lims_tax_list = Tax::where('is_active',true)->get();
-            $lims_return_data = ReturnPurchase::find($id);
             $lims_product_return_data = PurchaseProductReturn::where('return_id', $id)->get();
             return view('backend.return_purchase.edit',compact('lims_supplier_list', 'lims_warehouse_list', 'lims_tax_list', 'lims_account_list', 'lims_return_data','lims_product_return_data'));
         }
@@ -762,11 +802,18 @@ class ReturnPurchaseController extends Controller
 
     public function update(Request $request, $id)
     {
+        try {
+        DB::beginTransaction();
+
         $data = $request->except('document');
         //return dd($data);
         $document = $request->document;
         $lims_return_data = ReturnPurchase::find($id);
-
+        if ($lims_return_data->purchase?->import_batch_id) {
+            $data['purchase_id'] = $lims_return_data->purchase_id;
+            $data['warehouse_id'] = $lims_return_data->warehouse_id;
+            $data['supplier_id'] = $lims_return_data->supplier_id;
+        }
         if ($document) {
             $v = Validator::make(
                 [
@@ -794,13 +841,18 @@ class ReturnPurchaseController extends Controller
             $data['document'] = $documentName;
         }
 
+        app(\App\Services\ImportCostAllocationService::class)->reversePurchaseReturnCost($lims_return_data);
+
         $lims_product_return_data = PurchaseProductReturn::where('return_id', $id)->get();
+        foreach ($lims_product_return_data as $existingReturnLine) {
+            app(\App\Services\PurchaseReturnQuantityService::class)
+                ->releaseReturnLine($lims_return_data, $existingReturnLine);
+        }
 
         $product_id = $data['product_id'];
         $imei_number = $data['imei_number'];
         $product_batch_id = $data['product_batch_id'];
         $product_code = $data['product_code'];
-        $product_variant_id = $data['product_variant_id'];
         $qty = $data['qty'];
         $purchase_unit = $data['purchase_unit'];
         $net_unit_cost = $data['net_unit_cost'];
@@ -810,11 +862,13 @@ class ReturnPurchaseController extends Controller
         $total = $data['subtotal'];
 
         foreach ($lims_product_return_data as $key => $product_return_data) {
-            $old_product_id[] = $product_return_data->product_id;
-            $old_product_variant_id[] = null;
             $lims_product_data = Product::find($product_return_data->product_id);
             if($product_return_data->purchase_unit_id != 0) {
                 $lims_purchase_unit_data = Unit::find($product_return_data->purchase_unit_id);
+                if (!$lims_purchase_unit_data) {
+                    \Log::error("Calculation integrity error: Purchase unit ID {$product_return_data->purchase_unit_id} not found for product ID {$product_return_data->product_id} in purchase return ID {$id}.");
+                    throw new \Exception("Data integrity error: referenced unit #{$product_return_data->purchase_unit_id} could not be resolved for purchase return calculation.");
+                }
                 if ($lims_purchase_unit_data->operator == '*')
                     $quantity = $product_return_data->qty * $lims_purchase_unit_data->operation_value;
                 elseif($lims_purchase_unit_data->operator == '/')
@@ -824,7 +878,6 @@ class ReturnPurchaseController extends Controller
                     $lims_product_variant_data = ProductVariant::select('id', 'qty')->FindExactProduct($product_return_data->product_id, $product_return_data->variant_id)->first();
                     $lims_product_warehouse_data = Product_Warehouse::FindProductWithVariant($product_return_data->product_id, $product_return_data->variant_id, $lims_return_data->warehouse_id)
                     ->first();
-                    $old_product_variant_id[$key] = $lims_product_variant_data->id;
                     $lims_product_variant_data->qty += $quantity;
                     $lims_product_variant_data->save();
                 }
@@ -855,15 +908,16 @@ class ReturnPurchaseController extends Controller
                 $lims_product_data->save();
                 $lims_product_warehouse_data->save();
             }
-            if($product_return_data->variant_id && !(in_array($old_product_variant_id[$key], $product_variant_id)) ){
-                $product_return_data->delete();
-            }
-            elseif( !(in_array($old_product_id[$key], $product_id)) )
-                $product_return_data->delete();
         }
+        // Rebuild the detail rows from the submitted exact identities. Updating
+        // by product_id alone corrupts returns that contain multiple batches of
+        // the same product, and updating by variant alone has the same problem.
+        PurchaseProductReturn::where('return_id', $id)->delete();
         foreach ($product_id as $key => $pro_id) {
             $lims_product_data = Product::find($pro_id);
             $product_return['variant_id'] = null;
+            $purchase_unit_id = 0;
+            $purchaseLine = null;
             if($purchase_unit[$key] != 'n/a'){
                 $lims_purchase_unit_data = Unit::where('unit_name', $purchase_unit[$key])->first();
                 $purchase_unit_id = $lims_purchase_unit_data->id;
@@ -916,6 +970,18 @@ class ReturnPurchaseController extends Controller
                 $lims_product_warehouse_data->save();
             }
 
+            if (!$lims_return_data->purchase?->import_batch_id) {
+                $purchaseLine = app(\App\Services\PurchaseReturnQuantityService::class)->resolveLine(
+                    (int) $lims_return_data->purchase_id,
+                    (int) $pro_id,
+                    (int) $purchase_unit_id,
+                    $product_return['variant_id'] !== null ? (int) $product_return['variant_id'] : null,
+                    !empty($product_batch_id[$key]) ? (int) $product_batch_id[$key] : null
+                );
+                app(\App\Services\PurchaseReturnQuantityService::class)
+                    ->assertCanReturn($purchaseLine, (float) $qty[$key]);
+            }
+
             if($lims_product_data->is_variant)
                 $mail_data['products'][$key] = $lims_product_data->name . ' [' . $variant_data->name .']';
             else
@@ -941,23 +1007,52 @@ class ReturnPurchaseController extends Controller
             $product_return['tax'] = $tax[$key];
             $product_return['total'] = $total[$key];
 
-            if($product_return['variant_id'] && in_array($product_variant_id[$key], $old_product_variant_id)) {
-                PurchaseProductReturn::where([
-                    ['product_id', $pro_id],
-                    ['variant_id', $product_return['variant_id']],
-                    ['return_id', $id]
-                ])->update($product_return);
+            PurchaseProductReturn::create($product_return);
+
+            if ($purchaseLine) {
+                app(\App\Services\PurchaseReturnQuantityService::class)
+                    ->addReturnedQty($purchaseLine, (float) $qty[$key]);
             }
-            elseif( $product_return['variant_id'] === null && (in_array($pro_id, $old_product_id)) ) {
-                PurchaseProductReturn::where([
-                    ['return_id', $id],
-                    ['product_id', $pro_id]
-                    ])->update($product_return);
-            }
-            else
-                PurchaseProductReturn::create($product_return);
         }
         $lims_return_data->update($data);
+
+        if ($lims_return_data->purchase?->import_batch_id) {
+            foreach (PurchaseProductReturn::where('return_id', $id)->get() as $updatedLine) {
+                $purchaseLines = ProductPurchase::where('purchase_id', $lims_return_data->purchase_id)
+                    ->where('product_id', $updatedLine->product_id)
+                    ->where('variant_id', $updatedLine->variant_id ?: null)
+                    ->where('product_batch_id', $updatedLine->product_batch_id ?: null)->get();
+                if ($purchaseLines->count() !== 1) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'product_id' => 'Cannot identify a unique original purchase line for this imported supplier return.',
+                    ]);
+                }
+                app(\App\Services\ImportCostAllocationService::class)->allocatePurchaseReturnCost(
+                    $lims_return_data, $updatedLine, $purchaseLines->first()
+                );
+            }
+        }
+
+        $revRes = $this->accountingService->reverseTransaction(get_class($lims_return_data), $lims_return_data->id);
+        if (!$revRes->success && $revRes->error !== 'No entries to reverse') {
+            throw new \App\Exceptions\AccountingException($revRes->error);
+        }
+
+        $res = $this->accountingService->recordPurchaseReturn($lims_return_data, 'purchase_return_updated');
+        if (!$res->success) {
+            throw new \App\Exceptions\AccountingException($res->error);
+        }
+        $lims_return_data->accounting_status = $res->sourceStatus();
+        $lims_return_data->save();
+
+        DB::commit();
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Return purchase update failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Return purchase update failed: ' . $e->getMessage());
+        }
+
         $message = 'Return updated successfully';
         if($data['supplier_id']) {
             $lims_supplier_data = Supplier::find($data['supplier_id']);
@@ -986,15 +1081,38 @@ class ReturnPurchaseController extends Controller
     public function deleteBySelection(Request $request)
     {
         $return_id = $request['returnIdArray'];
+        DB::beginTransaction();
+        try {
         foreach ($return_id as $id) {
             $lims_return_data = ReturnPurchase::find($id);
+            if (!$lims_return_data) {
+                continue;
+            }
+            $revRes = $this->accountingService->reverseTransaction(get_class($lims_return_data), $id, '_deleted');
+            if (!$revRes->success && $revRes->error !== 'No entries to reverse') {
+                throw new \App\Exceptions\AccountingException($revRes->error);
+            }
+            foreach (Payment::where('purchase_return_id', $id)->get() as $refundPayment) {
+                $paymentReversal = $this->accountingService->reverseTransaction(get_class($refundPayment), $refundPayment->id, '_deleted');
+                if (!$paymentReversal->success && $paymentReversal->error !== 'No entries to reverse') {
+                    throw new \App\Exceptions\AccountingException($paymentReversal->error);
+                }
+                $refundPayment->delete();
+            }
+            app(\App\Services\ImportCostAllocationService::class)->reversePurchaseReturnCost($lims_return_data);
             $lims_product_return_data = PurchaseProductReturn::where('return_id', $id)->get();
 
             foreach ($lims_product_return_data as $key => $product_return_data) {
+                app(\App\Services\PurchaseReturnQuantityService::class)
+                    ->releaseReturnLine($lims_return_data, $product_return_data);
                 $lims_product_data = Product::find($product_return_data->product_id);
 
                 if($product_return_data->purchase_unit_id != 0){
                     $lims_purchase_unit_data = Unit::find($product_return_data->purchase_unit_id);
+                    if (!$lims_purchase_unit_data) {
+                        \Log::error("Calculation integrity error: Purchase unit ID {$product_return_data->purchase_unit_id} not found for product ID {$product_return_data->product_id} in purchase return ID {$id}.");
+                        throw new \Exception("Data integrity error: referenced unit #{$product_return_data->purchase_unit_id} could not be resolved for purchase return calculation.");
+                    }
 
                     if ($lims_purchase_unit_data->operator == '*')
                         $quantity = $product_return_data->qty * $lims_purchase_unit_data->operation_value;
@@ -1030,19 +1148,50 @@ class ReturnPurchaseController extends Controller
             $lims_return_data->delete();
             $this->fileDelete(public_path('documents/purchase_return/'), $lims_return_data->document);
         }
+        DB::commit();
         return 'Return deleted successfully!';
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('Bulk purchase return deletion failed: ' . $e->getMessage());
+            return response('Purchase return deletion failed.', 422);
+        }
     }
 
     public function destroy($id)
     {
+        try {
+        DB::beginTransaction();
+
         $lims_return_data = ReturnPurchase::find($id);
+        if (!$lims_return_data) {
+            DB::rollBack();
+            return response('Purchase return not found.', 404);
+        }
+        $revRes = $this->accountingService->reverseTransaction(get_class($lims_return_data), $id, '_deleted');
+        if (!$revRes->success && $revRes->error !== 'No entries to reverse') {
+            throw new \App\Exceptions\AccountingException($revRes->error);
+        }
+        foreach (Payment::where('purchase_return_id', $id)->get() as $refundPayment) {
+            $paymentReversal = $this->accountingService->reverseTransaction(get_class($refundPayment), $refundPayment->id, '_deleted');
+            if (!$paymentReversal->success && $paymentReversal->error !== 'No entries to reverse') {
+                throw new \App\Exceptions\AccountingException($paymentReversal->error);
+            }
+            $refundPayment->delete();
+        }
+        app(\App\Services\ImportCostAllocationService::class)->reversePurchaseReturnCost($lims_return_data);
         $lims_product_return_data = PurchaseProductReturn::where('return_id', $id)->get();
 
         foreach ($lims_product_return_data as $key => $product_return_data) {
+            app(\App\Services\PurchaseReturnQuantityService::class)
+                ->releaseReturnLine($lims_return_data, $product_return_data);
             $lims_product_data = Product::find($product_return_data->product_id);
 
             if($product_return_data->purchase_unit_id != 0) {
                 $lims_purchase_unit_data = Unit::find($product_return_data->purchase_unit_id);
+                if (!$lims_purchase_unit_data) {
+                    \Log::error("Calculation integrity error: Purchase unit ID {$product_return_data->purchase_unit_id} not found for product ID {$product_return_data->product_id} in purchase return ID {$id}.");
+                    throw new \Exception("Data integrity error: referenced unit #{$product_return_data->purchase_unit_id} could not be resolved for purchase return calculation.");
+                }
 
                 if ($lims_purchase_unit_data->operator == '*')
                     $quantity = $product_return_data->qty * $lims_purchase_unit_data->operation_value;
@@ -1085,6 +1234,14 @@ class ReturnPurchaseController extends Controller
         $lims_return_data->delete();
         $this->fileDelete(public_path('documents/purchase_return/'), $lims_return_data->document);
 
+        DB::commit();
+
         return redirect('return-purchase')->with('not_permitted', __('db.Data deleted successfully'));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Return purchase deletion failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Return purchase deletion failed: ' . $e->getMessage());
+        }
     }
 }

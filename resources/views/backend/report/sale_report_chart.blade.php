@@ -1,3 +1,6 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 @extends('backend.layout.main') @section('content')
 <section class="forms">
     <div class="container-fluid">
@@ -45,9 +48,9 @@
                     <div class="col-md-4">
                         <div class="form-group">
                             <label><strong>{{__('db.product_list')}}</strong></label>
-                            <input type="text" 
-                                name="product_list" 
-                                class="form-control" 
+                            <input type="text"
+                                name="product_list"
+                                class="form-control"
                                 value="{{ $product_list ?? '' }}"
                                 placeholder="{{__('db.Type product code seperated by comma')}}">
                         </div>
@@ -63,14 +66,9 @@
 
 @endsection
 @push('scripts')
-    @if (!config('database.connections.saleprosaas_landlord'))
-    <script type="text/javascript" src="<?php echo asset('vendor/chart.js/Chart.min.js'); ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('js/charts-custom.js'); ?>"></script>
-    @else
-    <script type="text/javascript" src="<?php echo asset('../../vendor/chart.js/Chart.min.js'); ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('../../js/charts-custom.js'); ?>"></script>    
-    @endif
-    
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/chart.js/Chart.min.js') }}"></script>
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'js/charts-custom.js') }}"></script>
+
     <script type="text/javascript">
 
         $("ul#report").siblings('a').attr('aria-expanded','true');
@@ -91,7 +89,7 @@
                 var soldqty = SALEREPORTCHART.data('soldqty');
                 var datepoints = SALEREPORTCHART.data('datepoints');
                 var label1 = SALEREPORTCHART.data('label1');
-                
+
                 if (sale_chart_instance) {
                     sale_chart_instance.destroy();
                 }
@@ -137,7 +135,15 @@
                 data: formData,
                 method: 'POST',
                 beforeSend: function () {
-                    $('#chart-container').html('<div class="text-center mt-4 mb-4"><i class="fa fa-spin fa-spinner"></i> {{__("db.Loading")}}...</div>');
+                    var loadingText = @json(__('db.Loading'));
+
+                    $('#chart-container').html(
+                        '<div class="text-center mt-4 mb-4">' +
+                            '<i class="ti ti-loader-2 ti-spin"></i> ' +
+                            loadingText +
+                            '...' +
+                        '</div>'
+                    );
                 },
                 success: function (response) {
                     $('#chart-container').html(response);

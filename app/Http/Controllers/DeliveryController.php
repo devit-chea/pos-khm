@@ -55,7 +55,8 @@ class DeliveryController extends Controller
         $query = Delivery::with([
             'sale:id,reference_no,customer_id,grand_total',
             'sale.customer:id,name,phone_number,city',
-            'courier:id,name'
+            'courier:id,name',
+            'user:id,name',
         ])
             ->leftJoin('sales', 'deliveries.sale_id', '=', 'sales.id')
             ->leftJoin('customers', 'sales.customer_id', '=', 'customers.id')
@@ -110,16 +111,10 @@ class DeliveryController extends Controller
 
             $status = __('db.Packing');
 
-            if ($delivery->tracking_code) {
-                if ($delivery->status == 2)
-                    $status = __('db.Delivering');
-                elseif ($delivery->status == 3)
-                    $status = __('db.Delivered');
-                else
-                    $status = __('db.Delivering');
-            } else {
-                $status = __('db.Packing');
-            }
+            if ($delivery->status == 2)
+                $status = __('db.Delivering');
+            elseif ($delivery->status == 3)
+                $status = __('db.Delivered');
 
 
 
@@ -134,6 +129,10 @@ class DeliveryController extends Controller
             $nestedData['customer'] = $customer ? $customer->name . '<br>' . $customer->phone_number : '';
             $nestedData['courier'] = $delivery->courier->name ?? 'N/A';
             $nestedData['address'] = $delivery->address;
+            $nestedData['note'] = $delivery->note;
+            $nestedData['prepared_by'] = $delivery->user->name ?? '';
+            $nestedData['delivered_by'] = $delivery->delivered_by;
+            $nestedData['recieved_by'] = $delivery->recieved_by;
             $nestedData['products'] = implode(",", $product_names);
             $nestedData['grand_total'] = number_format($delivery->sale->grand_total ?? 0, 2);
             $nestedData['status'] = '<div class="badge badge-primary">' . $status . '</div>';
@@ -161,7 +160,7 @@ class DeliveryController extends Controller
                         $steadfast .= '
             <li>
                 <button type="submit" class="btn btn-link">
-                    <i class="fa fa-search"></i> ' . __("Track Order") . '
+                    <i class="ti ti-search"></i> ' . __("Track Order") . '
                 </button>
             </li>';
                         $steadfast .= '</form>';
@@ -171,7 +170,7 @@ class DeliveryController extends Controller
                 <button type="button"
                     class="steadfast-delivery btn btn-link"
                     data-id="' . $delivery->sale_id . '" data-type="steadfast">
-                    <i class="fa fa-truck"></i> ' . __('Send To SteadFast') . '
+                    <i class="ti ti-truck"></i> ' . __('Send To SteadFast') . '
                 </button>
             </li>';
                     }
@@ -187,7 +186,7 @@ class DeliveryController extends Controller
                     class="track-delivery-btn btn btn-link"
                     data-id="' . $delivery->id . '"
                     data-tracking="' . $delivery->tracking_code . '">
-                    <i class="fa fa-search"></i> ' . __("Track Order") . '
+                    <i class="ti ti-search"></i> ' . __("Track Order") . '
                 </button>
             </li>';
                     } elseif ($isPacking) {
@@ -196,7 +195,7 @@ class DeliveryController extends Controller
             <button type="button"
                     class="steadfast-delivery btn btn-link"
                     data-id="' . $delivery->sale_id . '" data-type="pathao">
-                    <i class="fa fa-truck"></i> ' . __('Send To Pathao') . '
+                    <i class="ti ti-truck"></i> ' . __('Send To Pathao') . '
                 </button>
             </li>';
                     }
@@ -210,12 +209,12 @@ class DeliveryController extends Controller
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                                 <li>
-                                    <button type="button" data-id="' . $delivery->id . '" class="open-EditCategoryDialog btn btn-link" data-toggle="modal" data-target="#editModal" ><i class="dripicons-document-edit"></i> ' . __("db.edit") . '</button>
+                                    <button type="button" data-id="' . $delivery->id . '" class="open-EditCategoryDialog btn btn-link" data-toggle="modal" data-target="#editModal" ><i class="ti ti-edit"></i> ' . __("db.edit") . '</button>
                                 </li>' . $steadfast . '
                                 <li class="divider"></li>
                                 <form action="' . route("delivery.delete", $delivery->id) . '" method="POST">' . csrf_field() . '' . method_field("POST") . '
                                 <li>
-                                  <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> ' . __("db.delete") . '</button>
+                                  <button type="submit" class="btn btn-link" data-confirm-message="' . __('db.Are you sure want to delete?') . '"><i class="ti ti-trash"></i> ' . __("db.delete") . '</button>
                                 </li></form>
                             </ul>
                         </div>';
@@ -278,6 +277,9 @@ class DeliveryController extends Controller
 
     public function store(Request $request)
     {
+        try {
+        DB::beginTransaction();
+
         $data = $request->except('file');
         $delivery = Delivery::firstOrNew(['reference_no' => $data['reference_no']]);
 
@@ -341,6 +343,14 @@ class DeliveryController extends Controller
                     ]);
                 }
             }
+        }
+
+        DB::commit();
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Delivery creation failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Delivery creation failed: ' . $e->getMessage());
         }
 
         // ================== MAIL SEND ==================
@@ -468,6 +478,9 @@ class DeliveryController extends Controller
 
     public function update(Request $request)
     {
+        try {
+        DB::beginTransaction();
+
         $input = $request->except('file');
         //return $input;
         $lims_delivery_data = Delivery::find($input['delivery_id']);
@@ -482,6 +495,15 @@ class DeliveryController extends Controller
         $lims_delivery_data->update($input);
         $lims_sale_data = Sale::find($lims_delivery_data->sale_id);
         $lims_customer_data = Customer::find($lims_sale_data->customer_id);
+
+        DB::commit();
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Delivery update failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Delivery update failed: ' . $e->getMessage());
+        }
+
         $message = 'Delivery updated successfully';
         $mail_setting = MailSetting::latest()->first();
         if ($lims_customer_data->email && $input['status'] != 1 && $mail_setting) {
@@ -504,22 +526,38 @@ class DeliveryController extends Controller
 
     public function deleteBySelection(Request $request)
     {
-        $delivery_id = $request['deliveryIdArray'];
-        foreach ($delivery_id as $id) {
-            $lims_delivery_data = Delivery::find($id);
-            $this->fileDelete(public_path('documents/delivery/'), $lims_delivery_data->file);
-            $lims_delivery_data->delete();
+        try {
+            DB::beginTransaction();
+            $delivery_id = $request['deliveryIdArray'];
+            foreach ($delivery_id as $id) {
+                $lims_delivery_data = Delivery::find($id);
+                $this->fileDelete(public_path('documents/delivery/'), $lims_delivery_data->file);
+                $lims_delivery_data->delete();
+            }
+            DB::commit();
+            return 'Delivery deleted successfully';
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Delivery bulk deletion failed: ' . $e->getMessage());
+            return 'Delivery deletion failed: ' . $e->getMessage();
         }
-        return 'Delivery deleted successfully';
     }
 
     public function delete($id)
     {
-        $lims_delivery_data = Delivery::find($id);
-        $this->fileDelete(public_path('documents/delivery/'), $lims_delivery_data->file);
-        $lims_delivery_data->delete();
+        try {
+            DB::beginTransaction();
+            $lims_delivery_data = Delivery::find($id);
+            $this->fileDelete(public_path('documents/delivery/'), $lims_delivery_data->file);
+            $lims_delivery_data->delete();
 
-        return redirect('delivery')->with('not_permitted', __('db.Delivery deleted successfully'));
+            DB::commit();
+            return redirect('delivery')->with('not_permitted', __('db.Delivery deleted successfully'));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Delivery deletion failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Delivery deletion failed: ' . $e->getMessage());
+        }
     }
 
     public function track($id)

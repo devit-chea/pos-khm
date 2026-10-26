@@ -17,7 +17,19 @@ class UpdateProductRequest extends BaseFormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:255'],
+            'code' => [
+                'required',
+                'string',
+                'max:255',
+                function ($attribute, $value, $fail) {
+                    $isEmbedded = request()->boolean('is_embeded') || request()->boolean('is_embedded') || request()->input('is_embeded') == 1 || request()->input('is_embedded') == 1;
+                    if ($isEmbedded) {
+                        if (!preg_match('/^\d{7}$/', (string) $value)) {
+                            $fail(__('db.Embedded barcode products require exactly 7 numeric digits for the product code.'));
+                        }
+                    }
+                },
+            ],
             'type' => 'required|string|in:standard,digital,combo,service',
             'barcode_symbology' => 'required|string|max:50',
             'category_id' => 'required|exists:categories,id',

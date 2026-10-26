@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <x-validation-error fieldName="name" />
 <x-success-message key="message" />
@@ -6,7 +10,7 @@
 
 <section>
     <div class="container-fluid">
-        <button type="button" class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="dripicons-plus"></i> {{__('db.Add Table')}}</button>
+        <button type="button" class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="ti ti-plus"></i> {{__('db.Add Table')}}</button>
     </div>
     <div class="table-responsive">
         <table id="table-table" class="table">
@@ -34,27 +38,32 @@
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                                 <li>
-                                    <button type="button" data-id="{{$table->id}}" data-name="{{$table->name}}" data-number_of_person="{{$table->number_of_person}}" data-description="{{$table->description}}" data-floor_id="{{$table->floor_id}}" class="edit-btn btn btn-link" data-toggle="modal" data-target="#editModal" ><i class="dripicons-document-edit"></i>  {{__('db.edit')}}</button>
+                                    <button type="button" data-id="{{$table->id}}" data-name="{{$table->name}}" data-number_of_person="{{$table->number_of_person}}" data-description="{{$table->description}}" data-floor_id="{{$table->floor_id}}" class="edit-btn btn btn-link" data-toggle="modal" data-target="#editModal" ><i class="ti ti-edit"></i>  {{__('db.edit')}}</button>
                                 </li>
-                                @if(in_array('restaurant',explode(',',$general_setting->modules)))
+                                @can('restaurant-table')
+                                @if(isset($floors))
                                 @if($table->qr_code_id)
                                     <li>
-                                        <button type="button" data-id="{{$table->qr_code_id}}" class="btn btn-link btn-view-qr"><i class="fa fa-qrcode"></i> View QR</button>
+                                        <button type="button" data-qr-id="{{$table->qr_code_id}}" class="btn btn-link btn-view-qr"><i class="ti ti-qrcode"></i> {{ __('db.View QR Code') }}</button>
                                     </li>
                                     <li>
-                                        <a href="{{ url('qr/download/'.$table->qr_code_id) }}" class="btn btn-link"><i class="dripicons-download"></i> Download QR</a>
+                                        <a href="{{ route('qr.download', $table->qr_code_id) }}" class="btn btn-link"><i class="ti ti-download"></i> {{ __('db.Download QR') }}</a>
+                                    </li>
+                                    <li>
+                                        <button type="button" data-qr-id="{{$table->id}}" data-qr-type="table" class="btn btn-link btn-generate-qr"><i class="ti ti-reload"></i> {{ __('db.Regenerate QR Code') }}</button>
                                     </li>
                                 @else
                                     <li>
-                                        <button type="button" data-id="{{$table->id}}" data-type="table" class="btn btn-link btn-generate-qr"><i class="fa fa-qrcode"></i> Generate QR</button>
+                                        <button type="button" data-qr-id="{{$table->id}}" data-qr-type="table" class="btn btn-link btn-generate-qr"><i class="ti ti-qrcode"></i> {{ __('db.Generate QR Code') }}</button>
                                     </li>
                                 @endif
                                 @endif
+                                @endcan
                                 <form action="{{ route('tables.destroy', $table->id) }}" method="POST">
                                     @csrf
                                     @method('DELETE')
                                     <li>
-                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> {{__('db.delete')}}</button>
+                                        <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> {{__('db.delete')}}</button>
                                     </li>
                                 </form>
                             </ul>
@@ -67,6 +76,14 @@
     </div>
 </section>
 
+<div class="modal fade" id="qrModal">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            @include('backend.qr-menu.includes', ['tables' => $lims_table_all, 'lims_warehouse_list' => $lims_warehouse_list])
+        </div>
+    </div>
+</div>
+
 <!-- Create Modal -->
 <div id="createModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" class="modal fade text-left">
     <div role="document" class="modal-dialog">
@@ -75,7 +92,7 @@
           @csrf
           <div class="modal-header">
             <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Table')}}</h5>
-            <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+            <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
           </div>
           <div class="modal-body">
           <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -122,7 +139,7 @@
             @method('PUT')
       <div class="modal-header">
         <h5 id="exampleModalLabel" class="modal-title">{{__('db.Update Table')}}</h5>
-        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
       </div>
       <div class="modal-body">
         <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -165,6 +182,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
     $("ul#setting").siblings('a').attr('aria-expanded','true');
     $("ul#setting").addClass("show");
@@ -176,12 +194,7 @@
         }
     });
 
-    function confirmDelete() {
-      if (confirm("Are you sure want to delete?")) {
-          return true;
-      }
-      return false;
-    }
+    function confirmDelete() { return true; }
 $(document).ready(function() {
     $('.edit-btn').on('click', function(){
         $("#editModal input[name='table_id']").val($(this).data('id'));
@@ -189,7 +202,40 @@ $(document).ready(function() {
         $("#editModal input[name='number_of_person']").val($(this).data('number_of_person'));
         $("#editModal textarea[name='description']").val($(this).data('description'));
         $("#floor_id").val($(this).data('floor_id'));
-        $('.selectpicker').selectpicker('refresh');
+    $('.selectpicker').selectpicker('refresh');
+    });
+
+    $(document).on('click', '.btn-generate-qr', function() {
+        resetQrActions();
+        $('#qrModal')
+            .attr('data-qr-id', $(this).attr('data-qr-id'))
+            .attr('data-qr-type', $(this).attr('data-qr-type'))
+            .modal('show');
+    });
+
+    $(document).on('click', '.btn-view-qr', function() {
+        resetQrActions();
+        $.get('{{ url("qr/show") }}/' + $(this).attr('data-qr-id'), function(data) {
+            if (data.success) {
+                $('#qrcode').html('<img src="' + data.image_url + '" style="width:220px;height:220px;">');
+                $('#qr_link').val(data.url);
+                $('#qr_open').attr('href', data.url);
+                $('#qr_actions').removeClass('d-none');
+                $('#qr_download').prop('disabled', false).attr('data-url', data.download_url);
+                $('#qr_print').prop('disabled', false);
+                $('#qrModal')
+                    .attr('data-qr-id', data.entity_id)
+                    .attr('data-qr-type', data.entity_type)
+                    .modal('show');
+            }
+        }).fail(function(xhr) {
+            window.saleProToast(xhr.responseJSON?.message || qrMessages.request_failed, 'error');
+        });
+    });
+
+    $('#qrModal').on('hidden.bs.modal', function() {
+        $(this).removeAttr('data-qr-id data-qr-type');
+        resetQrActions();
     });
 });
 
@@ -200,8 +246,8 @@ $(document).ready(function() {
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -230,7 +276,7 @@ $(document).ready(function() {
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -239,7 +285,7 @@ $(document).ready(function() {
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -248,7 +294,7 @@ $(document).ready(function() {
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -257,7 +303,7 @@ $(document).ready(function() {
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -266,7 +312,7 @@ $(document).ready(function() {
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],

@@ -1,3 +1,6 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 <?php $general_setting = DB::table('general_settings')->find(1); ?>
 <!DOCTYPE html>
 <html lang="{{ app()->getLocale() }}">
@@ -9,22 +12,22 @@
     <!-- CSRF Token -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{$general_setting->site_title}}</title>
+    <title>{{gen_setting()->site_title}}</title>
 
     <!-- Fonts -->
     <link rel="dns-prefetch" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css?family=Raleway:300,400,600" rel="stylesheet" type="text/css">
     @if(!config('database.connections.saleprosaas_landlord'))
     <!-- Styles -->
-    <link href="{{ asset('css/app.css') }}" rel="stylesheet">
+    <link href="{{ asset($asset_prefix . 'css/app.css') }}" rel="stylesheet">
     <!-- Scripts -->
-    <script src="{{ asset('js/app.js') }}" defer></script>
-    <!-- <script type="text/javascript" src="{{ asset('js/barcode-qrcode-scanner_plugin.js') }}"></script> -->
+    <script src="{{ asset($asset_prefix . 'js/app.js') }}" defer></script>
+    <!-- <script type="text/javascript" src="{{ asset($asset_prefix . 'js/barcode-qrcode-scanner_plugin.js') }}"></script> -->
     @else
     <!-- Styles -->
-    <link href="{{ asset('../../css/app.css') }}" rel="stylesheet">
+    <link href="{{ asset($asset_prefix . 'css/app.css') }}" rel="stylesheet">
     <!-- Scripts -->
-    <script src="{{ asset('../../js/app.js') }}" defer></script>
+    <script src="{{ asset($asset_prefix . 'js/app.js') }}" defer></script>
     @endif
 </head>
 <body>
@@ -32,7 +35,7 @@
         <nav class="navbar navbar-expand-md navbar-light navbar-laravel">
             <div class="container">
                 <a class="navbar-brand" href="{{ url('/') }}" style="color: #7c5cc4; font-size: 18px; font-weight: bold;">
-                    {{$general_setting->site_title}}
+                    {{gen_setting()->site_title}}
                 </a>
                 <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>

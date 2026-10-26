@@ -5,7 +5,7 @@
 @endphp
 
 <head>
-    <link rel="icon" type="image/png" href="{{ url('logo', $general_setting->site_logo) }}" />
+    <link rel="icon" type="image/png" href="{{ url('logo', gen_setting()->site_logo) }}" />
     <title>Payment_Receipt_{{ $lims_payment_data->payment_reference }}</title>
     @php
         $primary_color =
@@ -74,7 +74,7 @@
     <div class="hidden-print">
         <table>
             <tr>
-                <td><a href="{{ $url }}" class="btn btn-info"><i class="fa fa-arrow-left"></i>
+                <td><a href="{{ $url }}" class="btn btn-info"><i class="ti ti-arrow-left"></i>
                         {{ __('db.Back') }}</a></td>
                 <td><button onclick="window.print();" class="btn btn-primary"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-printer"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2" /><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4" /><path d="M7 15a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2l0 -4" /></svg></button></td>
                 <td><button id="download-btn" onclick="downloadPDF()"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-file-type-pdf"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M5 12v-7a2 2 0 0 1 2 -2h7l5 5v4" /><path d="M5 18h1.5a1.5 1.5 0 0 0 0 -3h-1.5v6" /><path d="M17 18h2" /><path d="M20 15h-3v6" /><path d="M11 15v6h1a2 2 0 0 0 2 -2v-2a2 2 0 0 0 -2 -2h-1" /></svg></button></td>
@@ -90,7 +90,7 @@
             <tr>
                 <td colspan="2" style="padding:9px 0;width:40%">
                     @if (isset($show->show_warehouse_info) && $show->show_warehouse_info == 1)
-                        <h1 style="margin:0">{{ $general_setting->company_name ?? '' }}</h1>
+                        <h1 style="margin:0">{{ gen_setting()->company_name ?? '' }}</h1>
                         <div>
                             <span>{{ __('db.Address') }}:</span>&nbsp;&nbsp;<span>{{ $lims_warehouse_data->address }}</span>
                         </div>
@@ -98,18 +98,18 @@
                             <span>{{ __('db.Phone') }}:</span>&nbsp;&nbsp;<span>{{ $lims_warehouse_data->phone }}</span>
                         </div>
                         @if (
-                            $general_setting->vat_registration_number &&
+                            gen_setting()->vat_registration_number &&
                                 isset($show->show_vat_registration_number) &&
                                 $show->show_vat_registration_number == 1)
                             <div>
-                                <span>{{ __('db.VAT Number') }}:</span>&nbsp;&nbsp;<span>{{ $general_setting->vat_registration_number }}</span>
+                                <span>{{ __('db.VAT Number') }}:</span>&nbsp;&nbsp;<span>{{ gen_setting()->vat_registration_number }}</span>
                             </div>
                         @endif
                     @endif
                 </td>
                 <td style="width:30%; text-align: middle; vertical-align: top;">
-                    @if ($general_setting->site_logo || $invoice_settings->company_logo)
-                        <img src="{{ $invoice_settings->company_logo ? url('invoices', $invoice_settings->company_logo) : url('logo', $general_setting->site_logo) }}"
+                    @if (gen_setting()->site_logo || $invoice_settings->company_logo)
+                        <img src="{{ $invoice_settings->company_logo ? url('invoices', $invoice_settings->company_logo) : url('logo', gen_setting()->site_logo) }}"
                             height="{{ $invoice_settings->logo_height ?? 'auto' }}"
                             width="{{ $invoice_settings->logo_width ?? 'auto' }}" style="margin:5px 0;">
                     @endif
@@ -145,6 +145,15 @@
         </table>
 
         {{-- ── Bill To ── --}}
+        @if ($lims_sale_data->voided_at)
+            <div style="margin:8px 0;padding:8px;border:2px solid #b91c1c;color:#b91c1c;font-weight:bold;text-align:center;">
+                {{ __('db.Voided') }}
+                @if ($lims_sale_data->void_reason)
+                    — {{ $lims_sale_data->void_reason }}
+                @endif
+            </div>
+        @endif
+
         @if (isset($show->show_bill_to_info) && $show->show_bill_to_info == 1)
             <table style="width: 100%;border-collapse: collapse; margin-top: 4px;">
                 <tr>
@@ -174,7 +183,7 @@
             <table style="width: 100%;border-collapse: collapse; margin-top: 4px; margin-bottom: 4px;">
                 <tr class="table-header" style="background-color: {{ $primary_color }}; color: white;">
                     <td style="border:1px solid #222;padding:2px 6px;" colspan="4">
-                        {{ __('db.Cheque Details') }}
+                        {{ __('db.cheque_details') }}
                     </td>
                 </tr>
                 <tr>
@@ -184,10 +193,10 @@
                     <td style="border:1px solid #222;padding:2px 6px;width:25%">{{ $cheque_no }}</td>
                     <td class="td-text"
                         style="border:1px solid #222;padding:2px 6px;background-color:rgb(205,218,235);width:25%">
-                        {{ __('db.Cheque Amount') }}</td>
+                        {{ __('db.cheque_amount') }}</td>
                     <td style="border:1px solid #222;padding:2px 6px;width:25%">
                         {{ config('currency') }}
-                        {{ number_format($lims_payment_data->amount, $general_setting->decimal) }}
+                        {{ number_format($lims_payment_data->amount, gen_setting()->decimal) }}
                     </td>
                 </tr>
             </table>
@@ -226,21 +235,21 @@
                 <td class="td-text" style="border:1px solid #222;padding:4px 8px;background-color:rgb(205,218,235)">
                     {{ __('db.Recieved Amount') }}</td>
                 <td style="border:1px solid #222;padding:4px 8px;text-align:right">
-                    {{ number_format($lims_payment_data->amount + $lims_payment_data->change, $general_setting->decimal) }}
+                    {{ number_format($lims_payment_data->amount + $lims_payment_data->change, gen_setting()->decimal) }}
                 </td>
             </tr>
             <tr>
                 <td class="td-text" style="border:1px solid #222;padding:4px 8px;background-color:rgb(205,218,235)">
                     {{ __('db.Paying Amount') }}</td>
                 <td style="border:1px solid #222;padding:4px 8px;text-align:right">
-                    {{ number_format($lims_payment_data->amount, $general_setting->decimal) }}
+                    {{ number_format($lims_payment_data->amount, gen_setting()->decimal) }}
                 </td>
             </tr>
             <tr>
                 <td class="td-text" style="border:1px solid #222;padding:4px 8px;background-color:rgb(205,218,235)">
                     {{ __('db.Change') }}</td>
                 <td style="border:1px solid #222;padding:4px 8px;text-align:right">
-                    {{ number_format($lims_payment_data->change, $general_setting->decimal) }}
+                    {{ number_format($lims_payment_data->change, gen_setting()->decimal) }}
                 </td>
             </tr>
             @if ($lims_payment_data->payment_receiver)
@@ -329,7 +338,7 @@
                     console.error(err);
                     btn.disabled = false;
                     btn.innerHTML = '⬇ Download PDF';
-                    alert('PDF generation failed!');
+                    SaleProToast.show('PDF generation failed!');
                 });
         }
     </script>

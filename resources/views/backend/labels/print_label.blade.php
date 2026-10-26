@@ -96,9 +96,9 @@
                     @if(!empty($print['price']))
                     <span style="font-size: {{$print['price_size']}}px;">
                     @if(isset($print['promo_price']) && ($page_product['product_promo_price'] != 'null'))
-                            <span style="font-size: 11px">{{format_currency($page_product['currency'])}}</span> <span style="text-decoration: line-through;">{{format_currency($page_product['product_price'])}}</span> {{format_currency($page_product['product_promo_price'])}}
+                            <span style="text-decoration: line-through;">{{format_currency($page_product['product_price'])}}</span> {{format_currency($page_product['product_promo_price'])}}
                         @else
-                            <span style="font-size: 11px">{{format_currency($page_product['currency'])}}</span> {{format_currency($page_product['product_price'])}}
+                            {{format_currency($page_product['product_price'])}}
                     @endif
                     </span>
                     @endif

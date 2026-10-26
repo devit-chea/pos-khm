@@ -1,19 +1,17 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 @extends('backend.layout.main')
 @section('content')
 
 @push('css')
-    @if (!config('database.connections.saleprosaas_landlord'))
-        <link rel="preload" href="<?php echo asset('vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" rel="stylesheet">
-        </noscript>
-    @else
-        <link rel="preload" href="<?php echo asset('../../vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" as="style"
+    @include('backend.layout.partials.datatable_css')
+
+    <link rel="preload" href="{{ asset($asset_prefix . 'vendor/jquery-timepicker/jquery.timepicker.min.css') }}" as="style"
             onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('../../vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" rel="stylesheet">
-        </noscript>
-    @endif
+    <noscript>
+        <link href="{{ asset($asset_prefix . 'vendor/jquery-timepicker/jquery.timepicker.min.css') }}" rel="stylesheet">
+    </noscript>
 @endpush
 
 <x-error-message key="name" />
@@ -21,9 +19,10 @@
 <x-error-message key="not_permitted" />
 
 <section>
+    @include('backend.hrm.partials.warehouse_filter')
     <div class="container-fluid">
         <button type="button" class="btn btn-info" data-toggle="modal" data-target="#createModal">
-            <i class="dripicons-plus"></i> {{__('db.Add Overtime')}}
+            <i class="ti ti-plus"></i> {{__('db.Add Overtime')}}
         </button>
     </div>
     <div class="table-responsive">
@@ -32,6 +31,7 @@
                 <tr>
                     <th class="not-exported"></th>
                     <th>{{__('db.Employee')}}</th>
+                    <th>{{__('db.Warehouse')}}</th>
                     <th>{{__('db.date')}}</th>
                     <th>{{__('db.Hours')}}</th>
                     <th>{{__('db.Rate')}}</th>
@@ -45,6 +45,7 @@
                 <tr data-id="{{$overtime->id}}">
                     <td>{{$key}}</td>
                     <td>{{ $overtime->employee->name }}</td>
+                    <td>{{ $overtime->employee->warehouse?->name }}</td>
                     <td>{{ $overtime->date }}</td>
                     <td>{{ $overtime->hours }}</td>
                     <td>{{ $overtime->rate }}</td>
@@ -66,7 +67,7 @@
                                         data-status="{{$overtime->status}}"
                                         class="edit-btn btn btn-link"
                                         data-toggle="modal" data-target="#editModal" >
-                                        <i class="dripicons-document-edit"></i>  {{__('db.edit')}}
+                                        <i class="ti ti-edit"></i>  {{__('db.edit')}}
                                     </button>
                                 </li>
                                 <li class="divider"></li>
@@ -74,7 +75,7 @@
                                     @csrf
                                     @method('DELETE')
                                     <li>
-                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> {{__('db.delete')}}</button>
+                                        <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> {{__('db.delete')}}</button>
                                     </li>
                                 </form>
                             </ul>
@@ -110,7 +111,7 @@
                     </div>
                     <div class="col-md-6 col-12 mb-3">
                         <label>{{__('db.date')}}</label>
-                        <input type="text" name="date" class="form-control date" value="{{date($general_setting->date_format)}}" required>
+                        <input type="text" name="date" class="form-control date" value="{{date(gen_setting()->date_format)}}" required>
                     </div>
                     <div class="col-md-6 col-12 mb-3">
                         <label>{{__('db.Hours')}}</label>
@@ -155,7 +156,7 @@
           </div>
           <div class="col-md-6 col-12 mb-3">
             <label>{{__('db.date')}}</label>
-            <input type="text" name="date" class="form-control date" value="{{date($general_setting->date_format)}}" required>
+            <input type="text" name="date" class="form-control date" value="{{date(gen_setting()->date_format)}}" required>
           </div>
           <div class="col-md-6 col-12 mb-3">
             <label>{{__('db.Hours')}}</label>
@@ -175,7 +176,7 @@
           </div>
           <input type="hidden" name="overtime_id" id="edit_id">
           <div class="col-12 text-end">
-            <input type="submit" value="{{__('db.Update')}}" class="btn btn-primary">
+            <input type="submit" value="{{__('db.update')}}" class="btn btn-primary">
           </div>
         </div>
       </div>
@@ -188,18 +189,15 @@
 @endsection
 
 @push('scripts')
-    @if (!config('database.connections.saleprosaas_landlord'))
-        <script type="text/javascript" src="<?php echo asset('vendor/jquery/jquery.timepicker.min.js'); ?>"></script>
-    @else
-        <script type="text/javascript" src="<?php echo asset('../../vendor/jquery/jquery.timepicker.min.js'); ?>"></script>
-    @endif
+    @include('backend.layout.partials.datatable_js')
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/jquery/jquery.timepicker.min.js') }}"></script>
     <script type="text/javascript">
         $("ul#hrm").siblings('a').attr('aria-expanded','true');
         $("ul#hrm").addClass("show");
         $("ul#hrm #dept-menu").addClass("active");
 
         var overtime_id = [];
-        var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+        var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
         $.ajaxSetup({
             headers: {
@@ -207,9 +205,7 @@
             }
         });
 
-        function confirmDelete() {
-        return confirm("Are you sure want to delete?");
-        }
+        function confirmDelete() { return true; }
 
         $(document).ready(function() {
             $('.edit-btn').on('click', function(){
@@ -230,12 +226,12 @@
                 "info": '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
                 "search": '{{__("db.Search")}}',
                 'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
                 }
             },
             'columnDefs': [
-                { "orderable": false, 'targets': [0, 7] },
+                { "orderable": false, 'targets': [0, 8] },
                 {
                     'render': function(data, type, row, meta){
                         if(type === 'display'){
@@ -254,12 +250,12 @@
             'lengthMenu': [[10,25,50,-1],[10,25,50,"All"]],
             dom: '<"row"lfB>rtip',
             buttons:[
-                { extend:'pdf', text:'<i class="fa fa-file-pdf-o"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
-                { extend:'excel', text:'<i class="dripicons-document-new"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
-                { extend:'csv', text:'<i class="fa fa-file-text-o"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
-                { extend:'print', text:'<i class="fa fa-print"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
+                { extend:'pdf', text:'<i class="ti ti-file-type-pdf"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
+                { extend:'excel', text:'<i class="ti ti-file-type-xls"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
+                { extend:'csv', text:'<i class="ti ti-file-type-csv"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
+                { extend:'print', text:'<i class="ti ti-printer"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
                 {
-                    text:'<i class="dripicons-cross"></i>',
+                    text:'<i class="ti ti-x"></i>',
                     className:'buttons-delete',
                     action: function(e, dt, node, config){
                         if(user_verified=='1'){
@@ -267,14 +263,16 @@
                             $(':checkbox:checked').each(function(i){
                                 if(i) overtime_id[i-1]=$(this).closest('tr').data('id');
                             });
-                            if(overtime_id.length && confirm("Are you sure want to delete?")){
-                                $.ajax({type:'POST', url:'overtime/deletebyselection', data:{overtimeIdArray:overtime_id}, success:function(data){alert(data);}});
+                            if (overtime_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
+                                $.ajax({type:'POST', url:'overtime/deletebyselection', data:{overtimeIdArray:overtime_id}, success:function(data){SaleProToast.show(data);}});
                                 dt.rows({ page:'current', selected:true }).remove().draw(false);
-                            } else if(!overtime_id.length) alert('No overtime selected!');
-                        } else alert('This feature is disabled for demo!');
+                            }
+                            });
+                            } else if(!overtime_id.length) SaleProToast.show('No overtime selected!');
+                        } else SaleProToast.show('This feature is disabled for demo!');
                     }
                 },
-                { extend:'colvis', text:'<i class="fa fa-eye"></i>', columns:':gt(0)'}
+                { extend:'colvis', text:'<i class="ti ti-eye"></i>', columns:':gt(0)'}
             ]
         });
 

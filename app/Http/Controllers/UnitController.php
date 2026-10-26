@@ -8,6 +8,8 @@ use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use Auth;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class UnitController extends Controller
 {
@@ -41,6 +43,7 @@ class UnitController extends Controller
 
         ]);
         $input = $request->all();
+        $this->validateHierarchy($input);
         $input['is_active'] = true;
         if(!$input['base_unit']){
             $input['operator'] = '*';
@@ -78,24 +81,25 @@ class UnitController extends Controller
         $this->validate($request, [
             'unit_code' => [
                 'max:255',
-                    Rule::unique('units')->ignore($request->unit_id)->where(function ($query) {
+                    Rule::unique('units')->ignore($id)->where(function ($query) {
                     return $query->where('is_active', 1);
                 }),
             ],
             'unit_name' => [
                 'max:255',
-                    Rule::unique('units')->ignore($request->unit_id)->where(function ($query) {
+                    Rule::unique('units')->ignore($id)->where(function ($query) {
                     return $query->where('is_active', 1);
                 }),
             ]
         ]);
 
         $input = $request->all();
+        $lims_unit_data = Unit::findOrFail($id);
+        $this->validateHierarchy($input, $lims_unit_data);
         if(!$input['base_unit']){
             $input['operator'] = '*';
             $input['operation_value'] = 1;
         }
-        $lims_unit_data = Unit::where('id',$input['unit_id'])->first();
         $lims_unit_data->update($input);
         return redirect('unit');
     }
@@ -144,10 +148,47 @@ class UnitController extends Controller
                 $unit->operation_value = 1;
             else
                 $unit->operation_value = $data['operationvalue'];
+            $this->validateHierarchy($unit->getAttributes(), $unit->exists ? $unit : null);
             $unit->save();
         }
         return redirect('unit')->with('message', __('db.Unit imported successfully'));
 
+    }
+
+    private function validateHierarchy(array $input, ?Unit $unit = null): void
+    {
+        $baseId = $input['base_unit'] ?? null;
+        if ($baseId === '') {
+            $baseId = null;
+        }
+
+        Validator::make([
+            'base_unit' => $baseId,
+            'operator' => $input['operator'] ?? null,
+            'operation_value' => $input['operation_value'] ?? null,
+        ], [
+            'base_unit' => ['nullable', 'integer', Rule::exists('units', 'id')->where('is_active', 1)],
+            'operator' => [$baseId === null ? 'nullable' : 'required', Rule::in(['*', '/'])],
+            'operation_value' => [$baseId === null ? 'nullable' : 'required', 'numeric', 'gt:0'],
+        ])->validate();
+
+        if ($baseId === null) {
+            return;
+        }
+
+        $base = Unit::findOrFail($baseId);
+        if (($unit && (int) $base->id === (int) $unit->id) || $base->base_unit !== null) {
+            throw ValidationException::withMessages([
+                'base_unit' => 'The base unit must be a different root unit.',
+            ]);
+        }
+
+        // Product sale and purchase units are selected as direct children of a root unit.
+        if ($unit && Unit::where('base_unit', $unit->id)->exists()) {
+            throw ValidationException::withMessages([
+                'base_unit' => 'A unit with derived units cannot itself become derived.',
+            ]);
+        }
     }
 
     public function deleteBySelection(Request $request)

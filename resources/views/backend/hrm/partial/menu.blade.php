@@ -19,7 +19,7 @@
         <div class="container-fluid" style="background: #fffcf2">
 
             <a class="navbar-brand font-weight-bold text-primary" href="{{ route('hrm-panel') }}">
-                <i class="dripicons-wallet mr-2"></i> {{ __("db.HRM") }}
+                <i class="ti ti-wallet mr-2"></i> {{ __("db.HRM") }}
             </a>
 
             <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#hrmNavbar">
@@ -33,7 +33,7 @@
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('employees.index') ? 'active' : '' }}"
                            href="{{ route('employees.index') }}">
-                            <i class="dripicons-clock mr-1"></i> {{ __("db.Employees") }}
+                            <i class="ti ti-clock mr-1"></i> {{ __("db.Employees") }}
                         </a>
                     </li>
                     @endif
@@ -41,7 +41,7 @@
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('payroll.index') ? 'active' : '' }}"
                            href="{{ route('payroll.index') }}">
-                            <i class="dripicons-wallet mr-1"></i> {{ __("db.Payroll") }}
+                            <i class="ti ti-wallet mr-1"></i> {{ __("db.Payroll") }}
                         </a>
                     </li>
                     @endif
@@ -50,7 +50,7 @@
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('attendance.index') ? 'active' : '' }}"
                            href="{{ route('attendance.index') }}">
-                            <i class="dripicons-time-reverse mr-1"></i> {{ __("db.Attendance") }}
+                            <i class="ti ti-time-reverse mr-1"></i> {{ __("db.Attendance") }}
                         </a>
                     </li>
                     @endif
@@ -59,7 +59,7 @@
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('leave-type.index') ? 'active' : '' }}"
                            href="{{ route('leave-type.index') }}">
-                            <i class="dripicons-briefcase mr-1"></i> {{ __("db.Leave Type") }}
+                            <i class="ti ti-briefcase mr-1"></i> {{ __("db.Leave Type") }}
                         </a>
                     </li>
                     @endif
@@ -68,7 +68,7 @@
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('leave.index') ? 'active' : '' }}"
                            href="{{ route('leave.index') }}">
-                            <i class="dripicons-to-do mr-1"></i> {{ __("db.Leaves") }}
+                            <i class="ti ti-to-do mr-1"></i> {{ __("db.Leaves") }}
                         </a>
                     </li>
                     @endif
@@ -77,7 +77,7 @@
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('holidays.index') ? 'active' : '' }}"
                            href="{{ route('holidays.index') }}">
-                            <i class="dripicons-calendar mr-1"></i> {{ __("db.Holiday") }}
+                            <i class="ti ti-calendar mr-1"></i> {{ __("db.Holiday") }}
                         </a>
                     </li>
                     @endif
@@ -86,7 +86,7 @@
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('shift.index') ? 'active' : '' }}"
                            href="{{ route('shift.index') }}">
-                            <i class="dripicons-calendar mr-1"></i> {{ __("db.Shift") }}
+                            <i class="ti ti-calendar mr-1"></i> {{ __("db.Shift") }}
                         </a>
                     </li>
                     @endif
@@ -95,7 +95,7 @@
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('overtime.index') ? 'active' : '' }}"
                            href="{{ route('overtime.index') }}">
-                            <i class="dripicons-briefcase mr-1"></i> {{ __("db.Overtime") }}
+                            <i class="ti ti-briefcase mr-1"></i> {{ __("db.Overtime") }}
                         </a>
                     </li>
                     @endif

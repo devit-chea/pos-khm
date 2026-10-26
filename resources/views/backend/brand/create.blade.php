@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
     <x-validation-error fieldName="title" />
     <x-validation-error fieldName="image" />
@@ -7,9 +11,9 @@
 
     <section>
         <div class="container-fluid">
-            <button class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="dripicons-plus"></i>
+            <button class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="ti ti-plus"></i>
                 {{ __('db.Add Brand') }} </button>&nbsp;
-            <button class="btn btn-primary" data-toggle="modal" data-target="#importBrand"><i class="dripicons-copy"></i>
+            <button class="btn btn-primary" data-toggle="modal" data-target="#importBrand"><i class="ti ti-copy"></i>
                 {{ __('db.Import Brand') }}</button>
         </div>
         <div class="table-responsive">
@@ -45,7 +49,7 @@
                                         user="menu">
                                         <li><button type="button" data-id="{{ $brand->id }}"
                                                 class="open-EditbrandDialog btn btn-link" data-toggle="modal"
-                                                data-target="#editModal"><i class="dripicons-document-edit"></i>
+                                                data-target="#editModal"><i class="ti ti-edit"></i>
                                                 {{ __('db.edit') }}</button></li>
                                         <li class="divider"></li>
                                         <form action="{{ route('brand.destroy', $brand->id) }}" method="POST">
@@ -53,8 +57,8 @@
                                             @method('DELETE')
                                             <li>
                                                 <button type="submit" class="btn btn-link"
-                                                    onclick="return confirm('Are you sure want to delete?')"><i
-                                                        class="dripicons-trash"></i> {{ __('db.delete') }}</button>
+                                                    data-confirm-message="Are you sure want to delete?"><i
+                                                        class="ti ti-trash"></i> {{ __('db.delete') }}</button>
                                             </li>
                                         </form>
                                     </ul>
@@ -76,7 +80,7 @@
                     <div class="modal-header">
                         <h5 id="exampleModalLabel" class="modal-title">{{ __('db.Add Brand') }}</h5>
                         <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                                aria-hidden="true"><i class="ti ti-x"></i></span></button>
                     </div>
                 <div class="modal-body">
                     <p class="italic">
@@ -89,7 +93,7 @@
                         <label>{{ __('db.Image') }}</label>
                         <input type="file" name="image" class="form-control">
                     </div>
-                    @if (in_array('ecommerce', explode(',', $general_setting->modules)))
+                    @if (app(\App\Services\ModuleAccessService::class)->userCanAccess(auth()->user(), 'ecommerce'))
                         <div class="row">
                             <div class="col-md-12 mt-3">
                                 <h6><strong>{{ __('For SEO') }}</strong></h6>
@@ -123,7 +127,7 @@
                     <div class="modal-header">
                         <h5 id="exampleModalLabel" class="modal-title">{{ __('db.Import Brand') }}</h5>
                         <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                                aria-hidden="true"><i class="ti ti-x"></i></span></button>
                     </div>
                 <div class="modal-body">
                     <p class="italic">
@@ -142,7 +146,7 @@
                             <div class="form-group">
                                 <label> {{ __('db.Sample File') }}</label>
                                 <a href="sample_file/sample_brand.csv" class="btn btn-info btn-block btn-md"><i
-                                        class="dripicons-download"></i> {{ __('db.Download') }}</a>
+                                        class="ti ti-download"></i> {{ __('db.Download') }}</a>
                             </div>
                         </div>
                     </div>
@@ -163,7 +167,7 @@
                     <div class="modal-header">
                         <h5 id="exampleModalLabel" class="modal-title"> {{ __('db.Update Brand') }}</h5>
                         <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                                aria-hidden="true"><i class="ti ti-x"></i></span></button>
                     </div>
                 <div class="modal-body">
                     <p class="italic">
@@ -177,7 +181,7 @@
                         <label>{{ __('db.Image') }}</label>
                         <input type="file" name="image" class="form-control">
                     </div>
-                    @if (in_array('ecommerce', explode(',', $general_setting->modules)))
+                    @if (app(\App\Services\ModuleAccessService::class)->userCanAccess(auth()->user(), 'ecommerce'))
                         <div class="row">
                             <div class="col-md-12 mt-3">
                                 <h6><strong>{{ __('db.For SEO') }}</strong></h6>
@@ -204,9 +208,10 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
     <script type="text/javascript">
         var brand_id = [];
-        var user_verified = <?php echo json_encode(env('USER_VERIFIED')); ?>;
+        var user_verified = <?php echo json_encode(config('app.user_verified')); ?>;
 
         $.ajaxSetup({
             headers: {
@@ -236,7 +241,7 @@
                     brandArray: brand
                 },
                 success: function(data) {
-                    alert('Exported to CSV file successfully! Click Ok to download file');
+                    SaleProToast.show('Exported to CSV file successfully! Click Ok to download file');
                     window.location.href = data;
                 }
             });
@@ -264,8 +269,8 @@
                 "info": '<small>{{ __('db.Showing') }} _START_ - _END_ (_TOTAL_)</small>',
                 "search": '{{ __('db.Search') }}',
                 'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
                 }
             },
             'columnDefs': [{
@@ -299,7 +304,7 @@
             dom: '<"row"lfB>rtip',
             buttons: [{
                     extend: 'pdf',
-                    text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                    text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
@@ -328,7 +333,7 @@
                 },
                 {
                     extend: 'excel',
-                    text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                    text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
@@ -345,7 +350,7 @@
                 },
                 {
                     extend: 'csv',
-                    text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
@@ -362,7 +367,7 @@
                 },
                 {
                     extend: 'print',
-                    text: '<i title="print" class="fa fa-print"></i>',
+                    text: '<i title="print" class="ti ti-printer"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
@@ -370,7 +375,7 @@
                     },
                 },
                 {
-                    text: '<i title="delete" class="dripicons-cross"></i>',
+                    text: '<i title="delete" class="ti ti-x"></i>',
                     className: 'buttons-delete',
                     action: function(e, dt, node, config) {
                         if (user_verified == '1') {
@@ -380,7 +385,7 @@
                                     brand_id[i - 1] = $(this).closest('tr').data('id');
                                 }
                             });
-                            if (brand_id.length && confirm("Are you sure want to delete?")) {
+                            if (brand_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                                 $.ajax({
                                     type: 'POST',
                                     url: 'brand/deletebyselection',
@@ -393,20 +398,22 @@
                                                  dt.row($(this).closest('tr')).remove().draw(false);
                                             }
                                         });
-                                        alert(data);    
+                                        SaleProToast.show(data);
                                     }
 
                                 });
                                 // dt.rows({ page: 'current', selected: true }).remove().draw(false);
+                            }
+                            });
                             } else if (!brand_id.length)
-                                alert('No brand is selected!');
+                                SaleProToast.show('No brand is selected!');
                         } else
-                            alert('This feature is disable for demo!');
+                            SaleProToast.show('This feature is disable for demo!');
                     }
                 },
                 {
                     extend: 'colvis',
-                    text: '<i title="column visibility" class="fa fa-eye"></i>',
+                    text: '<i title="column visibility" class="ti ti-eye"></i>',
                     columns: ':gt(0)'
                 },
             ],

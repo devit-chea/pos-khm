@@ -1,4 +1,11 @@
-@extends('backend.layout.main') @section('content')
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
+@extends('backend.layout.main')
+@push('css')
+<link rel="stylesheet" href="{{ asset($asset_prefix . 'css/dropzone.css') }}">
+@endpush
+ @section('content')
 
 <div class="row">
     <div class="col-md-6 offset-3">
@@ -20,6 +27,7 @@
 @endsection
 
 @push('scripts')
+<script type="text/javascript" src="{{ asset($asset_prefix . 'js/dropzone.js') }}"></script>
 <script type="text/javascript">
     /*Dropzone.options.imageUpload =
     {
@@ -148,7 +156,7 @@
 
             if(count) {
               this.on('sending', function (file, xhr, formData) {
-                alert('hello');
+                SaleProToast.show('hello');
                 // Append all form inputs to the formData Dropzone will POST
                 var data = $('#imageUploadForm').serializeArray();
                 $.each(data, function (key, el) {
@@ -206,7 +214,7 @@
             var myDropzone = this;
             // Update selector to match your button
             $('#uploaderBtn').on("click", function (e) {
-                //alert(myDropzone.getAcceptedFiles());
+                //SaleProToast.show(myDropzone.getAcceptedFiles(););
                 e.preventDefault();
                 if ( $("#imageUploadForm").valid() && myDropzone.getAcceptedFiles().length ) {
                     myDropzone.processQueue();

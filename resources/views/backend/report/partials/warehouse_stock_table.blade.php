@@ -2,11 +2,11 @@
     <div class="row">
         <div class="col-md-6">
             <span>Total {{__('db.Items')}}</span>
-            <h2><strong>{{number_format((float)$total_item, $general_setting->decimal, '.', '')}}</strong></h2>
+            <h2><strong>{{number_format((float)$total_item, gen_setting()->decimal, '.', '')}}</strong></h2>
         </div>
         <div class="col-md-6">
             <span>Total {{__('db.Quantity')}}</span>
-            <h2><strong>{{number_format((float)$total_qty, $general_setting->decimal, '.', '')}}</strong></h2>
+            <h2><strong>{{number_format((float)$total_qty, gen_setting()->decimal, '.', '')}}</strong></h2>
         </div>
     </div>
 </div>
@@ -14,19 +14,19 @@
 <div class="col-md-5 offset-md-3 mt-2">
     <div class="pie-chart">
         @php
-            if($general_setting->theme == 'default.css'){
+            if(gen_setting()->theme == 'default.css'){
                 $color = '#733686';
                 $color_rgba = 'rgba(115, 54, 134, 0.8)';
             }
-            elseif($general_setting->theme == 'green.css'){
+            elseif(gen_setting()->theme == 'green.css'){
                 $color = '#2ecc71';
                 $color_rgba = 'rgba(46, 204, 113, 0.8)';
             }
-            elseif($general_setting->theme == 'blue.css'){
+            elseif(gen_setting()->theme == 'blue.css'){
                 $color = '#3498db';
                 $color_rgba = 'rgba(52, 152, 219, 0.8)';
             }
-            elseif($general_setting->theme == 'dark.css'){
+            elseif(gen_setting()->theme == 'dark.css'){
                 $color = '#34495e';
                 $color_rgba = 'rgba(52, 73, 94, 0.8)';
             }

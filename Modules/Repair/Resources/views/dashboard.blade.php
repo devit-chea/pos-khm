@@ -309,7 +309,7 @@
     <div class="dash-header fade-up">
         <div class="d-flex align-items-center justify-content-between flex-wrap" style="gap:16px;">
             <div>
-                <h4><i class="fa fa-wrench mr-2" style="opacity:.8"></i>Repair &amp; Service Dashboard</h4>
+                <h4><i class="ti ti-wrench mr-2" style="opacity:.8"></i>Repair &amp; Service Dashboard</h4>
                 <p>Overview of all service jobs, revenue and technician performance</p>
             </div>
             {{-- Date filter --}}
@@ -320,10 +320,10 @@
                 <input type="text" name="ending_date" id="ed" class="form-control"
                     value="{{ $ending_date }}" placeholder="End date" style="width:120px;" readonly/>
                 <button type="submit" class="btn-filter">
-                    <i class="fa fa-filter mr-1"></i>Filter
+                    <i class="ti ti-filter mr-1"></i>Filter
                 </button>
                 <a href="{{ route('repair.dashboard') }}" class="btn-filter" style="text-decoration:none; padding:0 12px; display:flex; align-items:center; height:34px;">
-                    <i class="fa fa-refresh"></i>
+                    <i class="ti ti-refresh"></i>
                 </a>
             </form>
         </div>
@@ -370,7 +370,7 @@
         <div class="kpi-card kpi-revenue fade-up">
             <div class="d-flex align-items-start justify-content-between">
                 <div>
-                    <div class="kpi-icon"><i class="fa fa-bar-chart"></i></div>
+                    <div class="kpi-icon"><i class="ti ti-chart-bar"></i></div>
                     <div class="kpi-label">Total Revenue</div>
                     <div class="kpi-val">{{ config('currency') }} {{ number_format($total_revenue, config('decimal')) }}</div>
                 </div>
@@ -399,7 +399,7 @@
 
         {{-- Total Jobs --}}
         <div class="kpi-card fade-up" style="--accent:#7c5cc4; --icon-bg:#f0ecfb;">
-            <div class="kpi-icon"><i class="fa fa-list-alt"></i></div>
+            <div class="kpi-icon"><i class="ti ti-list-numbers"></i></div>
             <div class="kpi-val" data-count="{{ $total_jobs }}">{{ $total_jobs }}</div>
             <div class="kpi-label">Total Jobs</div>
             <div class="kpi-sub">
@@ -411,7 +411,7 @@
 
         {{-- In Progress --}}
         <div class="kpi-card fade-up" style="--accent:#3b82f6; --icon-bg:#eff6ff;">
-            <div class="kpi-icon"><i class="fa fa-spinner"></i></div>
+            <div class="kpi-icon"><i class="ti ti-reload"></i></div>
             <div class="kpi-val" data-count="{{ $in_progress }}">{{ $in_progress }}</div>
             <div class="kpi-label">{{ __('db.in_progress') }}</div>
             <div class="kpi-sub">+{{ $diagnosed }} {{ __('db.diagnosed') }} &nbsp;·&nbsp; {{ $pending }} {{ __('db.Pending') }}</div>
@@ -419,7 +419,7 @@
 
         {{-- Completed --}}
         <div class="kpi-card fade-up" style="--accent:#22c55e; --icon-bg:#f0fdf4;">
-            <div class="kpi-icon"><i class="fa fa-check-circle"></i></div>
+            <div class="kpi-icon"><i class="ti ti-shield-check"></i></div>
             <div class="kpi-val" data-count="{{ $completed + $delivered }}">{{ $completed + $delivered }}</div>
             <div class="kpi-label">Completed</div>
             <div class="kpi-sub">{{ $completed }} completed &nbsp;·&nbsp; {{ $delivered }} delivered</div>
@@ -436,7 +436,7 @@
         <div class="panel fade-up">
             <div class="panel-head">
                 <h6>
-                    <span class="ph-icon"><i class="fa fa-line-chart"></i></span>
+                    <span class="ph-icon"><i class="ti ti-chart-line"></i></span>
                     Monthly Trend <small style="color:var(--slate);font-weight:400;font-size:.75rem;margin-left:4px;">(last 6 months)</small>
                 </h6>
                 <a href="{{ route('repair.service.index') }}" class="panel-link">View All →</a>
@@ -452,7 +452,7 @@
         <div class="panel fade-up">
             <div class="panel-head">
                 <h6>
-                    <span class="ph-icon"><i class="fa fa-pie-chart"></i></span>
+                    <span class="ph-icon"><i class="ti ti-chart-pie"></i></span>
                     Job Status
                 </h6>
             </div>
@@ -508,7 +508,7 @@
         <div class="panel fade-up">
             <div class="panel-head">
                 <h6>
-                    <span class="ph-icon"><i class="fa fa-clock-o"></i></span>
+                    <span class="ph-icon"><i class="ti ti-clock"></i></span>
                     Recent Service Jobs
                 </h6>
                 <a href="{{ route('repair.service.create') }}" class="panel-link" style="background:var(--p-lt);padding:4px 12px;border-radius:999px;">
@@ -582,7 +582,7 @@
         <div class="panel fade-up">
             <div class="panel-head">
                 <h6>
-                    <span class="ph-icon"><i class="fa fa-users"></i></span>
+                    <span class="ph-icon"><i class="ti ti-users"></i></span>
                     Top Technicians
                 </h6>
             </div>
@@ -620,7 +620,7 @@
         <div class="panel fade-up">
             <div class="panel-head">
                 <h6>
-                    <span class="ph-icon"><i class="fa fa-credit-card"></i></span>
+                    <span class="ph-icon"><i class="ti ti-credit-card"></i></span>
                     Payment Methods
                 </h6>
             </div>

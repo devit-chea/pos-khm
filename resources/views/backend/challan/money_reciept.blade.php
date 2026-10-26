@@ -1,19 +1,18 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 <!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <link rel="icon" type="image/png" href="{{url('images/logo_2.png')}}" />
-    <title>{{$general_setting->site_title}} | Money Receipt</title>
+    <title>{{gen_setting()->site_title}} | Money Receipt</title>
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="all,follow">
 
-    @if(!config('database.connections.saleprosaas_landlord'))
-        <link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
-    @else
-    <link rel="stylesheet" href="<?php echo asset('../../vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
-    @endif
+    <link rel="stylesheet" href="{{ asset($asset_prefix . 'vendor/bootstrap/css/bootstrap.min.css') }}" type="text/css">
 
     <style type="text/css">
         * {
@@ -73,8 +72,8 @@
     <div class="hidden-print">
         <table>
             <tr>
-                <td><a href="{{route('challan.index')}}" class="btn btn-info"><i class="fa fa-arrow-left"></i> Back</a> </td>
-                <td><button onclick="window.print();" class="btn btn-primary"><i class="fa fa-print"></i> Print</button></td>
+                <td><a href="{{route('challan.index')}}" class="btn btn-info"><i class="ti ti-arrow-left"></i> Back</a> </td>
+                <td><button onclick="window.print();" class="btn btn-primary"><i class="ti ti-printer"></i> Print</button></td>
             </tr>
         </table>
 
@@ -85,7 +84,7 @@
         <h1 class="text-center">MONEY RECIEPT</h1>
         <h2 class="text-center">Office Copy</h2><br>
         <p>Reference: DC-{{$challan->reference_no}}</p>
-        <p>Date: {{date($general_setting->date_format, strtotime($challan->created_at->toDateString()))}}</p>
+        <p>Date: {{date(gen_setting()->date_format, strtotime($challan->created_at->toDateString()))}}</p>
         <p>Courier: {{$challan->courier->name.' ['.$challan->courier->phone_number.']'}}</p>
         <?php
             $packing_slip_list = explode(",", $challan->packing_slip_list);

@@ -1,3 +1,6 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 @extends('backend.layout.main')
 @section('content')
 <section>
@@ -31,18 +34,14 @@
 @endsection
 
 @push('scripts')
-	@if (!config('database.connections.saleprosaas_landlord'))
-    <script type="text/javascript" src="<?php echo asset('vendor/chart.js/Chart.min.js'); ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('js/charts-custom.js'); ?>"></script>
-    @else
-    <script type="text/javascript" src="<?php echo asset('../../vendor/chart.js/Chart.min.js'); ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('../../js/charts-custom.js'); ?>"></script>    
-    @endif
+
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/chart.js/Chart.min.js') }}"></script>
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'js/charts-custom.js') }}"></script>
 	<script type="text/javascript">
 		$("ul#report").siblings('a').attr('aria-expanded','true');
 		$("ul#report").addClass("show");
 		$("ul#report #warehouse-stock-report-menu").addClass("active");
-		var warehouse_id = <?php echo json_encode($warehouse_id) ?>;
+		var warehouse_id = {{ json_encode($warehouse_id) }};
 		$('#warehouse_id').val(warehouse_id);
 		$('.selectpicker').selectpicker('refresh');
 

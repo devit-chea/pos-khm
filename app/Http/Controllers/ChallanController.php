@@ -38,7 +38,7 @@ class ChallanController extends Controller
         $lims_gift_card_list = GiftCard::where("is_active", true)->get();
         $lims_pos_setting_data = PosSetting::latest()->first();
         $lims_reward_point_setting_data = RewardPointSetting::latest()->first();
-        $lims_account_list = Account::where('is_active', true)->get();
+        $lims_account_list = app(\App\Services\PaymentAccountService::class)->validOperationalAccounts();
         if($lims_pos_setting_data)
             $options = explode(',', $lims_pos_setting_data->payment_options);
         else
@@ -50,7 +50,8 @@ class ChallanController extends Controller
     public function challanData(Request $request)
     {
         $columns = array(
-            1 => 'date',
+            0 => 'id',
+            1 => 'created_at',
             2 => 'reference_no',
         );
 
@@ -79,6 +80,9 @@ class ChallanController extends Controller
                             ['status', $status]
                         ])->count();
         }
+        else {
+            $totalData = Challan::count();
+        }
 
         $totalFiltered = $totalData;
 
@@ -87,7 +91,7 @@ class ChallanController extends Controller
         else
             $limit = $totalData;
         $start = $request->input('start');
-        $order = 'challans.'.$columns[$request->input('order.0.column')];
+        $order = 'challans.'.($columns[$request->input('order.0.column')] ?? 'created_at');
         $dir = $request->input('order.0.dir');
         if(empty($request->input('search.value'))) {
             if($courier_id == 'All Courier' && !$status) {
@@ -245,13 +249,13 @@ class ChallanController extends Controller
                 else
                     $nestedData['closed_by'] = 'N/A';
 
-                $nestedData['options'] = '<div class="d-flex"><a href="'.route('challan.genInvoice', $challan->id).'" class="btn btn-primary btn-sm" title="Print Challan" target="_blank"><i class="dripicons-print"></i></a>&nbsp;';
+                $nestedData['options'] = '<div class="d-flex"><a href="'.route('challan.genInvoice', $challan->id).'" class="btn btn-primary btn-sm" title="Print Challan" target="_blank"><i class="ti ti-printer"></i></a>&nbsp;';
 
                 if($challan->status == 'Active') {
-                    $nestedData['options'] .= '<a href="javascript:void(0)" class="btn btn-success btn-sm add-payment" data-id="'.$challan->id.'" data-due="'.$total_due.'" data-toggle="modal" data-target="#add-payment" title="Finalize Challan"><i class="fa fa-money"></i></a>&nbsp;';
+                    $nestedData['options'] .= '<a href="javascript:void(0)" class="btn btn-success btn-sm add-payment" data-id="'.$challan->id.'" data-due="'.$total_due.'" data-toggle="modal" data-target="#add-payment" title="Finalize Challan"><i class="ti ti-cash-banknote"></i></a>&nbsp;';
                 }
                 elseif($challan->status == 'Close') {
-                    $nestedData['options'] .= '<a href="'.route('challan.moneyReciept', $challan->id).'" class="btn btn-success btn-sm" title="Print Money Reciept" target="_blank"><i class="fa fa-copy"></i></a>';
+                    $nestedData['options'] .= '<a href="'.route('challan.moneyReciept', $challan->id).'" class="btn btn-success btn-sm" title="Print Money Reciept" target="_blank"><i class="ti ti-copy"></i></a>';
                 }
                 $nestedData['options'] .= '</div>';
                 $data[] = $nestedData;
@@ -334,7 +338,7 @@ class ChallanController extends Controller
     public function genInvoice($id)
     {
        $challan          = Challan::with('courier')->find($id);
-        $general_setting  = \App\Models\GeneralSetting::latest()->first();
+        $general_setting = cache()->get('general_setting');
         $invoice_settings = \App\Models\InvoiceSetting::latest()->first();
 
         return view('backend.challan.invoice', compact(
@@ -361,6 +365,13 @@ class ChallanController extends Controller
         DB::beginTransaction();
         try {
             $challan = Challan::find($id);
+            if (app(\App\Services\ZatcaIntegrationService::class)->isPhase2Configured()) {
+                foreach (explode(',', (string) $challan->packing_slip_list) as $packingSlipId) {
+                    if ($packingSlipId === '') { continue; }
+                    $sale = PackingSlip::with('sale')->findOrFail($packingSlipId)->sale;
+                    app(\App\Services\ZatcaIntegrationService::class)->assertExistingSaleCanEnterFiscalStatus($sale);
+                }
+            }
             foreach ($data['paid_amount_list'] as $key => $amount) {
                 if(!$amount)
                     $data['status_list'][$key] = 'Failed';
@@ -488,6 +499,10 @@ class ChallanController extends Controller
             }
             DB::commit();
         }
+        catch (\App\Exceptions\ZatcaPhase2WorkflowUnavailable|\App\Exceptions\SaleValidationException $e) {
+            DB::rollBack();
+            return redirect()->back()->with('not_permitted', $e->getMessage());
+        }
         catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => $e->getMessage()]);
@@ -530,6 +545,18 @@ class ChallanController extends Controller
         $challan = Challan::find($data['challan_id']);
         $packingSlipList = explode(",", $challan->packing_slip_list);
         $amount_list = explode(",", $challan->amount_list);
+
+        if (app(\App\Services\ZatcaIntegrationService::class)->isPhase2Configured()) {
+            try {
+                foreach ($packingSlipList as $key => $packingSlipId) {
+                    if ((float) ($data['paid_amount_list'][$key] ?? 0) <= 0) { continue; }
+                    $sale = PackingSlip::with('sale')->findOrFail($packingSlipId)->sale;
+                    app(\App\Services\ZatcaIntegrationService::class)->assertExistingSaleCanEnterFiscalStatus($sale);
+                }
+            } catch (\App\Exceptions\ZatcaPhase2WorkflowUnavailable|\App\Exceptions\SaleValidationException $exception) {
+                return redirect()->back()->with('not_permitted', $exception->getMessage());
+            }
+        }
 
         $document = $request->document;
         if ($document) {

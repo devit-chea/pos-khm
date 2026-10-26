@@ -26,7 +26,7 @@ class InstallationRequest extends FormRequest
             'db_host' => 'required|string',
             'db_name' => ['required', 'regex:/^\S*$/'],
             'db_username' => ['required', 'regex:/^\S*$/'],
-            'db_password' => ['required', 'regex:/^\S*$/'],
+            'db_password' => ['required', 'regex:/^[^\s"\r\n]+$/'],
         ];
     }
 
@@ -35,7 +35,7 @@ class InstallationRequest extends FormRequest
         return [
             'db_name.regex' => "The :attribute must not contain any whitespace",
             'db_username.regex' => "The :attribute must not contain any whitespace",
-            'db_password.regex' => "The :attribute must not contain any whitespace",
+            'db_password.regex' => "The :attribute must not contain spaces, quotes, or line breaks",
         ];
     }
 }

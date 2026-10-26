@@ -6,9 +6,9 @@
 		<table class="table table-bordered" style="border-top: 1px solid #dee2e6; border-bottom: 1px solid #dee2e6;">
 			<thead>
 				<tr>
-					<th><a href="{{url('my-transactions/'.$prev_year.'/'.$prev_month)}}"><i class="fa fa-arrow-left"></i> {{__('db.Previous')}}</a></th>
+					<th><a href="{{url('my-transactions/'.$prev_year.'/'.$prev_month)}}"><i class="ti ti-arrow-left"></i> {{__('db.Previous')}}</a></th>
 			    	<th colspan="5" class="text-center">{{date("F", strtotime($year.'-'.$month.'-01')).' ' .$year}}</th>
-			    	<th><a href="{{url('my-transactions/'.$next_year.'/'.$next_month)}}">{{__('db.Next')}} <i class="fa fa-arrow-right"></i></a></th>
+			    	<th><a href="{{url('my-transactions/'.$next_year.'/'.$next_month)}}">{{__('db.Next')}} <i class="ti ti-arrow-right"></i></a></th>
 			    </tr>
 			</thead>
 		    <tbody>

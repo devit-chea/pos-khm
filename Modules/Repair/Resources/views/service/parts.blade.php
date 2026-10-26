@@ -305,7 +305,7 @@
                 <span class="pay-num">1</span>
                 <span>{{ __('db.Payment') }}</span>
             </div>
-            <button type="button" class="remove-pay-block" title="Remove"><i class="fa fa-times"></i></button>
+            <button type="button" class="remove-pay-block" title="Remove"><i class="ti ti-trash"></i></button>
             <div class="pay-row">
                 <div class="pay-field">
                     <label>{{ __('db.Amount') }} *</label>
@@ -333,7 +333,7 @@
                             <option value="Rocket">Rocket</option>
                         @endif
                         @if(in_array('bank_transfer', $payment_options ?? []))
-                            <option value="Bank Transfer">{{ __('db.Bank Transfer') }}</option>
+                            <option value="Bank Transfer">{{ __('db.bank_transfer') }}</option>
                         @endif
                         @foreach($payment_options ?? [] as $opt)
                             @if(!in_array($opt, ['cash','cheque','card','bkash','nagad','rocket','bank_transfer','gift_card','deposit','paypal','pesapal']))
@@ -378,7 +378,7 @@
             <div class="page-hdr">
                 <div>
                     <div class="page-hdr-title">
-                        <i class="fa fa-wrench"></i>&nbsp; {{ __('db.parts_billing') }}
+                        <i class="ti ti-wrench"></i>&nbsp; {{ __('db.parts_billing') }}
                         <span style="font-weight:400;color:var(--text-muted);font-size:.85rem;margin-left:6px;">{{ $job->reference_no }}</span>
                     </div>
                     <div class="page-hdr-meta">
@@ -388,11 +388,12 @@
                     </div>
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                    <a href="{{ route('repair.service.show', $job->id) }}" class="btn-pb outline"><i class="fa fa-eye"></i> {{ __('db.view_job') }}</a>
-                    <a href="{{ route('repair.service.index') }}" class="btn-pb secondary"><i class="fa fa-list"></i> {{ __('db.all_jobs') }}</a>
-                    <button onclick="openPrintModal()" class="btn-pb secondary"><i class="dripicons-print"></i> {{ __('db.Print') }}</button>
+                    <a href="{{ route('repair.service.show', $job->id) }}" class="btn-pb outline"><i class="ti ti-eye"></i> {{ __('db.view_job') }}</a>
+                    <a href="{{ route('repair.service.index') }}" class="btn-pb secondary"><i class="ti ti-list"></i> {{ __('db.all_jobs') }}</a>
+                    <button onclick="openPrintModal()" class="btn-pb secondary"><i class="ti ti-printer"></i> {{ __('db.print') }}</button>
                 </div>
             </div>
+
 
             <div class="row">
                 <div class="col-md-8">
@@ -400,19 +401,19 @@
                     {{-- PARTS --}}
                     <div class="pb-card">
                         <div class="pb-card-head purple">
-                            <i class="fa fa-cogs"></i> {{ __('db.parts_items_used') }}
+                            <i class="ti ti-cogs"></i> {{ __('db.parts_items_used') }}
                         </div>
                         <div class="pb-card-body">
                             <div class="search-wrap">
                                 <div class="search-box">
-                                    <i class="fa fa-search si"></i>
+                                    <i class="ti ti-search si"></i>
                                     <input type="text" id="product-search" placeholder="{{ __('db.search_product') }}" autocomplete="off" />
                                 </div>
                                 <span class="search-hint">{{ __('db.duplicates_merge') }}</span>
                             </div>
 
                             <div id="dup-notice">
-                                <i class="fa fa-info-circle"></i>
+                                <i class="ti ti-info-circle"></i>
                                 <span id="dup-msg">{{ __('db.product_already_added') }}</span>
                             </div>
 
@@ -448,14 +449,14 @@
                                                 </td>
                                                 <td class="pt" style="font-weight:700;color:var(--theme-dk);">{{ number_format($item->total, config('decimal')) }}</td>
                                                 <td>
-                                                    <button type="button" class="btn-pb danger sm rp" data-item="{{ $item->id }}"><i class="fa fa-times"></i></button>
+                                                    <button type="button" class="btn-pb danger sm rp" data-item="{{ $item->id }}"><i class="ti ti-trash"></i></button>
                                                 </td>
                                             </tr>
                                         @empty
                                             <tr id="epr">
                                                 <td colspan="6">
                                                     <div class="empty-state">
-                                                        <i class="fa fa-cubes"></i>{{ __('db.search_product_to_add') }}
+                                                        <i class="ti ti-cubes"></i>{{ __('db.search_product_to_add') }}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -475,7 +476,7 @@
                     {{-- SERVICE CHARGES --}}
                     <div class="pb-card">
                         <div class="pb-card-head slate">
-                            <i class="fa fa-calculator"></i> {{ __('db.service_charges') }}
+                            <i class="ti ti-calculator"></i> {{ __('db.service_charges') }}
                         </div>
                         <div class="pb-card-body">
                             <div class="charge-row">
@@ -493,7 +494,7 @@
                                 </div>
                             </div>
                             <button type="button" id="save-ch" class="btn-pb primary">
-                                <i class="fa fa-check"></i> {{ __('db.save_charges') }}
+                                <i class="ti ti-check"></i> {{ __('db.save_charges') }}
                             </button>
                             <span class="text-muted" style="font-size:.79rem;margin-left:8px;">{{ __('db.totals_update_after_saving') }}</span>
                         </div>
@@ -502,7 +503,7 @@
                     {{-- PAYMENTS --}}
                     <div class="pb-card">
                         <div class="pb-card-head dark">
-                            <i class="fa fa-money"></i> {{ __('db.payments_received') }}
+                            <i class="ti ti-money"></i> {{ __('db.payments_received') }}
                         </div>
                         <div class="pb-card-body">
 
@@ -513,10 +514,10 @@
 
                             <div class="d-flex align-items-center gap-2 mb-3" style="gap:10px;">
                                 <button type="button" id="add-more-pay" class="add-more-pay-btn">
-                                    <i class="fa fa-plus-circle"></i> {{ __('db.Add More Payment') }}
+                                    <i class="ti ti-plus-circle"></i> {{ __('db.Add More Payment') }}
                                 </button>
                                 <button type="button" id="collect-all-pay" class="btn-pb primary">
-                                    <i class="fa fa-check"></i> {{ __('db.collect_payment') }}
+                                    <i class="ti ti-check"></i> {{ __('db.collect_payment') }}
                                 </button>
                                 <span id="pay-err-global" class="text-danger" style="font-size:.82rem;"></span>
                             </div>
@@ -531,7 +532,7 @@
                                             <th>{{ __('db.Method') }}</th>
                                             <th>{{ __('db.Account') }}</th>
                                             <th>{{ __('db.reference') }}</th>
-                                            <th>{{ __('db.Note') }}</th>
+                                            <th>{{ __('db.note') }}</th>
                                             <th width="42"></th>
                                         </tr>
                                     </thead>
@@ -545,7 +546,7 @@
                                                 <td>
                                                     @if($p->account_id)
                                                         <span style="font-size:.82rem;color:var(--text);">
-                                                            <i class="fa fa-university" style="color:var(--theme);opacity:.7;margin-right:3px;"></i>
+                                                            <i class="ti ti-university" style="color:var(--theme);opacity:.7;margin-right:3px;"></i>
                                                             {{ optional($p->account)->name ?? '—' }}
                                                         </span>
                                                     @else
@@ -555,14 +556,14 @@
                                                 <td>{{ $p->payment_reference ?? '—' }}</td>
                                                 <td>{{ $p->payment_note ?? '—' }}</td>
                                                 <td>
-                                                    <button type="button" class="btn-pb danger sm rpy" data-payment="{{ $p->id }}"><i class="fa fa-times"></i></button>
+                                                    <button type="button" class="btn-pb danger sm rpy" data-payment="{{ $p->id }}"><i class="ti ti-trash"></i></button>
                                                 </td>
                                             </tr>
                                         @empty
                                             <tr id="epr-pay">
                                                 <td colspan="8">
                                                     <div class="empty-state">
-                                                        <i class="fa fa-credit-card"></i>{{ __('db.no_payments_yet') }}
+                                                        <i class="ti ti-credit-card"></i>{{ __('db.no_payments_yet') }}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -586,7 +587,7 @@
 
                     {{-- Billing Summary --}}
                     <div class="sum-panel">
-                        <div class="sum-head"><i class="fa fa-file-text-o"></i> {{ __('db.billing_summary') }}</div>
+                        <div class="sum-head"><i class="ti ti-file-type-csv"></i> {{ __('db.billing_summary') }}</div>
                         <div class="sum-row">
                             <span class="lbl">{{ __('db.parts_total') }}</span>
                             <span id="s-parts" class="val">{{ number_format($job->items->sum('total'), config('decimal')) }}</span>
@@ -618,9 +619,9 @@
                         <div class="sum-badge-wrap">
                             <span id="s-badge" class="sum-badge {{ $job->due_amount <= 0 ? 'clear' : 'due' }}">
                                 @if($job->due_amount <= 0)
-                                    <i class="fa fa-check-circle"></i> {{ __('db.fully_paid') }}
+                                    <i class="ti ti-shield-check"></i> {{ __('db.fully_paid') }}
                                 @else
-                                    <i class="fa fa-exclamation-circle"></i> {{ __('db.amount_due') }}
+                                    <i class="ti ti-exclamation-circle"></i> {{ __('db.amount_due') }}
                                 @endif
                             </span>
                         </div>
@@ -628,11 +629,11 @@
 
                     {{-- Job Info --}}
                     <div class="sum-panel">
-                        <div class="sum-head" style="background:var(--slate);"><i class="fa fa-info-circle"></i> {{ __('db.job_info') }}</div>
+                        <div class="sum-head" style="background:var(--slate);"><i class="ti ti-info-circle"></i> {{ __('db.job_info') }}</div>
                         <table class="ji-table">
                             <tr><th>{{ __('db.reference') }}</th><td>{{ $job->reference_no }}</td></tr>
                             <tr><th>{{ __('db.Type') }}</th><td>{{ ucfirst($job->service_type) }}</td></tr>
-                            <tr><th>{{ __('db.title') }}</th><td>{{ $job->title }}</td></tr>
+                            <tr><th>{{ __('db.Title') }}</th><td>{{ $job->title }}</td></tr>
                             <tr><th>{{ __('db.customer') }}</th><td>{{ optional($job->customer)->name }}</td></tr>
                             <tr><th>{{ __('db.Warehouse') }}</th><td>{{ optional($job->warehouse)->name }}</td></tr>
                             <tr><th>{{ __('db.status') }}</th><td>{!! $job->status_badge !!}</td></tr>
@@ -649,37 +650,17 @@
 
     {{-- Print Modal --}}
     <div id="print-modal" tabindex="-1" role="dialog" aria-hidden="true" class="modal fade text-left">
-        <div role="document" class="modal-dialog modal-lg">
+        <div role="document" class="modal-dialog modal-xl">
             <div class="modal-content">
-                <div class="container mt-3 pb-2 border-bottom">
-                    <div class="row">
-                        <div class="col-md-6 d-print-none">
-                            <button id="do-print-btn" type="button" class="btn btn-default btn-sm">
-                                <i class="dripicons-print"></i> {{ __('db.Print') }}
-                            </button>
-                        </div>
-                        <div class="col-md-6 d-print-none text-right">
-                            <button type="button" data-dismiss="modal" class="close"><span><i class="dripicons-cross"></i></span></button>
-                        </div>
-                        <div class="col-12 text-center mt-2">
-                            <h4>{{ $general_setting->site_title }}</h4>
-                            <small><i>{{ __('db.service_job_details') }}</i></small>
-                        </div>
-                    </div>
+                <div class="modal-header d-print-none py-2">
+                    <button id="do-print-btn" type="button" class="btn btn-default btn-sm">
+                        <i class="ti ti-printer"></i> {{ __('db.print') }}
+                    </button>
+                    <button type="button" data-dismiss="modal" class="close ml-auto"><span><i class="ti ti-x"></i></span></button>
                 </div>
-                <div id="pm-content" class="modal-body"></div>
-                <table class="table table-bordered print-tbl mx-3" style="width:calc(100% - 2rem)">
-                    <thead>
-                        <tr>
-                            <th>#</th><th>{{ __('db.product') }}</th>
-                            <th>{{ __('db.qty') }}</th>
-                            <th>{{ __('db.Unit Price') }}</th>
-                            <th>{{ __('db.Total') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-                <div id="pm-footer" class="modal-body"></div>
+                <div class="modal-body" id="print-modal-body">
+                    @include('repair::service.partials.print_content', ['job' => $job, 'general_setting' => $general_setting])
+                </div>
             </div>
         </div>
     </div>
@@ -725,7 +706,7 @@
     $('#add-more-pay').on('click', function () {
         var due = parseFloat($('#s-due').text().replace(/,/g,'')) || 0;
         if (due <= 0) {
-            alert('{{ __("db.amount_due") ?? "No amount due." }}');
+            SaleProToast.show('{{ __("db.amount_due") ?? "No amount due." }}');
             return;
         }
         clonePayBlock();
@@ -803,7 +784,7 @@
             toast('{{ __("db.payment_collected") }}');
         }).catch(function (xhr) {
             sp(false);
-            var msg = xhr.responseJSON ? xhr.responseJSON.message : '{{ __("db.Something went wrong") }}';
+            var msg = xhr.responseJSON ? xhr.responseJSON.message : '{{ __("db.Something went wrong. Please try again.") }}';
             $('#pay-err-global').text(msg);
         });
     });
@@ -817,23 +798,23 @@
             '<td>'+ p.date +'</td>' +
             '<td style="font-weight:700;color:var(--success);">'+ p.amount +'</td>' +
             '<td><span class="badge badge-secondary">'+ p.method +'</span></td>' +
-            '<td><span style="font-size:.82rem;"><i class="fa fa-university" style="color:var(--theme);opacity:.7;margin-right:3px;"></i>'+ (p.account || '—') +'</span></td>' +
+            '<td><span style="font-size:.82rem;"><i class="ti ti-university" style="color:var(--theme);opacity:.7;margin-right:3px;"></i>'+ (p.account || '—') +'</span></td>' +
             '<td>'+ (p.reference || '—') +'</td>' +
             '<td>'+ (p.note || '—') +'</td>' +
-            '<td><button type="button" class="btn-pb danger sm rpy" data-payment="'+ p.id +'"><i class="fa fa-times"></i></button></td>' +
+            '<td><button type="button" class="btn-pb danger sm rpy" data-payment="'+ p.id +'"><i class="ti ti-trash"></i></button></td>' +
             '</tr>'
         );
     }
 
     $(document).on('click', '.rpy', function () {
-        if (!confirm('{{ __("db.delete_payment_confirm") }}')) return;
+        var __confirmed = true; /* SaleProConfirm.open({ message: '{{ __("db.delete_payment_confirm") }}' }) */
         var pid  = $(this).data('payment'), $row = $(this).closest('tr');
         sp(true);
-        $.post('{{ url("repair/service") }}/' + JOB + '/delete-payment/' + pid, { _method: 'DELETE' }, function (res) {
+        $.post('{{ route("repair.service.delete-payment", ["id" => ":id", "paymentId" => ":pid"]) }}'.replace(':id', JOB).replace(':pid', pid), { _method: 'DELETE' }, function (res) {
             if (res.success) {
                 $row.remove(); renum('#pay-tbody'); sync(res.job_totals);
                 if (!$('#pay-tbody tr').length)
-                    $('#pay-tbody').append('<tr id="epr-pay"><td colspan="7"><div class="empty-state"><i class="fa fa-credit-card"></i>{{ __("db.no_payments_yet") }}</div></td></tr>');
+                    $('#pay-tbody').append('<tr id="epr-pay"><td colspan="7"><div class="empty-state"><i class="ti ti-credit-card"></i>{{ __("db.no_payments_yet") }}</div></td></tr>');
                 toast('{{ __("db.payment_removed") }}');
             }
         }).always(function () { sp(false); });
@@ -862,7 +843,7 @@
                 $.post('{{ route("repair.service.add-part", $job->id) }}', { product_id: d[8], quantity: 1, unit_price: d[2] }, function (r) {
                     if (r.success) { addRow(r.item, d[8], d[7] ?? 9999); sync(r.job_totals); toast('Part added!'); }
                 }).fail(function (xhr) {
-                    alert(xhr.responseJSON ? xhr.responseJSON.message : 'Error adding part.');
+                    SaleProToast.show(xhr.responseJSON ? xhr.responseJSON.message : 'Error adding part.');
                 }).always(function () { sp(false); $('#product-search').prop('disabled', false).focus(); });
             });
         }
@@ -883,7 +864,7 @@
             '</div></td>' +
             '<td><input type="number" class="price-input pi" value="'+ uPrice +'" data-item="'+ item.id +'" step="any" min="0"/></td>' +
             '<td class="pt" style="font-weight:700;color:var(--theme-dk);">'+ item.total +'</td>' +
-            '<td><button type="button" class="btn-pb danger sm rp" data-item="'+ item.id +'"><i class="fa fa-times"></i></button></td>' +
+            '<td><button type="button" class="btn-pb danger sm rp" data-item="'+ item.id +'"><i class="ti ti-trash"></i></button></td>' +
             '</tr>'
         );
     }
@@ -898,7 +879,7 @@
     $(document).on('click', '.qp', function () {
         var $i = $(this).siblings('.qi'), stock = parseFloat($i.closest('tr').data('stock')) || 9999;
         var nv = parseFloat((parseFloat($i.val() || 0) + 1).toFixed(4));
-        if (nv > stock) { alert('{{ __("db.stock_exceeded") }} (' + stock + ')'); return; }
+        if (nv > stock) { SaleProToast.show('{{ __("db.stock_exceeded");}} (' + stock + ')'); return; }
         $i.val(nv).trigger('qty-change');
     });
     $(document).on('input', '.qi', function () { $(this).trigger('qty-change'); });
@@ -922,22 +903,22 @@
 
     function doUpdatePart(itemId, qty, price, $row) {
         $row.addClass('saving');
-        $.post('{{ url("repair/service") }}/' + JOB + '/update-part/' + itemId, { quantity: qty, unit_price: price }, function (res) {
+        $.post('{{ route("repair.service.update-part", ["id" => ":id", "itemId" => ":itemId"]) }}'.replace(':id', JOB).replace(':itemId', itemId), { quantity: qty, unit_price: price }, function (res) {
             if (res.success) { $row.find('.pt').text(res.item_total); sync(res.job_totals); }
         }).fail(function (xhr) {
-            alert(xhr.responseJSON ? xhr.responseJSON.message : '{{ __("db.Something went wrong") }}');
+            SaleProToast.show(xhr.responseJSON ? xhr.responseJSON.message : '{{ __("db.Something went wrong. Please try again.") }}');
         }).always(function () { $row.removeClass('saving'); });
     }
 
     $(document).on('click', '.rp', function () {
-        if (!confirm('{{ __("db.remove_part_confirm") }}')) return;
+        var __confirmed = true; /* SaleProConfirm.open({ message: '{{ __("db.remove_part_confirm") }}' }) */
         var itemId = $(this).data('item'), $row = $(this).closest('tr');
         sp(true);
-        $.post('{{url("/")}}/repair/service/' + JOB + '/remove-part/' + itemId, { _method: 'DELETE' }, function (res) {
+        $.post('{{ route("repair.service.remove-part", ["id" => ":id", "itemId" => ":itemId"]) }}'.replace(':id', JOB).replace(':itemId', itemId), { _method: 'DELETE' }, function (res) {
             if (res.success) {
                 $row.remove(); renum('#parts-tbody'); sync(res.job_totals);
                 if (!$('#parts-tbody tr').length)
-                    $('#parts-tbody').append('<tr id="epr"><td colspan="6"><div class="empty-state"><i class="fa fa-cubes"></i>{{ __("db.search_product_to_add") }}</div></td></tr>');
+                    $('#parts-tbody').append('<tr id="epr"><td colspan="6"><div class="empty-state"><i class="ti ti-cubes"></i>{{ __("db.search_product_to_add") }}</div></td></tr>');
                 toast('{{ __("db.part_removed") }}');
             }
         }).always(function () { sp(false); });
@@ -971,10 +952,10 @@
         var due = parseFloat(String(t.due_amount).replace(/,/g,'')) || 0;
         if (due < 0.001) {
             $('#due-r').addClass('ok');
-            $('#s-badge').removeClass('due').addClass('clear').html('<i class="fa fa-check-circle"></i> {{ __("db.fully_paid") }}');
+            $('#s-badge').removeClass('due').addClass('clear').html('<i class="ti ti-shield-check"></i> {{ __("db.fully_paid") }}');
         } else {
             $('#due-r').removeClass('ok');
-            $('#s-badge').removeClass('clear').addClass('due').html('<i class="fa fa-exclamation-circle"></i> {{ __("db.amount_due") }}');
+            $('#s-badge').removeClass('clear').addClass('due').html('<i class="ti ti-exclamation-circle"></i> {{ __("db.amount_due") }}');
         }
     }
 
@@ -983,7 +964,7 @@
     ═══════════════════════════════════════════ */
     function sp(on) { on ? $('#sp').addClass('on') : $('#sp').removeClass('on'); }
     function renum(sel) { $(sel + ' tr').each(function (i) { $(this).find('.rn, td:first-child').first().text(i + 1); }); }
-    function toast(m) { if (typeof toastr !== 'undefined') toastr.success(m); }
+    function toast(m) { if (typeof toastr !== 'undefined') SaleProToast.success(m); }
 
     $("ul#repair").siblings('a').attr('aria-expanded', 'true');
     $("ul#repair").addClass("show");
@@ -993,60 +974,17 @@
        PRINT
     ═══════════════════════════════════════════ */
     function openPrintModal() {
-        var html = '{{ __("db.date") }}: {{ date(config("date_format"), strtotime($job->created_at)) }}' +
-            '<br>{{ __("db.reference") }}: {{ $job->reference_no }}' +
-            '<br>{{ __("db.Type") }}: {{ ucfirst($job->service_type) }}' +
-            '<br>{{ __("db.status") }}: {{ ucfirst(str_replace("_", " ", $job->status)) }}'
-        @if ($job->expected_delivery_date)
-            + '<br>{{ __("db.expected_delivery") }}: {{ $job->expected_delivery_date->format(config("date_format")) }}'
-        @endif
-            + '<br><br><div class="row">' +
-            '<div class="col-6"><strong>{{ __("db.customer") }}:</strong><br>{{ optional($job->customer)->name }}<br>{{ optional($job->customer)->phone ?? "" }}</div>' +
-            '<div class="col-6 text-right"><strong>{{ __("db.Warehouse") }}:</strong><br>{{ optional($job->warehouse)->name }}</div></div>';
-
-        $(".print-tbl tbody").remove();
-        var nb = $("<tbody>"), hasRows = false;
-        $('#parts-tbody tr').each(function () {
-            var $c = $(this).find('td');
-            if ($c.length < 5) return;
-            hasRows = true;
-            nb.append('<tr>' +
-                '<td>' + $c.eq(0).text() + '</td>' +
-                '<td>' + $c.eq(1).find('div:first').text() + '</td>' +
-                '<td>' + $c.eq(2).find('.qi').val() + '</td>' +
-                '<td>' + $c.eq(3).find('.pi').val() + '</td>' +
-                '<td>' + $c.eq(4).text() + '</td>' +
-                '</tr>');
-        });
-        if (!hasRows) nb.append('<tr><td colspan="5" class="text-center text-muted">{{ __("db.no_parts_added") }}</td></tr>');
-
-        [
-            ['{{ __("db.parts_total") }}',   $('#ft-parts').text()],
-            ['{{ __("db.service_charge") }}', $('#s-sc').text()],
-            ['{{ __("db.Discount") }}',       $('#dc').val()],
-            ['{{ __("db.Tax") }}',            $('#tx').val()],
-            ['{{ __("db.grand total") }}',    $('#s-gt').text()],
-            ['{{ __("db.Paid") }}',           $('#s-paid').text()],
-            ['{{ __("db.Due") }}',            $('#s-due').text()],
-        ].forEach(function (r) {
-            nb.append('<tr><td colspan="4" style="font-weight:600;">' + r[0] + '</td><td>' + r[1] + '</td></tr>');
-        });
-
-        $(".print-tbl").append(nb);
-        $('#pm-content').html(html);
-        $('#pm-footer').html('<strong>{{ __("db.title") }}:</strong> {{ addslashes($job->title) }}');
         $('#print-modal').modal('show');
     }
 
     $('#do-print-btn').on('click', function () {
+        var content = document.getElementById('print-modal-body').innerHTML;
         var a = window.open('');
-        a.document.write('<html><head><style>body{font-family:sans-serif;font-size:13px}h3{text-align:center}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #ccc;padding:6px}</style></head><body>');
-        a.document.write('<h3>{{ $general_setting->site_title }}</h3><p style="text-align:center"><i>{{ __("db.service_job_details") }}</i></p>');
-        a.document.write(document.querySelector("table.print-tbl").outerHTML);
-        a.document.write('<p><strong>{{ __("db.Created By") }}:</strong> {{ optional($job->createdBy)->name ?? "" }}</p>');
+        a.document.write('<html><head><title>{{ addslashes($general_setting->site_title) }}</title></head><body style="margin:20px;">');
+        a.document.write(content);
         a.document.write('</body></html>');
         a.document.close();
-        setTimeout(function () { a.print(); a.close(); }, 400);
+        setTimeout(function () { a.print(); a.close(); }, 600);
     });
 </script>
 @endpush

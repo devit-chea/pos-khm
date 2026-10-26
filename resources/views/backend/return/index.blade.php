@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <x-success-message key="message" />
 <x-error-message key="not_permitted" />
@@ -49,7 +53,7 @@
             </form>
         </div> 
         @if(in_array("returns-add", $all_permission))
-            <a href="#" data-toggle="modal" data-target="#add-sale-return" class="btn btn-info"><i class="dripicons-plus"></i> {{__('db.Add Return')}}</a>
+            <a href="#" data-toggle="modal" data-target="#add-sale-return" class="btn btn-info"><i class="ti ti-plus"></i> {{__('db.Add Return')}}</a>
         @endif
     </div>
     <div class="table-responsive">
@@ -88,18 +92,18 @@
             <div class="container mt-3 pb-2 border-bottom">
             <div class="row">
                 <div class="col-md-6 d-print-none">
-                    <button id="print-btn" type="button" class="btn btn-default btn-sm"><i class="dripicons-print"></i> {{__('db.Print')}}</button>
+                    <button id="print-btn" type="button" class="btn btn-default btn-sm"><i class="ti ti-printer"></i> {{__('db.print')}}</button>
                     <form action="{{ route('return-sale.sendmail') }}" method="post" class="sendmail-form">
                         @csrf
                         <input type="hidden" name="return_id">
-                        <button class="btn btn-default btn-sm d-print-none"><i class="dripicons-mail"></i> {{__('db.Email')}}</button>
+                        <button class="btn btn-default btn-sm d-print-none"><i class="ti ti-mail"></i> {{__('db.email')}}</button>
                     </form>
                 </div>
                 <div class="col-md-6 d-print-none">
-                    <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="col-md-12">
-                    <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">{{$general_setting->site_title}}</h3>
+                    <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">{{gen_setting()->site_title}}</h3>
                 </div>
                 <div class="col-md-12 text-center">
                     <i style="font-size: 15px;">{{__('db.Return Details')}}</i>
@@ -132,6 +136,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
     $("ul#return").siblings('a').attr('aria-expanded','true');
     $("ul#return").addClass("show");
@@ -139,7 +144,7 @@
 
     var all_permission = <?php echo json_encode($all_permission) ?>;
     var return_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
     $.ajaxSetup({
         headers: {
@@ -147,12 +152,7 @@
         }
     });
 
-    function confirmDelete() {
-        if (confirm("Are you sure want to delete?")) {
-            return true;
-        }
-        return false;
-    }
+    function confirmDelete() { return true; }
 
      $(document).on("click", "tr.return-link td:not(:first-child, :last-child)", function() {
         var returns = $(this).parent().data('return');
@@ -196,7 +196,7 @@
             type:"post"
         },
         "createdRow": function( row, data, dataIndex ) {
-            //alert(data);
+            //SaleProToast.show(data);
             $(row).addClass('return-link');
             $(row).attr('data-return', data['return']);
         },
@@ -217,8 +217,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         order:[['1', 'desc']],
@@ -249,7 +249,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -263,7 +263,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -277,7 +277,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -291,7 +291,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -304,7 +304,7 @@
                 footer:true
             },
             {
-                text: '<i title="delete" class="dripicons-cross"></i>',
+                text: '<i title="delete" class="ti ti-x"></i>',
                 className: 'buttons-delete',
                 action: function ( e, dt, node, config ) {
                     if(user_verified == '1') {
@@ -315,7 +315,7 @@
                                 return_id[i-1] = returns[13];
                             }
                         });
-                        if(return_id.length && confirm("Are you sure want to delete?")) {
+                        if (return_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                             $.ajax({
                                 type:'POST',
                                 url:'returns/deletebyselection',
@@ -323,22 +323,24 @@
                                     returnIdArray: return_id
                                 },
                                 success:function(data){
-                                    alert(data);
+                                    SaleProToast.show(data);
                                     //dt.rows({ page: 'current', selected: true }).deselect();
                                     dt.rows({ page: 'current', selected: true }).remove().draw(false);
                                 }
                             });
                         }
+                        });
+                        }
                         else if(!return_id.length)
-                            alert('Nothing is selected!');
+                            SaleProToast.show('Nothing is selected!');
                     }
                     else
-                        alert('This feature is disable for demo!');
+                        SaleProToast.show('This feature is disable for demo!');
                 }
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],
@@ -353,10 +355,10 @@
         if (dt_selector.rows( '.selected' ).any() && is_calling_first) {
             var rows = dt_selector.rows( '.selected' ).indexes();
 
-            $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
         else {
-            $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
     }
 
@@ -367,6 +369,7 @@
             htmltext += '<br><strong>{{__("db.Exchange Rate")}}: </strong>'+returns[27]+'<br>';
         else
             htmltext += '<br><strong>{{__("db.Exchange Rate")}}: </strong>N/A<br>';
+        htmltext += '<strong>{{__("db.Refund Payment Method")}}: </strong>'+(returns[28] || '{{__("db.Not recorded")}}')+'<br>';
         if(returns[25])
             htmltext += '<strong>{{__("db.Attach Document")}}: </strong><a href="documents/sale_return/'+returns[25]+'">Download</a><br>';
         htmltext += '<br><div class="row"><div class="col-md-6"><strong>{{__("db.From")}}:</strong><br>'+returns[3]+'<br>'+returns[4]+'<br>'+returns[5]+'<br>'+returns[6]+'<br>'+returns[7]+'<br>'+returns[8]+'</div><div class="col-md-6"><div class="float-right"><strong>{{__("db.To")}}:</strong><br>'+returns[9]+'<br>'+returns[10]+'<br>'+returns[11]+'<br>'+returns[12]+'</div></div></div>';
@@ -388,7 +391,8 @@
                 cols += '<td>' + name_code[index] + '</td>';
                 cols += '<td>' + batch_no[index] + '</td>';
                 cols += '<td>' + qty[index] + ' ' + unit_code[index] + '</td>';
-                cols += '<td>' + (subtotal[index] / qty[index]) + '</td>';
+                var lineQty = Number(qty[index]);
+                cols += '<td>' + (Number.isFinite(lineQty) && lineQty > 0 ? (subtotal[index] / lineQty) : '{{ __('db.Not available') }}') + '</td>';
                 cols += '<td>' + tax[index] + '(' + tax_rate[index] + '%)' + '</td>';
                 cols += '<td>' + discount[index] + '</td>';
                 cols += '<td>' + subtotal[index] + '</td>';

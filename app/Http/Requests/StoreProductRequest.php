@@ -19,9 +19,22 @@ class StoreProductRequest extends BaseFormRequest
             'name' => ['required','string','max:255',Rule::unique('products')->ignore($this->route('product'))->where(function ($query) {
                     $query->where('is_active', 1);
                 }),],
-            'code' => ['required','string','max:255',Rule::unique('products')->ignore($this->route('product'))->where(function ($query) {
+            'code' => [
+                'required',
+                'string',
+                'max:255',
+                function ($attribute, $value, $fail) {
+                    $isEmbedded = request()->boolean('is_embeded') || request()->boolean('is_embedded') || request()->input('is_embeded') == 1 || request()->input('is_embedded') == 1;
+                    if ($isEmbedded) {
+                        if (!preg_match('/^\d{7}$/', (string) $value)) {
+                            $fail(__('db.Embedded barcode products require exactly 7 numeric digits for the product code.'));
+                        }
+                    }
+                },
+                Rule::unique('products')->ignore($this->route('product'))->where(function ($query) {
                     $query->where('is_active', 1);
-                }),],
+                }),
+            ],
             'type' => 'required|string|in:standard,digital,combo,service',
             'barcode_symbology' => 'required|string|max:50',
             'category_id' => 'required|exists:categories,id',

@@ -22,7 +22,7 @@ class LabelsController extends Controller
         $default = $barcode_settings->where('is_default', 1)->first();
         $barcode_settings = $barcode_settings->pluck('name', 'id');
 
-        return view('backend.labels.show',compact('barcode_settings'));
+        return view('backend.labels.show', compact('barcode_settings'));
     }
 
     public function printLabel(Request $request)
@@ -35,7 +35,7 @@ class LabelsController extends Controller
             $barcode_details = Barcode::findOrFail($barcode_setting);
 
             // Load business name
-            $general_setting = Cache::remember('general_setting', 60*60*24*365, function () {
+            $general_setting = Cache::remember('general_setting', 60 * 60 * 24 * 365, function () {
                 return DB::table('general_settings')->latest()->first();
             });
 
@@ -67,12 +67,25 @@ class LabelsController extends Controller
                 }
             }
 
+            // Dumbbell Barcode
+            if ($barcode_details->layout_type === 'dumbbell') {
+
+                $barcode_details->paper_width  = $barcode_details->width;
+                $barcode_details->paper_height = $barcode_details->height;
+
+                return view('backend.labels.print_label_dumbbell', [
+                    'labels'          => $all_labels,
+                    'print'           => $print,
+                    'business_name'   => $business_name,
+                    'barcode_details' => $barcode_details,
+                ]);
+            }
             /*
             |--------------------------------------------------------------------------
             | CONTINUOUS ROLL PRINTING
             |--------------------------------------------------------------------------
             */
-            if ($barcode_details->is_continuous) {
+            if ($barcode_details->layout_type === 'continuous') {
 
                 $barcode_details->paper_width  = $barcode_details->width;
                 $barcode_details->paper_height = $barcode_details->height;
@@ -127,13 +140,12 @@ class LabelsController extends Controller
             }
 
             return response($html);
-
         } catch (\Exception $e) {
 
             \Log::emergency(
-                'File:'.$e->getFile().
-                ' Line:'.$e->getLine().
-                ' Message:'.$e->getMessage()
+                'File:' . $e->getFile() .
+                    ' Line:' . $e->getLine() .
+                    ' Message:' . $e->getMessage()
             );
 
             return response(__('lang_v1.barcode_label_error'), 500);

@@ -1,103 +1,101 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 <!DOCTYPE html>
 <html dir="rtl">
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <link rel="icon" type="image/png" href="{{url('favicon.ico')}}" />
-    <title>{{$general_setting->site_title}}</title>
+    <title>{{gen_setting()->site_title}}</title>
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="all,follow">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="manifest" href="{{url('manifest.json')}}">
+    
     <!-- Bootstrap CSS-->
-    <link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
+    <link rel="stylesheet" href="<?php echo asset($asset_prefix . 'vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
 
-    <link rel="preload" href="<?php echo asset('vendor/bootstrap-toggle/css/bootstrap-toggle.min.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link href="<?php echo asset('vendor/bootstrap-toggle/css/bootstrap-toggle.min.css') ?>" rel="stylesheet"></noscript>
-    <link rel="preload" href="<?php echo asset('vendor/bootstrap/css/bootstrap-datepicker.min.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link href="<?php echo asset('vendor/bootstrap/css/bootstrap-datepicker.min.css') ?>" rel="stylesheet"></noscript>
-    <link rel="preload" href="<?php echo asset('vendor/bootstrap/css/awesome-bootstrap-checkbox.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link href="<?php echo asset('vendor/bootstrap/css/awesome-bootstrap-checkbox.css') ?>" rel="stylesheet"></noscript>
-    <link rel="preload" href="<?php echo asset('vendor/bootstrap/css/bootstrap-select.min.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link href="<?php echo asset('vendor/bootstrap/css/bootstrap-select.min.css') ?>" rel="stylesheet"></noscript>
-    <!-- Font Awesome CSS-->
-    <link rel="preload" href="<?php echo asset('vendor/font-awesome/css/font-awesome.min.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link href="<?php echo asset('vendor/font-awesome/css/font-awesome.min.css') ?>" rel="stylesheet"></noscript>
-    <!-- Drip icon font-->
-    <link rel="preload" href="<?php echo asset('vendor/dripicons/webfont.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link href="<?php echo asset('vendor/dripicons/webfont.css') ?>" rel="stylesheet"></noscript>
+    <link rel="preload" href="<?php echo asset($asset_prefix . 'vendor/bootstrap-toggle/css/bootstrap-toggle.min.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="<?php echo asset($asset_prefix . 'vendor/bootstrap-toggle/css/bootstrap-toggle.min.css') ?>" rel="stylesheet"></noscript>
+    <link rel="preload" href="<?php echo asset($asset_prefix . 'vendor/bootstrap/css/bootstrap-datepicker.min.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="<?php echo asset($asset_prefix . 'vendor/bootstrap/css/bootstrap-datepicker.min.css') ?>" rel="stylesheet"></noscript>
+    <link rel="preload" href="<?php echo asset($asset_prefix . 'vendor/bootstrap/css/awesome-bootstrap-checkbox.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="<?php echo asset($asset_prefix . 'vendor/bootstrap/css/awesome-bootstrap-checkbox.css') ?>" rel="stylesheet"></noscript>
+    <link rel="preload" href="<?php echo asset($asset_prefix . 'vendor/bootstrap/css/bootstrap-select.min.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="<?php echo asset($asset_prefix . 'vendor/bootstrap/css/bootstrap-select.min.css') ?>" rel="stylesheet"></noscript>
+
     <!-- Google fonts - Roboto -->
     <link rel="preload" href="https://fonts.googleapis.com/css?family=Nunito:400,500,700" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link href="https://fonts.googleapis.com/css?family=Nunito:400,500,700" rel="stylesheet"></noscript>
 
     @if(Route::current()->getName() != '/')
     <!-- date range stylesheet-->
-    <link rel="preload" href="<?php echo asset('vendor/daterange/css/daterangepicker.min.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link href="<?php echo asset('vendor/daterange/css/daterangepicker.min.css') ?>" rel="stylesheet"></noscript>
+    <link rel="preload" href="<?php echo asset($asset_prefix . 'vendor/daterange/css/daterangepicker.min.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="<?php echo asset($asset_prefix . 'vendor/daterange/css/daterangepicker.min.css') ?>" rel="stylesheet"></noscript>
     <!-- table sorter stylesheet-->
-    <link rel="preload" href="<?php echo asset('vendor/datatable/dataTables.bootstrap4.min.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link href="<?php echo asset('vendor/datatable/dataTables.bootstrap4.min.css') ?>" rel="stylesheet"></noscript>
+    <link rel="preload" href="<?php echo asset($asset_prefix . 'vendor/datatable/dataTables.bootstrap4.min.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="<?php echo asset($asset_prefix . 'vendor/datatable/dataTables.bootstrap4.min.css') ?>" rel="stylesheet"></noscript>
     <link rel="preload" href="https://cdn.datatables.net/fixedheader/3.1.6/css/fixedHeader.bootstrap.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link href="https://cdn.datatables.net/fixedheader/3.1.6/css/fixedHeader.bootstrap.min.css" rel="stylesheet"></noscript>
     <link rel="preload" href="https://cdn.datatables.net/responsive/2.2.3/css/responsive.bootstrap.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link href="https://cdn.datatables.net/responsive/2.2.3/css/responsive.bootstrap.min.css" rel="stylesheet"></noscript>
     @endif
 
-    <link rel="stylesheet" href="<?php echo asset('css/style.default.css') ?>" id="theme-stylesheet" type="text/css">
-    <link rel="stylesheet" href="<?php echo asset('css/dropzone.css') ?>">
+    <link rel="stylesheet" href="<?php echo asset($asset_prefix . 'css/style.default.css') ?>" id="theme-stylesheet" type="text/css">
+    
 
 
-    <script type="text/javascript" src="<?php echo asset('vendor/jquery/jquery.min.js') ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('vendor/jquery/jquery-ui.min.js') ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('vendor/jquery/bootstrap-datepicker.min.js') ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('vendor/popper.js/umd/popper.min.js') ?>">
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/jquery/jquery.min.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/jquery/jquery-ui.min.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/jquery/bootstrap-datepicker.min.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/popper.js/umd/popper.min.js') ?>">
     </script>
-    <script type="text/javascript" src="<?php echo asset('vendor/bootstrap/js/bootstrap.min.js') ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('vendor/bootstrap-toggle/js/bootstrap-toggle.min.js') ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('vendor/bootstrap/js/bootstrap-select.min.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/bootstrap/js/bootstrap.min.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/bootstrap-toggle/js/bootstrap-toggle.min.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/bootstrap/js/bootstrap-select.min.js') ?>"></script>
 
-    <script type="text/javascript" src="<?php echo asset('vendor/jquery.cookie/jquery.cookie.js') ?>">
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/jquery.cookie/jquery.cookie.js') ?>">
     </script>
-    <script type="text/javascript" src="<?php echo asset('vendor/chart.js/Chart.min.js') ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('js/charts-custom.js') ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('vendor/jquery-validation/jquery.validate.min.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/chart.js/Chart.min.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'js/charts-custom.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/jquery-validation/jquery.validate.min.js') ?>"></script>
 
-    <script type="text/javascript" src="<?php echo asset('js/front.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'js/front.js') ?>"></script>
 
     @if(Route::current()->getName() != '/')
-    <script type="text/javascript" src="<?php echo asset('vendor/tinymce/js/tinymce/tinymce.min.js') ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('js/dropzone.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/tinymce/js/tinymce/tinymce.min.js') ?>"></script>
+    
 
     <!-- table sorter js-->
     @if( Config::get('app.locale') == 'ar')
-      <script type="text/javascript" src="<?php echo asset('vendor/datatable/pdfmake_arabic.min.js') ?>"></script>
-      <script type="text/javascript" src="<?php echo asset('vendor/datatable/vfs_fonts_arabic.js') ?>"></script>
+      <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/datatable/pdfmake_arabic.min.js') ?>"></script>
+      <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/datatable/vfs_fonts_arabic.js') ?>"></script>
     @else
-      <script type="text/javascript" src="<?php echo asset('vendor/datatable/pdfmake.min.js') ?>"></script>
-      <script type="text/javascript" src="<?php echo asset('vendor/datatable/vfs_fonts.js') ?>"></script>
+      <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/datatable/pdfmake.min.js') ?>"></script>
+      <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/datatable/vfs_fonts.js') ?>"></script>
     @endif
-    <script type="text/javascript" src="<?php echo asset('vendor/datatable/jquery.dataTables.min.js') ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('vendor/datatable/dataTables.bootstrap4.min.js') ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('vendor/datatable/dataTables.buttons.min.js') ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('vendor/datatable/buttons.bootstrap4.min.js') ?>">"></script>
-    <script type="text/javascript" src="<?php echo asset('vendor/datatable/buttons.colVis.min.js') ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('vendor/datatable/buttons.html5.min.js') ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('vendor/datatable/buttons.print.min.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/datatable/jquery.dataTables.min.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/datatable/dataTables.bootstrap4.min.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/datatable/dataTables.buttons.min.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/datatable/buttons.bootstrap4.min.js') ?>">"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/datatable/buttons.colVis.min.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/datatable/buttons.html5.min.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/datatable/buttons.print.min.js') ?>"></script>
 
-    <script type="text/javascript" src="<?php echo asset('vendor/datatable/sum().js') ?>"></script>
-    <script type="text/javascript" src="<?php echo asset('vendor/datatable/dataTables.checkboxes.min.js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/datatable/sum().js') ?>"></script>
+    <script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/datatable/dataTables.checkboxes.min.js') ?>"></script>
     <script type="text/javascript" src="https://cdn.datatables.net/fixedheader/3.1.6/js/dataTables.fixedHeader.min.js"></script>
     <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.3/js/dataTables.responsive.min.js"></script>
     <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.3/js/responsive.bootstrap.min.js"></script>
     @endif
 
     <!-- Custom stylesheet - for your changes-->
-    <link rel="stylesheet" href="<?php echo asset('css/custom-'.$general_setting->theme) ?>" type="text/css" id="custom-style">
+    <link rel="stylesheet" href="<?php echo asset('css/custom-'.gen_setting()->theme) ?>" type="text/css" id="custom-style">
     @if( Config::get('app.locale') == 'ar')
     <!-- RTL css -->
-    <link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap-rtl.min.css') ?>" type="text/css">
-    <link rel="stylesheet" href="<?php echo asset('css/custom-rtl.css') ?>" type="text/css" id="custom-style">
+    <link rel="stylesheet" href="<?php echo asset($asset_prefix . 'vendor/bootstrap/css/bootstrap-rtl.min.css') ?>" type="text/css">
+    <link rel="stylesheet" href="<?php echo asset($asset_prefix . 'css/custom-rtl.css') ?>" type="text/css" id="custom-style">
     @endif
   </head>
 
@@ -110,7 +108,7 @@
           <!-- Sidebar Navigation Menus-->
           <div class="main-menu">
             <ul id="side-main-menu" class="side-menu list-unstyled">
-              <li><a href="{{url('/')}}"> <i class="dripicons-meter"></i><span>{{ __('dbdashboard') }}</span></a></li>
+              <li><a href="{{url('/')}}"> <i class="ti ti-meter"></i><span>{{ __('dbdashboard') }}</span></a></li>
                <?php
                   $role = DB::table('roles')->find(Auth::user()->role_id);
                   $category_permission_active = DB::table('permissions')
@@ -143,7 +141,7 @@
                     ])->first();
               ?>
               @if($category_permission_active || $index_permission_active || $print_barcode_active || $stock_count_active || $adjustment_active)
-              <li><a href="#product" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-list"></i><span>{{__('dbproduct')}}</span><span></a>
+              <li><a href="#product" aria-expanded="false" data-toggle="collapse"> <i class="ti ti-list"></i><span>{{__('dbproduct')}}</span><span></a>
                 <ul id="product" class="collapse list-unstyled ">
                   @if($category_permission_active)
                   <li id="category-menu"><a href="{{route('category.index')}}">{{__('dbcategory')}}</a></li>
@@ -182,7 +180,7 @@
                     ])->first();
               ?>
               @if($index_permission_active)
-              <li><a href="#purchase" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-card"></i><span>{{__('db.Purchase')}}</span></a>
+              <li><a href="#purchase" aria-expanded="false" data-toggle="collapse"> <i class="ti ti-credit-card"></i><span>{{__('db.Purchase')}}</span></a>
                 <ul id="purchase" class="collapse list-unstyled ">
                   <li id="purchase-list-menu"><a href="{{route('purchases.index')}}">{{__('db.Purchase List')}}</a></li>
                   <?php
@@ -231,7 +229,7 @@
                 ])->first();
               ?>
               @if($sale_index_permission_active || $gift_card_permission_active || $coupon_permission_active || $delivery_permission_active)
-              <li><a href="#sale" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-cart"></i><span>{{__('db.Sale')}}</span></a>
+              <li><a href="#sale" aria-expanded="false" data-toggle="collapse"> <i class="ti ti-shopping-cart"></i><span>{{__('db.Sale')}}</span></a>
                 <ul id="sale" class="collapse list-unstyled ">
                   @if($sale_index_permission_active)
                   <li id="sale-list-menu"><a href="{{route('sales.index')}}">{{__('db.Sale List')}}</a></li>
@@ -263,7 +261,7 @@
                     ])->first();
               ?>
               @if($index_permission_active)
-              <li><a href="#expense" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-wallet"></i><span>{{__('db.Expense')}}</span></a>
+              <li><a href="#expense" aria-expanded="false" data-toggle="collapse"> <i class="ti ti-wallet"></i><span>{{__('db.Expense')}}</span></a>
                 <ul id="expense" class="collapse list-unstyled ">
                   <li id="exp-cat-menu"><a href="{{route('expense_categories.index')}}">{{__('db.Expense Category')}}</a></li>
                   <li id="exp-list-menu"><a href="{{route('expenses.index')}}">{{__('db.Expense List')}}</a></li>
@@ -288,7 +286,7 @@
                     ])->first();
               ?>
               @if($index_permission_active)
-              <li><a href="#quotation" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-document"></i><span>{{__('db.Quotation')}}</span><span></a>
+              <li><a href="#quotation" aria-expanded="false" data-toggle="collapse"> <i class="ti ti-document"></i><span>{{__('db.quotation')}}</span><span></a>
                 <ul id="quotation" class="collapse list-unstyled ">
                   <li id="quotation-list-menu"><a href="{{route('quotations.index')}}">{{__('db.Quotation List')}}</a></li>
                   <?php
@@ -312,7 +310,7 @@
                     ])->first();
               ?>
               @if($index_permission_active)
-              <li><a href="#transfer" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-export"></i><span>{{__('db.Transfer')}}</span></a>
+              <li><a href="#transfer" aria-expanded="false" data-toggle="collapse"> <i class="ti ti-export"></i><span>{{__('db.Transfer')}}</span></a>
                 <ul id="transfer" class="collapse list-unstyled ">
                   <li id="transfer-list-menu"><a href="{{route('transfers.index')}}">{{__('db.Transfer List')}}</a></li>
                   <?php
@@ -346,7 +344,7 @@
                         ])->first();
               ?>
               @if($sale_return_index_permission_active || $purchase_return_index_permission_active)
-              <li><a href="#return" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-return"></i><span>{{__('db.return')}}</span></a>
+              <li><a href="#return" aria-expanded="false" data-toggle="collapse"> <i class="ti ti-arrow-back"></i><span>{{__('db.return')}}</span></a>
                 <ul id="return" class="collapse list-unstyled ">
                   @if($sale_return_index_permission_active)
                   <li id="sale-return-menu"><a href="{{route('return-sale.index')}}">{{__('db.Sale')}}</a></li>
@@ -384,7 +382,7 @@
 
               ?>
               @if($index_permission_active || $balance_sheet_permission_active || $account_statement_permission_active || $money_transfer_permission_active)
-              <li class=""><a href="#account" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-briefcase"></i><span>{{__('db.Accounting')}}</span></a>
+              <li class=""><a href="#account" aria-expanded="false" data-toggle="collapse"> <i class="ti ti-briefcase"></i><span>{{__('db.Accounting')}}</span></a>
                 <ul id="account" class="collapse list-unstyled ">
                   @if($index_permission_active)
                   <li id="account-list-menu"><a href="{{route('accounts.index')}}">{{__('db.Account List')}}</a></li>
@@ -426,7 +424,7 @@
               ?>
 
               @if(Auth::user()->role_id != 5)
-              <li class=""><a href="#hrm" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-user-group"></i><span>HRM</span></a>
+              <li class=""><a href="#hrm" aria-expanded="false" data-toggle="collapse"> <i class="ti ti-user-group"></i><span>HRM</span></a>
                 <ul id="hrm" class="collapse list-unstyled ">
                   @if($department_active)
                   <li id="dept-menu"><a href="{{route('departments.index')}}">{{__('db.Department')}}</a></li>
@@ -474,7 +472,7 @@
                         ])->first();
               ?>
               @if($user_index_permission_active || $customer_index_permission_active || $biller_index_permission_active || $supplier_index_permission_active)
-              <li><a href="#people" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-user"></i><span>{{__('db.People')}}</span></a>
+              <li><a href="#people" aria-expanded="false" data-toggle="collapse"> <i class="ti ti-user"></i><span>{{__('db.People')}}</span></a>
                 <ul id="people" class="collapse list-unstyled ">
 
                   @if($user_index_permission_active)
@@ -624,7 +622,7 @@
                         ['role_id', $role->id] ])->first();
               ?>
               @if($profit_loss_active || $best_seller_active || $warehouse_report_active || $warehouse_stock_report_active || $product_report_active || $daily_sale_active || $monthly_sale_active || $daily_purchase_active || $monthly_purchase_active || $purchase_report_active || $sale_report_active || $payment_report_active || $product_qty_alert_active || $user_report_active || $customer_report_active || $supplier_report_active || $due_report_active)
-              <li><a href="#report" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-document-remove"></i><span>{{__('db.Reports')}}</span></a>
+              <li><a href="#report" aria-expanded="false" data-toggle="collapse"> <i class="ti ti-document-remove"></i><span>{{__('db.Reports')}}</span></a>
                 <ul id="report" class="collapse list-unstyled ">
                   @if($profit_loss_active)
                   <li id="profit-loss-report-menu">
@@ -747,7 +745,7 @@
               </li>
               @endif
 
-              <li><a href="#setting" aria-expanded="false" data-toggle="collapse"> <i class="dripicons-gear"></i><span>{{__('db.settings')}}</span></a>
+              <li><a href="#setting" aria-expanded="false" data-toggle="collapse"> <i class="ti ti-settings"></i><span>{{__('db.settings')}}</span></a>
                 <ul id="setting" class="collapse list-unstyled ">
                   <?php
                       $send_notification_permission = DB::table('permissions')->where('name', 'send_notification')->first();
@@ -902,12 +900,12 @@
         <nav class="navbar">
           <div class="container-fluid">
             <div class="navbar-holder d-flex align-items-center justify-content-between">
-              <a id="toggle-btn" href="#" class="menu-btn"><i class="fa fa-bars"> </i></a>
+              <a id="toggle-btn" href="#" class="menu-btn"><i class="ti ti-menu-deep"> </i></a>
               <span class="brand-big">
-                @if($general_setting->site_logo)
-                <a href="{{url('/')}}"><img src="{{url('logo', $general_setting->site_logo)}}" width="115"></a>
+                @if(gen_setting()->site_logo)
+                <a href="{{url('/')}}"><img src="{{url('logo', gen_setting()->site_logo)}}" width="115"></a>
                 @else
-                  <a href="{{url('/')}}"><h1 class="d-inline">{{$general_setting->site_title}}</h1></a>
+                  <a href="{{url('/')}}"><h1 class="d-inline">{{gen_setting()->site_title}}</h1></a>
                 @endif
               </span>
 
@@ -919,51 +917,62 @@
                       ['role_id', $role->id]
                   ])->first();
 
-                  $empty_database_permission = DB::table('permissions')->where('name', 'empty_database')->first();
-                  $empty_database_permission_active = DB::table('role_has_permissions')->where([
-                      ['permission_id', $empty_database_permission->id],
+                  $business_reset_permission = DB::table('permissions')->where('name', 'business_reset')->first();
+                  $business_reset_permission_active = DB::table('role_has_permissions')->where([
+                      ['permission_id', $business_reset_permission->id],
                       ['role_id', $role->id]
                   ])->first();
                 ?>
                 @if($add_permission_active)
-                <li class="nav-item"><a class="dropdown-item btn-pos btn-sm" href="{{route('sale.pos')}}"><i class="dripicons-shopping-bag"></i><span> POS</span></a></li>
+                <li class="nav-item"><a class="dropdown-item btn-pos btn-sm" href="{{route('sale.pos')}}"><i class="ti ti-shopping-bag"></i><span> POS</span></a></li>
                 @endif
-                <li class="nav-item"><a id="btnFullscreen" data-toggle="tooltip" title="{{__('db.Full Screen')}}"><i class="dripicons-expand"></i></a></li>
+                <li class="nav-item"><a id="btnFullscreen" data-toggle="tooltip" title="{{__('db.Full Screen')}}"><i class="ti ti-arrows-maximize"></i></a></li>
                 @if(\Auth::user()->role_id <= 2)
-                  <li class="nav-item"><a href="{{route('cashRegister.index')}}" data-toggle="tooltip" title="{{__('db.Cash Register List')}}"><i class="dripicons-archive"></i></a></li>
+                  <li class="nav-item"><a href="{{route('cashRegister.index')}}" data-toggle="tooltip" title="{{__('db.Cash Register List')}}"><i class="ti ti-archive"></i></a></li>
                 @endif
-                @if($product_qty_alert_active)
-                  @if(($alert_product + count(\Auth::user()->unreadNotifications)) > 0)
+                @php
+                  $alertProductCount = (int) ($alert_product ?? 0);
+                  $unreadCount = Auth::user() ? count(\Auth::user()->unreadNotifications) : 0;
+                  $totalAlerts = $alertProductCount + $unreadCount;
+                @endphp
+                @if($product_qty_alert_active ?? false)
+                  @if($totalAlerts > 0)
                   <li class="nav-item" id="notification-icon">
-                        <a rel="nofollow" data-toggle="tooltip" title="{{__('Notifications')}}" class="nav-link dropdown-item"><i class="dripicons-bell"></i><span class="badge badge-danger notification-number">{{$alert_product + count(\Auth::user()->unreadNotifications)}}</span>
+                        <a rel="nofollow" data-toggle="tooltip" title="{{__('Notifications')}}" class="nav-link dropdown-item"><i class="ti ti-bell"></i><span class="badge badge-danger notification-number">{{$totalAlerts}}</span>
                         </a>
                         <ul class="right-sidebar">
+                            @if($alertProductCount > 0)
                             <li class="notifications">
-                              <a href="{{route('report.qtyAlert')}}" class="btn btn-link"> {{$alert_product}} product exceeds alert quantity</a>
+                              <a href="{{route('report.qtyAlert')}}" class="btn btn-link"> {{$alertProductCount}} product exceeds alert quantity</a>
                             </li>
-                            @foreach(\Auth::user()->unreadNotifications as $key => $notification)
-                                <li class="notifications">
-                                    <a href="#" class="btn btn-link">{{ $notification->data['message'] }}</a>
-                                </li>
-                            @endforeach
-                        </ul>
-                  </li>
-                  @elseif(count(\Auth::user()->unreadNotifications) > 0)
-                  <li class="nav-item" id="notification-icon">
-                        <a rel="nofollow" data-toggle="tooltip" title="{{__('Notifications')}}" class="nav-link dropdown-item"><i class="dripicons-bell"></i><span class="badge badge-danger notification-number">{{count(\Auth::user()->unreadNotifications)}}</span>
-                        </a>
-                        <ul class="right-sidebar">
-                            @foreach(\Auth::user()->unreadNotifications as $key => $notification)
-                                <li class="notifications">
-                                    <a href="#" class="btn btn-link">{{ $notification->data['message'] }}</a>
-                                </li>
-                            @endforeach
+                            @endif
+                            @if(Auth::user())
+                              @foreach(\Auth::user()->unreadNotifications as $key => $notification)
+                                  <li class="notifications">
+                                      <a href="#" class="btn btn-link">{{ $notification->data['message'] }}</a>
+                                  </li>
+                              @endforeach
+                            @endif
                         </ul>
                   </li>
                   @endif
+                @elseif($unreadCount > 0)
+                  <li class="nav-item" id="notification-icon">
+                        <a rel="nofollow" data-toggle="tooltip" title="{{__('Notifications')}}" class="nav-link dropdown-item"><i class="ti ti-bell"></i><span class="badge badge-danger notification-number">{{$unreadCount}}</span>
+                        </a>
+                        <ul class="right-sidebar">
+                            @if(Auth::user())
+                              @foreach(\Auth::user()->unreadNotifications as $key => $notification)
+                                  <li class="notifications">
+                                      <a href="#" class="btn btn-link">{{ $notification->data['message'] }}</a>
+                                  </li>
+                              @endforeach
+                            @endif
+                        </ul>
+                  </li>
                 @endif
                 <li class="nav-item">
-                      <a rel="nofollow" data-toggle="tooltip" class="nav-link dropdown-item"><i class="dripicons-web"></i></a>
+                      <a rel="nofollow" data-toggle="tooltip" class="nav-link dropdown-item"><i class="ti ti-world"></i></a>
                       <ul class="right-sidebar">
                         @foreach ($languages as $language)
                           <li>
@@ -972,7 +981,7 @@
                         @endforeach
                       </ul>
 
-                      @if (!env('USER_VERIFIED'))
+                      @if (!config('app.user_verified'))
                         @if ($language_setting_active)
                             <li id="languages" style="background-color: #f0f0f0; padding: 10px; border-radius: 5px;">
                                 <a href="{{route('languages')}}"> {{__('db.Languages')}} <span style="font-size: 16px;">→</span></i></a>
@@ -981,34 +990,34 @@
                     @endif
                 </li>
                 <li class="nav-item">
-                  <a rel="nofollow" data-toggle="tooltip" class="nav-link dropdown-item"><i class="dripicons-user"></i> <span>{{ucfirst(Auth::user()->name)}}</span> <i class="fa fa-angle-down"></i>
+                  <a rel="nofollow" data-toggle="tooltip" class="nav-link dropdown-item"><i class="ti ti-user"></i> <span>{{ucfirst(Auth::user()->name)}}</span> <i class="ti ti-angle-down"></i>
                   </a>
                   <ul class="right-sidebar">
                       <li>
-                        <a href="{{route('user.profile', ['id' => Auth::id()])}}"><i class="dripicons-user"></i> {{__('db.profile')}}</a>
+                        <a href="{{route('user.profile', ['id' => Auth::id()])}}"><i class="ti ti-user"></i> {{__('db.profile')}}</a>
                       </li>
                       @if($general_setting_permission_active)
                       <li>
-                        <a href="{{route('setting.general')}}"><i class="dripicons-gear"></i> {{__('db.settings')}}</a>
+                        <a href="{{route('setting.general')}}"><i class="ti ti-settings"></i> {{__('db.settings')}}</a>
                       </li>
                       @endif
                       <li>
-                        <a href="{{url('my-transactions/'.date('Y').'/'.date('m'))}}"><i class="dripicons-swap"></i> {{__('db.My Transaction')}}</a>
+                        <a href="{{url('my-transactions/'.date('Y').'/'.date('m'))}}"><i class="ti ti-calendar-dollar"></i> {{__('db.My Transaction')}}</a>
                       </li>
                       @if(Auth::user()->role_id != 5)
                       <li>
-                        <a href="{{url('holidays/my-holiday/'.date('Y').'/'.date('m'))}}"><i class="dripicons-vibrate"></i> {{__('db.My Holiday')}}</a>
+                        <a href="{{url('holidays/my-holiday/'.date('Y').'/'.date('m'))}}"><i class="ti ti-luggage"></i> {{__('db.My Holiday')}}</a>
                       </li>
                       @endif
-                      @if($empty_database_permission_active)
+                      @if ($business_reset_permission_active)
                       <li>
-                        <a onclick="return confirm('Are you sure want to delete? If you do this all of your data will be lost.')" href="{{route('setting.emptyDatabase')}}"><i class="dripicons-stack"></i> {{__('db.Empty Database')}}</a>
+                          <a href="{{ route('setting.freshBusinessReset') }}"><i class="ti ti-alert-triangle"></i> {{ __('db.fresh_reset_title') }}</a>
                       </li>
                       @endif
                       <li>
                         <a href="{{ route('logout') }}"
                            onclick="event.preventDefault();
-                                         document.getElementById('logout-form').submit();"><i class="dripicons-power"></i>
+                                         document.getElementById('logout-form').submit();"><i class="ti ti-power"></i>
                             {{__('db.logout')}}
                         </a>
                         <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
@@ -1030,7 +1039,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="exampleModalLabel" class="modal-title">{{__('db.Send Notification')}}</h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                   <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -1072,7 +1081,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Expense')}}</h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                   <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -1087,7 +1096,7 @@
                         ])->get();
                       else
                         $lims_warehouse_list = DB::table('warehouses')->where('is_active', true)->get();
-                      $lims_account_list = \App\Models\Account::where('is_active', true)->get();
+                      $lims_account_list = app(\App\Services\PaymentAccountService::class)->validOperationalAccounts();
 
                     ?>
                       <div class="row">
@@ -1125,7 +1134,7 @@
                         </div>
                       </div>
                       <div class="form-group">
-                          <label>{{__('db.Note')}}</label>
+                          <label>{{__('db.note')}}</label>
                           <textarea name="note" rows="3" class="form-control"></textarea>
                       </div>
                       <div class="form-group">
@@ -1144,7 +1153,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Account')}}</h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                   <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -1163,7 +1172,7 @@
                           <input type="number" name="initial_balance" step="any" class="form-control">
                       </div>
                       <div class="form-group">
-                          <label>{{__('db.Note')}}</label>
+                          <label>{{__('db.note')}}</label>
                           <textarea name="note" rows="3" class="form-control"></textarea>
                       </div>
                       <div class="form-group">
@@ -1182,7 +1191,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="exampleModalLabel" class="modal-title">{{__('db.Account Statement')}}</h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                   <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -1230,7 +1239,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="exampleModalLabel" class="modal-title">{{__('db.Warehouse Report')}}</h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                   <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -1267,7 +1276,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="exampleModalLabel" class="modal-title">{{__('db.User Report')}}</h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                   <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -1304,7 +1313,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="exampleModalLabel" class="modal-title">{{__('db.Customer Report')}}</h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                   <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -1341,7 +1350,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="exampleModalLabel" class="modal-title">{{__('db.Supplier Report')}}</h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                   <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -1380,7 +1389,7 @@
         <div class="container-fluid">
           <div class="row">
             <div class="col-sm-12">
-              <p>&copy; {{$general_setting->site_title}} | {{__('db.Developed')}} {{__('db.By')}} <span class="external">{{$general_setting->developed_by}}</span></p>
+              <p>&copy; {{gen_setting()->site_title}} | {{__('db.Developed')}} {{__('db.By')}} <span class="external">{{gen_setting()->developed_by}}</span></p>
             </div>
           </div>
         </div>
@@ -1389,7 +1398,7 @@
     @yield('scripts')
     <script type="text/javascript">
 
-      var alert_product = <?php echo json_encode($alert_product) ?>;
+      var alert_product = <?php echo json_encode($alert_product ?? 0) ?>;
 
       if ($(window).outerWidth() > 1199) {
           $('nav.side-navbar').removeClass('shrink');
@@ -1404,12 +1413,7 @@
 
       $("div.alert").delay(3000).slideUp(750);
 
-      function confirmDelete() {
-          if (confirm("Are you sure want to delete?")) {
-              return true;
-          }
-          return false;
-      }
+      function confirmDelete() { return true; }
 
       $("li#notification-icon").on("click", function (argument) {
           $.get('notifications/mark-as-read', function(data) {
@@ -1502,5 +1506,6 @@
           style: 'btn-link',
       });
     </script>
+    @include('backend.layout.theme_customizer')
   </body>
 </html>

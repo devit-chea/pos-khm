@@ -52,10 +52,10 @@
                                             <table id="product-table" class="table">
                                                 <thead>
                                                     <tr>
-                                                        <th><i class="dripicons-view-apps"></i></th>
+                                                        <th><i class="ti ti-view-apps"></i></th>
                                                         <th>{{ __('db.name') }}</th>
                                                         <th>{{ __('db.Code') }}</th>
-                                                        <th><i class="dripicons-trash"></i></th>
+                                                        <th><i class="ti ti-trash"></i></th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -139,7 +139,7 @@
                 });
 
                 if (exists) {
-                    alert("This product already exists in the list.");
+                    SaleProToast.show("This product already exists in the list.");
                     $(this).val('');
                     return; // exit without adding
                 }

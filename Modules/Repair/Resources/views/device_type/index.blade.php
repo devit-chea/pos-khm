@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
     <x-validation-error fieldName="name" />
     <x-validation-error fieldName="category" />
@@ -7,8 +11,8 @@
 
     <section>
         <div class="container-fluid">
-            <button class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="dripicons-plus"></i>
-                {{ __('db.Add Device Type') }} </button>
+            <button class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="ti ti-plus"></i>
+                {{ __('db.Add Type') }} </button>
         </div>
         <div class="table-responsive">
             <table id="biller-table" class="table">
@@ -46,7 +50,7 @@
                                             <button type="button" data-id="{{ $device_type->id }}"
                                                 class="open-EditDeviceTypeDialog btn btn-link" data-toggle="modal"
                                                 data-target="#editModal">
-                                                <i class="dripicons-document-edit"></i>
+                                                <i class="ti ti-edit"></i>
                                                 {{ __('db.edit') }}
                                             </button>
                                         </li>
@@ -56,8 +60,8 @@
                                             @method('DELETE')
                                             <li>
                                                 <button type="submit" class="btn btn-link"
-                                                    onclick="return confirm('Are you sure want to delete?')">
-                                                    <i class="dripicons-trash"></i> {{ __('db.delete') }}
+                                                    data-confirm-message="Are you sure want to delete?">
+                                                    <i class="ti ti-trash"></i> {{ __('db.delete') }}
                                                 </button>
                                             </li>
                                         </form>
@@ -81,12 +85,12 @@
                     <div class="modal-header">
                         <h5 id="createModalLabel" class="modal-title">{{ __('db.Add Device Type') }}</h5>
                         <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                            <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                            <span aria-hidden="true"><i class="ti ti-x"></i></span>
                         </button>
                     </div>
                     <div class="modal-body">
                         <p class="italic">
-                            <small>{{ __('db.The field labels marked with * are required input fields.') }}</small>
+                            <small>{{ __('db.required_fields_notice') }}</small>
                         </p>
                         <div class="form-group">
                             <label>{{ __('db.name') }} *</label>
@@ -124,14 +128,14 @@
                     @csrf
                     @method('PUT')
                     <div class="modal-header">
-                        <h5 id="editModalLabel" class="modal-title">{{ __('db.Update Device Type') }}</h5>
+                        <h5 id="editModalLabel" class="modal-title">{{ __('db.update_device_type') }}</h5>
                         <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                            <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                            <span aria-hidden="true"><i class="ti ti-x"></i></span>
                         </button>
                     </div>
                     <div class="modal-body">
                         <p class="italic">
-                            <small>{{ __('db.The field labels marked with * are required input fields.') }}</small>
+                            <small>{{ __('db.required_fields_notice') }}</small>
                         </p>
                         <div class="form-group">
                             <label>{{ __('db.name') }} *</label>
@@ -140,7 +144,7 @@
                         <input type="hidden" name="device_type_id">
                         <div class="form-group">
                             <label>{{ __('db.category') }} *</label>
-                            <select name="category" required class="form-control">
+                            <select name="category" required class="form-control selectpicker">
                                 <option value="device">{{ __('db.device') }}</option>
                                 <option value="vehicle">{{ __('db.vehicle') }}</option>
                             </select>
@@ -162,9 +166,10 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
     <script type="text/javascript">
         var device_type_id = [];
-        var user_verified = <?php echo json_encode(env('USER_VERIFIED')); ?>;
+        var user_verified = <?php echo json_encode(config('app.user_verified')); ?>;
 
         $.ajaxSetup({
             headers: {
@@ -175,13 +180,16 @@
         $(document).ready(function() {
             $(document).on('click', '.open-EditDeviceTypeDialog', function() {
                 var id  = $(this).data('id').toString();
-                var url = "{{ url('repair/device-types') }}/" + id + "/edit";
+                var url = "{{ route('repair.device-types.edit', ':id') }}".replace(':id', id);
 
                 $.get(url, function(data) {
                     $("#editModal input[name='name']").val(data['name']);
                     $("#editModal input[name='device_type_id']").val(data['id']);
                     $("#editModal input[name='description']").val(data['description']);
                     $("#editModal select[name='category']").val(data['category']);
+                    if ($('.selectpicker').length) {
+                        $('.selectpicker').selectpicker('refresh');
+                    }
                 });
             });
         });
@@ -193,8 +201,8 @@
                 "info": '<small>{{ __('db.Showing') }} _START_ - _END_ (_TOTAL_)</small>',
                 "search": '{{ __('db.Search') }}',
                 'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
                 }
             },
             'columnDefs': [
@@ -225,26 +233,26 @@
             buttons: [
                 {
                     extend: 'pdf',
-                    text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                    text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                     exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible', stripHtml: false },
                 },
                 {
                     extend: 'excel',
-                    text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                    text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                     exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                 },
                 {
                     extend: 'csv',
-                    text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                     exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                 },
                 {
                     extend: 'print',
-                    text: '<i title="print" class="fa fa-print"></i>',
+                    text: '<i title="print" class="ti ti-printer"></i>',
                     exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible', stripHtml: false },
                 },
                 {
-                    text: '<i title="delete" class="dripicons-cross"></i>',
+                    text: '<i title="delete" class="ti ti-x"></i>',
                     className: 'buttons-delete',
                     action: function(e, dt, node, config) {
                         if (user_verified == '1') {
@@ -254,10 +262,10 @@
                                     device_type_id[i - 1] = $(this).closest('tr').data('id');
                                 }
                             });
-                            if (device_type_id.length && confirm("Are you sure want to delete?")) {
+                            if (device_type_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                                 $.ajax({
                                     type: 'POST',
-                                    url: '{{ url('repair/device-types/deletebyselection') }}',
+                                    url: '{{ route('repair.device-types.deletebyselection') }}',
                                     data: { deviceTypeIdArray: device_type_id },
                                     success: function(data) {
                                         $(':checkbox:checked').each(function(i) {
@@ -265,20 +273,20 @@
                                                 dt.row($(this).closest('tr')).remove().draw(false);
                                             }
                                         });
-                                        alert(data);
+                                        SaleProToast.show(data);
                                     }
                                 });
                             } else if (!device_type_id.length) {
-                                alert('No device type is selected!');
+                                SaleProToast.show('No device type is selected!');
                             }
                         } else {
-                            alert('This feature is disable for demo!');
+                            SaleProToast.show('This feature is disable for demo!');
                         }
                     }
                 },
                 {
                     extend: 'colvis',
-                    text: '<i title="column visibility" class="fa fa-eye"></i>',
+                    text: '<i title="column visibility" class="ti ti-eye"></i>',
                     columns: ':gt(0)'
                 },
             ],

@@ -4,6 +4,21 @@
     .top-fields{margin-top:10px;position: relative;}
     .top-fields label {font-size:11px;font-weight:600;margin-left:10px;padding:0 3px;position:absolute;top:-8px;z-index:9;}
     .top-fields input{font-size:13px;height:45px}
+
+    @media print {
+        header, footer, .side-navbar, .filter-section {
+            display: none !important;
+        }
+        body, .page {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+        }
+        .card {
+            border: none !important;
+            box-shadow: none !important;
+        }
+    }
 </style>
 <section>
     <form id="profitLossForm">
@@ -12,7 +27,7 @@
             <div class="card">
                 <div class="card-body">
                     <h3 class="text-center">{{__('db.profit_loss_report')}}</h3>
-                    <div class="row mt-4 justify-content-center">
+                    <div class="row mt-4 justify-content-center filter-section">
                         <!-- Warehouse Dropdown -->
                         <div class="col-md-3">
                             <div class="form-group top-fields">
@@ -43,7 +58,12 @@
                             <span class="spinner-border text-primary spinner-border-sm" role="status"></span>
                             <span>Loading results...</span>
                         </div>
+                    </div>
 
+                    <div class="row mt-2 d-print-none">
+                        <div class="col-md-12 text-center">
+                            <button type="button" class="btn btn-outline-secondary btn-print" onclick="window.print()"><i class="ti ti-printer"></i> {{ __('db.print') }}</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -96,6 +116,10 @@ document.addEventListener("DOMContentLoaded", function () {
             resultBox.style.opacity = "1";
         });
     }
+
+    $(document).ready(function() {
+        submitFilter();
+    })
 
     // 🔹 Warehouse Change (Bootstrap Select Compatible)
     $('#warehouse_id').on('changed.bs.select', function () {

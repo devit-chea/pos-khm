@@ -17,6 +17,7 @@
     // Variant modal state
     let selectedProduct = null;   // { id, name, basePrice, image }
     let selectedVariants = {};     // keyed by group index → { id, name, additional_price }
+    let checkoutIdempotencyKey = null;
 
     // AJAX / lazy-load state
     let categoryState = {}; // { categoryId: { page: 1, loading: false, loaded: false, finished: false } }
@@ -54,6 +55,19 @@
 
     function parsePrice(raw) {
         return parseFloat(String(raw).replace(/,/g, '').trim()) || 0;
+    }
+
+    function errorText(message, fallback) {
+        if (typeof message === 'string' && message.trim()) {
+            return message.trim();
+        }
+        if (message && typeof message === 'object') {
+            const first = Object.values(message).flat(Infinity).find(function (value) {
+                return typeof value === 'string' && value.trim();
+            });
+            if (first) return first.trim();
+        }
+        return fallback;
     }
 
     function escHtml(str) {
@@ -212,18 +226,42 @@
         if (el) el.classList.remove('active');
     }
 
-    // ─── Product Card HTML Builder ────────────────────────────────────────────
+    // ─── Product Card HTML Builder ─────────────────────────────────────────────
     function buildProductCardHTML(p) {
         const variantsJson = escHtml(JSON.stringify(p.variants_data || []));
-        const imageHtml = p.image
-            ? '<img src="' + p.image + '" alt="' + escHtml(p.name) + '" loading="lazy">'
-            : `<div class="pm-item-img-placeholder"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg></div>`;
+        const images = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
+
+        let imageHtml;
+        if (images.length > 1) {
+            // Multi-image slideshow
+            const slides = images.map(function (url, idx) {
+                return '<div class="pm-slide" data-slide-idx="' + idx + '"' + (idx === 0 ? ' style="opacity:1"' : '') + '>' +
+                    '<img src="' + escHtml(url) + '" alt="" loading="lazy">' +
+                    '</div>';
+            }).join('');
+            const dots = images.map(function (_, idx) {
+                return '<span class="pm-slide-dot' + (idx === 0 ? ' active' : '') + '" data-dot-idx="' + idx + '"></span>';
+            }).join('');
+            imageHtml = '<div class="pm-slideshow" data-slideshow="true" data-slide-count="' + images.length + '" data-current="0">' +
+                slides +
+                '<div class="pm-slide-dots">' + dots + '</div>' +
+                '</div>';
+        } else if (images.length === 1) {
+            imageHtml = '<img src="' + escHtml(images[0]) + '" alt="' + escHtml(p.name) + '" loading="lazy">';
+        } else {
+            imageHtml = '<div class="pm-item-img-placeholder"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg></div>';
+        }
 
         const descHtml = p.short_description
             ? '<div class="pm-item-desc">' + escHtml(p.short_description) + '</div>'
             : '';
 
-        return '<div class="pm-item-card" data-name="' + escHtml(p.name) + '">' +
+        const isOutOfStock = p.qty <= 0;
+        const oosClass = isOutOfStock ? ' pm-out-of-stock' : '';
+        const oosBadge = isOutOfStock ? '<div class="pm-item-badge-oos">Out of Stock</div>' : '';
+
+        return '<div class="pm-item-card' + oosClass + '" data-name="' + escHtml(p.name) + '">' +
+            oosBadge +
             '<div class="pm-item-img-wrap">' + imageHtml + '</div>' +
             '<div class="pm-item-info">' +
             '<div class="pm-item-name">' + escHtml(p.name) + '</div>' +
@@ -235,11 +273,12 @@
             ' data-id="' + p.id + '"' +
             ' data-name="' + escHtml(p.name) + '"' +
             ' data-price="' + p.price + '"' +
-            ' data-image="' + (p.image ? escHtml(p.image) : '') + '"' +
+            ' data-image="' + (images[0] ? escHtml(images[0]) : '') + '"' +
             ' data-has-variants="' + (p.has_variants ? 'true' : 'false') + '"' +
             ' data-variants="' + variantsJson + '"' +
             ' aria-label="Add ' + escHtml(p.name) + ' to cart"' +
-            '>+</button>' +
+            (isOutOfStock ? ' disabled' : '') +
+            '>' + (isOutOfStock ? '✕' : '+') + '</button>' +
             '<div class="pm-qty-box">' +
             '<button class="pm-qty-btn pm-qty-minus" data-id="' + p.id + '" aria-label="Decrease">−</button>' +
             '<span class="pm-qty-value">0</span>' +
@@ -247,6 +286,39 @@
             '</div>' +
             '</div>' +
             '</div>';
+    }
+
+    // ─── Slideshow Initialiser ─────────────────────────────────────────────────
+    // Tracks interval IDs so we don't double-start on the same element.
+    var _slideshowIntervals = new WeakMap();
+
+    function initSlideshows(container) {
+        var root = container || document;
+        root.querySelectorAll('.pm-slideshow[data-slideshow="true"]').forEach(function (el) {
+            if (_slideshowIntervals.has(el)) return; // already running
+            var count   = parseInt(el.dataset.slideCount, 10) || 1;
+            var current = 0;
+
+            // Show first slide immediately
+            var slides = el.querySelectorAll('.pm-slide');
+            if (slides.length) slides[0].style.opacity = '1';
+
+            var timer = setInterval(function () {
+                // Hide current
+                slides[current].style.opacity = '0';
+                var dots = el.querySelectorAll('.pm-slide-dot');
+                if (dots[current]) dots[current].classList.remove('active');
+
+                // Advance
+                current = (current + 1) % count;
+
+                // Show next
+                slides[current].style.opacity = '1';
+                if (dots[current]) dots[current].classList.add('active');
+            }, 2500);
+
+            _slideshowIntervals.set(el, timer);
+        });
     }
 
     // ─── Append products to the grid ──────────────────────────────────────────
@@ -276,6 +348,9 @@
 
         // Sync cart button states for newly rendered cards
         renderProductButtons();
+
+        // Boot slideshows for any multi-image cards just added
+        initSlideshows(grid);
     }
 
     // ─── AJAX: Fetch one page of products ────────────────────────────────────
@@ -583,34 +658,149 @@
     }
 
     // ─── WhatsApp Checkout ────────────────────────────────────────────────────
-    function buildWhatsAppMessage() {
+    // ─── WhatsApp Checkout ────────────────────────────────────────────────────
+    function buildWhatsAppMessage(customer, reference) {
         const cfg = window.MENU_CONFIG || {};
-        const warehouse = cfg.warehouse_name || 'Business';
-        const table = cfg.table_name || null;
-        const items = Object.values(cart);
-        if (items.length === 0) return null;
+        const divider     = '━━━━━━━━━━━━━━━━━━━━━━';
+        const thinDivider = '┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄';
 
-        let msg = 'Order from ' + warehouse + '\n\n';
-        if (table) {
-            msg += '🪑 Table: ' + table + '\n\n';
-        } else {
-            msg += '🛍️ Takeaway Order\n\n';
+        let message = '*NEW ORDER RECEIVED*\n';
+        message += divider + '\n\n';
+
+        // ── Customer Info ──
+        message += '*CUSTOMER DETAILS*\n';
+        message += thinDivider + '\n';
+        message += 'Name    : ' + (customer.name || 'N/A') + '\n';
+        message += 'Phone   : ' + (customer.phone || 'N/A') + '\n';
+        message += 'Address : ' + (customer.address || 'N/A') + '\n';
+        if (cfg.table_name) {
+            message += 'Table   : ' + cfg.table_name + '\n';
         }
-        items.forEach(function (item) {
-            msg += '• ' + item.name + ' x' + item.qty + '\n';
+        message += divider + '\n\n';
+
+        // ── Order Items ──
+        message += '*ORDER ITEMS*\n';
+        message += thinDivider + '\n';
+        
+        const items = Object.values(cart);
+        items.forEach(function (item, index) {
+            message += (index + 1) + '. *' + item.name + '*\n';
+            message += '    Qty   : ' + item.qty + '\n';
+            message += '    Price : ' + formatPrice(item.price) + '\n';
+            message += thinDivider + '\n';
         });
-        msg += '\nTotal: ' + formatPrice(getTotal());
-        return msg;
+
+        // ── Pricing Summary ──
+        message += '\n*PRICE SUMMARY*\n';
+        message += thinDivider + '\n';
+        message += 'Grand Total: ' + formatPrice(getTotal()) + '\n';
+        message += divider + '\n';
+        
+        if (reference) {
+            message += '\n*Order Ref:* #' + reference;
+            message += '\n' + divider;
+        }
+
+        return message;
     }
 
     function sendViaWhatsApp() {
         const items = Object.values(cart);
-        if (items.length === 0) { alert('Your cart is empty!'); return; }
+        if (items.length === 0) { SaleProToast.show('Your cart is empty!'); return; }
+
+        const nameField = document.getElementById('pm-name');
+        const phoneField = document.getElementById('pm-phone');
+        const addressField = document.getElementById('pm-address');
+
+        const name = nameField ? nameField.value.trim() : '';
+        const phoneInput = phoneField ? phoneField.value.trim() : '';
+        const address = addressField ? addressField.value.trim() : '';
+
+        if (!name || !phoneInput) {
+            SaleProToast.show('Please enter your name and phone number to place the order.');
+            if (!name && nameField) nameField.focus();
+            else if (!phoneInput && phoneField) phoneField.focus();
+            return;
+        }
+
         const cfg = window.MENU_CONFIG || {};
-        const phone = (cfg.whatsapp_number || '').replace(/\D/g, '');
-        if (!phone) { alert('WhatsApp number not configured for this business.'); return; }
-        const message = buildWhatsAppMessage();
-        window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(message), '_blank');
+        const storePhone = (cfg.whatsapp_number || '').replace(/\D/g, '');
+        if (!storePhone) { SaleProToast.show('WhatsApp number not configured for this business.'); return; }
+
+        const btn = document.getElementById('pm-whatsapp-btn');
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span>Processing Order...</span>';
+
+        // Prepare data for backend
+        checkoutIdempotencyKey = checkoutIdempotencyKey || (window.crypto && window.crypto.randomUUID
+            ? window.crypto.randomUUID()
+            : 'public-menu-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+        const orderData = {
+            billing_name: name,
+            billing_phone: phoneInput,
+            billing_address: address,
+            warehouse_id: cfg.warehouse_id,
+            item_count: items.length,
+            total_qty: items.reduce(function(sum, i) { return sum + i.qty; }, 0),
+            sub_total: getTotal(),
+            grand_total: getTotal(),
+            idempotency_key: checkoutIdempotencyKey,
+            cart: items.map(function(i) {
+                const parts = i.id.toString().split('_');
+                return {
+                    id: parts[0],
+                    variant_id: parts[1] || null, // Simplified: take the first variant ID if present
+                    qty: i.qty,
+                    price: i.price,
+                    name: i.name
+                };
+            })
+        };
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+        fetch(cfg.place_order_url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(orderData)
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.success) {
+                const message = buildWhatsAppMessage({name: name, phone: phoneInput, address: address}, data.reference);
+                window.open('https://wa.me/' + storePhone + '?text=' + encodeURIComponent(message), '_blank');
+                
+                // Success - clear cart
+                localStorage.removeItem(CART_KEY);
+                for (let k in cart) delete cart[k];
+                renderAll();
+                closeCartModal();
+                checkoutIdempotencyKey = null;
+                
+                // Show success notice
+                const notice = document.getElementById('pm-end-notice');
+                if (notice) {
+                    notice.textContent = 'Order #' + data.reference + ' placed successfully!';
+                    notice.classList.add('active');
+                    setTimeout(function() { notice.classList.remove('active'); }, 5000);
+                }
+            } else {
+                SaleProToast.show('Failed to place order: ' + errorText(data.message, 'Unknown error'));
+            }
+        })
+        .catch(function(err) {
+            console.error(err);
+            SaleProToast.show('An error occurred while placing your order. Please check your connection and try again.');
+        })
+        .finally(function() {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        });
     }
 
     // ─── Event Delegation ─────────────────────────────────────────────────────

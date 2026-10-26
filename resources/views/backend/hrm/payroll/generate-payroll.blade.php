@@ -21,7 +21,7 @@
                                 {{ __("db.Payroll for") }} <strong>{{ date('F Y', strtotime($month)) }}</strong>
                             </h5>
                             <small class="text-muted d-block">
-                                <b>{{ __("db.Location") }}</b> :
+                                <b>{{ __("db.Warehouse") }}</b> :
                                 {{ $warehouse_id ? $warehouse->name : __("db.All Warehouse") }}
                                 <input type="hidden" name="location_id" value="{{ $warehouse_id }}">
                             </small>
@@ -53,7 +53,7 @@
                                 <x-info title="Change status here to update payroll status for all selected employees." />
                             </label>
                             <select name="payroll_group_status" class="form-select select2 payroll-group-status">
-                                <option value="">{{ __("db.Change Status") }}</option>
+                                <option value="">{{ __("db.change_status") }}</option>
                                 <option value="draft">{{ __("db.Draft") }}</option>
                                 <option value="final">{{ __("db.final") }}</option>
                             </select>
@@ -139,9 +139,9 @@
                                                                 {{ $employee->is_sale_agent ? '' : 'readonly' }}>
                                                         </div>
 
-                                                        {{-- Expense --}}
+                                                        {{-- Employee advance recovery --}}
                                                         <div class="col-md-2">
-                                                            <label>{{ __("db.Expenses") }}</label>
+                                                            <label>{{ __("db.employee_advance_recovery") }}</label>
                                                             <input type="number" step="any"
                                                                 name="payrolls[{{ $employee->id }}][expense]"
                                                                 class="form-control prev-input"
@@ -196,7 +196,7 @@
 
                                                         {{-- Note --}}
                                                         {{-- <div class="col-md-8">
-                                                            <label>{{ __("db.Note") }}</label>
+                                                            <label>{{ __("db.note") }}</label>
                                                             <input type="text" class="form-control"
                                                                 name="payrolls[{{ $employee->id }}][note]"
                                                                 value="{{ $payroll['note'] ?? '' }}">
@@ -218,7 +218,7 @@
             {{-- Submit --}}
             <div class="text-end mt-3">
                 <button type="submit" class="btn btn-primary px-4">
-                    <i class="dripicons-checkmark me-1"></i> {{ __("db.Submit All Payrolls") }}
+                    <i class="ti ti-checkmark me-1"></i> {{ __("db.Submit All Payrolls") }}
                 </button>
             </div>
 

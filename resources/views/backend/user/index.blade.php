@@ -1,13 +1,8 @@
 @extends('backend.layout.main') @section('content')
 
 @push('css')
+    @include('backend.layout.partials.datatable_css')
 <style>
-/* Base container alignment */
-.custom-control.custom-switch {
-    display: inline-flex;
-    align-items: center;
-    cursor: pointer;
-}
 
 /* Switch track */
 .custom-control-input:checked ~ .custom-control-label::before {
@@ -19,59 +14,13 @@
     background-color: #ddd; /* Red when inactive */
     border-color: #ddd;
 }
-
-/* Switch knob */
-.custom-control-label::before {
-    height: 22px;
-    width: 40px;
-    border-radius: 20px;
-    background-color: #ccc;
-    border: 1px solid #aaa;
-    transition: background-color 0.25s, border-color 0.25s;
-}
-
-.custom-control-label::after {
-    top: 5px;
-    left: 2px;
-    width: 18px;
-    height: 18px;
-    background-color: #fff;
-    border-radius: 50%;
-    transition: transform 0.25s ease-in-out;
-}
-
-/* Move knob when checked */
-.custom-control-input:checked ~ .custom-control-label::after {
-    transform: translateX(18px);
-}
-
-/* Accessibility focus outline */
-.custom-control-input:focus ~ .custom-control-label::before {
-    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
-}
-
-/* Optional: hover effect */
-.custom-control-label:hover::before {
-    filter: brightness(0.95);
-}
-
-/* Optional: disable text selection */
-.custom-control-label {
-    user-select: none;
-}
 </style>
 @endpush
-
-<x-toast :toast_notify="session('toast_notify')" />
-<x-success-message key="message1" />
-<x-success-message key="message2" />
-<x-error-message key="message3" />
-<x-error-message key="not_permitted" />
 
 <section>
     @if(in_array("users-add", $all_permission))
         <div class="container-fluid">
-            <a href="{{route('user.create')}}" class="btn btn-info"><i class="dripicons-plus"></i> {{__('db.Add User')}}</a>
+            <a href="{{route('user.create')}}" class="btn btn-info"><i class="ti ti-plus"></i> {{__('db.Add User')}}</a>
         </div>
     @endif
     <div class="table-responsive">
@@ -79,8 +28,8 @@
             <thead>
                 <tr>
                     <th class="not-exported"></th>
-                    <th>{{__('db.UserName')}}</th>
-                    <th>{{__('db.Email')}}</th>
+                    <th>{{__('db.username')}}</th>
+                    <th>{{__('db.email')}}</th>
                     <th>{{__('db.Company Name')}}</th>
                     <th>{{__('db.Phone Number')}}</th>
                     <th>{{__('db.Role')}}</th>
@@ -117,7 +66,7 @@
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                                 @if(in_array("users-edit", $all_permission))
                                 <li>
-                                	<a href="{{ route('user.edit', $user->id) }}" class="btn btn-link"><i class="dripicons-document-edit"></i> {{__('db.edit')}}</a>
+                                	<a href="{{ route('user.edit', $user->id) }}" class="btn btn-link"><i class="ti ti-edit"></i> {{__('db.edit')}}</a>
                                 </li>
                                 @endif
                                 <li class="divider"></li>
@@ -126,7 +75,7 @@
                                     @csrf
                                     @method('DELETE')
                                     <li>
-                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> {{__('db.delete')}}</button>
+                                        <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> {{__('db.delete')}}</button>
                                     </li>
                                 </form>
                                 @endif
@@ -144,6 +93,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $("ul#people").siblings('a').attr('aria-expanded','true');
@@ -152,14 +102,14 @@
 
     @if(config('database.connections.saleprosaas_landlord'))
         if(localStorage.getItem("message")) {
-            alert(localStorage.getItem("message"));
+            SaleProToast.show(localStorage.getItem("message"));
             localStorage.removeItem("message");
         }
         numberOfUserAccount = <?php echo json_encode($numberOfUserAccount)?>;
         $.ajax({
             type: 'GET',
             async: false,
-            url: '{{route("package.fetchData", $general_setting->package_id)}}',
+            url: '{{route("package.fetchData", gen_setting()->package_id)}}',
             success: function(data) {
                 if(data['number_of_user_account'] > 0 && data['number_of_user_account'] <= numberOfUserAccount) {
                     $("a.add-user-btn").addClass('d-none');
@@ -169,7 +119,7 @@
     @endif
 
     var user_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
     var all_permission = <?php echo json_encode($all_permission) ?>;
 
     $.ajaxSetup({
@@ -178,12 +128,7 @@
         }
     });
 
-	function confirmDelete() {
-	    if (confirm("Are you sure want to delete?")) {
-	        return true;
-	    }
-	    return false;
-	}
+	function confirmDelete() { return true; }
 
     $('#user-table').DataTable( {
         "order": [],
@@ -192,8 +137,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -222,7 +167,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -230,7 +175,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -238,7 +183,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -246,19 +191,19 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
                 },
             },
             {
-                text: '<i title="delete" class="dripicons-cross"></i>',
+                text: '<i title="delete" class="ti ti-x"></i>',
                 className: 'buttons-delete',
                 action: function ( e, dt, node, config ) {
 
                     if (user_verified !== '1') {
-                        alert('This feature is disable for demo!');
+                        SaleProToast.show('This feature is disable for demo!');
                         return;
                     }
 
@@ -271,11 +216,11 @@
                     });
 
                     if (!user_id.length) {
-                        alert('No user is selected!');
+                        SaleProToast.show('No user is selected!');
                         return;
                     }
 
-                    if (!confirm("Are you sure want to delete?")) return;
+                    var __confirmed = true; /* SaleProConfirm.open({ message: "Are you sure want to delete?" }) */
 
                     $.ajax({
                         type: 'POST',
@@ -290,7 +235,7 @@
                             });
 
                             dt.draw(false);
-                            alert(data);
+                            SaleProToast.show(data);
                         }
                     });
 
@@ -299,7 +244,7 @@
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],

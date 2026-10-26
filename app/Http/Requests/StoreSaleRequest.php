@@ -87,7 +87,13 @@ class StoreSaleRequest extends FormRequest
                 'coupon_active' => $this->input('coupon_active', 0),
                 'coupon_id' => $this->input('coupon_id', null),
                 'draft' => $this->input('draft', 0),
+                'payment_status' => $this->input('payment_status', 1),
             ]);
+        } else {
+            // Even if products array is missing, ensure payment_status is present for validation
+            if (!$this->has('payment_status')) {
+                $this->merge(['payment_status' => 1]);
+            }
         }
     }
 

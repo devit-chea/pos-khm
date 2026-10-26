@@ -3,23 +3,24 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use Illuminate\Http\Request;
 
 class SendNotification extends Notification
 {
     use Queueable;
-    private $request;
+
+    private $customData;
+
     /**
      * Create a new notification instance.
      *
+     * @param mixed $customData Pass either a structured array or a simple message string
      * @return void
      */
-    public function __construct(Request $request)
+    public function __construct($customData)
     {
-        $this->request = $request;
+        $this->customData = $customData;
     }
 
     /**
@@ -42,25 +43,46 @@ class SendNotification extends Notification
     public function toMail($notifiable)
     {
         return (new MailMessage)
-                    ->line('The introduction to the notification.')
-                    ->action('Notification Action', url('/'))
-                    ->line('Thank you for using our application!');
+            ->line('The introduction to the notification.')
+            ->action('Notification Action', url('/'))
+            ->line('Thank you for using our application!');
     }
 
     /**
-     * Get the array representation of the notification.
+     * Get the array representation of the notification saved in the DB.
      *
      * @param  mixed  $notifiable
      * @return array
      */
     public function toArray($notifiable)
     {
+        if (is_string($this->customData)) {
+            return [
+                'sender_id'     => auth()->id() ?? null,
+                'receiver_id'   => $notifiable->id ?? null,
+                'reminder_date' => date('Y-m-d'),
+                'document_name' => null,
+                'message'       => $this->customData
+            ];
+        }
+
+        if ($this->customData instanceof \Illuminate\Http\Request) {
+            return [
+                'sender_id'     => $this->customData->input('sender_id', auth()->id() ?? null),
+                'receiver_id'   => $this->customData->input('receiver_id', $notifiable->id ?? null),
+                'reminder_date' => $this->customData->filled('reminder_date') ? date('Y-m-d', strtotime($this->customData->input('reminder_date'))) : date('Y-m-d'),
+                'document_name' => $this->customData->document_name ?? $this->customData->input('document_name'),
+                'message'       => (string) $this->customData->input('message', '')
+            ];
+        }
+
+        // Otherwise handle structured array payloads safely
         return [
-            'sender_id' => $this->request->sender_id,
-            'receiver_id' => $this->request->receiver_id,
-            'reminder_date' => date('Y-m-d', strtotime($this->request->reminder_date)),
-            'document_name' => $this->request->document_name,
-            'message' => $this->request->message
+            'sender_id'     => $this->customData['sender_id'] ?? (auth()->id() ?? null),
+            'receiver_id'   => $this->customData['receiver_id'] ?? ($notifiable->id ?? null),
+            'reminder_date' => isset($this->customData['reminder_date']) ? date('Y-m-d', strtotime($this->customData['reminder_date'])) : date('Y-m-d'),
+            'document_name' => $this->customData['document_name'] ?? null,
+            'message'       => $this->customData['message'] ?? ''
         ];
     }
 }

@@ -1,7 +1,9 @@
 @props(['key'])
 
 @if(session()->has($key))
-<div class="container-fluid">
-  <div class="alert alert-danger alert-dismissible text-center"><button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>{{ session()->get($key) }}</div>
-</div>
+@php
+    $legacyToastTypes = view()->shared('salepro_legacy_toast_types', []);
+    $legacyToastTypes[$key] = 'error';
+    view()->share('salepro_legacy_toast_types', $legacyToastTypes);
+@endphp
 @endif

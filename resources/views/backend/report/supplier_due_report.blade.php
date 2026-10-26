@@ -1,5 +1,14 @@
-@extends('backend.layout.main') @section('content')
-
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+@section('content')
+<style type="text/css">
+    .top-fields{margin-top:10px;position: relative;}
+    .top-fields label {font-size:11px;font-weight:600;margin-left:10px;padding:0 3px;position:absolute;top:-8px;z-index:9;}
+    .top-fields input{font-size:13px;height:45px}
+    .dt-buttons{width: 100%}
+</style>
 <section class="forms">
     <div class="container-fluid">
         <div class="card">
@@ -12,26 +21,27 @@
                     <div class="row mb-3">
                         <!-- Date Range -->
                         <div class="col-md-6">
-                            <div class="form-group">
-                                <label><strong>{{ __('db.Choose Your Date') }}</strong></label>
-                                <div class="input-group">
-                                    <input type="text" id="daterange" name="daterange" class="daterangepicker-field form-control"
-                                        value="{{ $start_date }} To {{ $end_date }}" required />
-                                    <input type="hidden" name="start_date" value="{{ $start_date }}">
-                                    <input type="hidden" name="end_date" value="{{ $end_date }}">
+                            <div class="form-group top-fields row daterangepicker-container">
+                                <label class="d-tc">{{__('db.Choose Your Date')}}</label>
+                                <div class="d-tc">
+                                    <div class="input-group">
+                                        <input type="text" class="daterangepicker-field form-control" value="{{$start_date}} To {{$end_date}}" required />
+                                        <input type="hidden" name="start_date" value="{{$start_date}}" />
+                                        <input type="hidden" name="end_date" value="{{$end_date}}" />
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Supplier Filter -->
                         <div class="col-md-6">
-                            <div class="form-group">
-                                <label><strong>{{ __('db.Supplier') }}</strong></label>
+                            <div class="form-group top-fields row">
+                                <label class="d-tc">{{ __('db.Supplier') }}</label>
                                 <select id="supplier_id" name="supplier_id" class="form-control selectpicker" data-live-search="true">
                                     <option value="">{{ __('All Suppliers') }}</option>
                                     @foreach($lims_supplier_list as $supplier)
                                         <option value="{{ $supplier->id }}" {{ $supplier_id == $supplier->id ? 'selected' : '' }}>
-                                            {{ $supplier->name }}
+                                            {{ $supplier->name }} ({{ $supplier->phone_number }})
                                         </option>
                                     @endforeach
                                 </select>
@@ -50,6 +60,13 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
+@php
+    $supplierDueLoadingText = __('db.Loading');
+    if (is_array($supplierDueLoadingText)) {
+        $supplierDueLoadingText = 'Loading';
+    }
+@endphp
 <script type="text/javascript">
 
     $("ul#report").siblings('a').attr('aria-expanded','true');
@@ -65,8 +82,8 @@
                  "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
                 "search":  '{{__("db.Search")}}',
                 'paginate': {
-                        'previous': '<i class="dripicons-chevron-left"></i>',
-                        'next': '<i class="dripicons-chevron-right"></i>'
+                        'previous': '<i class="ti ti-chevron-left"></i>',
+                        'next': '<i class="ti ti-chevron-right"></i>'
                 }
             },
             'columnDefs': [
@@ -95,7 +112,7 @@
             buttons: [
                 {
                     extend: 'pdf',
-                    text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                    text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -109,7 +126,7 @@
                 },
                 {
                     extend: 'excel',
-                    text: '<i title="export to excel" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to excel" class="ti ti-file-type-csv"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -123,7 +140,7 @@
                 },
                 {
                     extend: 'csv',
-                    text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -137,7 +154,7 @@
                 },
                 {
                     extend: 'print',
-                    text: '<i title="print" class="fa fa-print"></i>',
+                    text: '<i title="print" class="ti ti-printer"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -151,7 +168,7 @@
                 },
                 {
                     extend: 'colvis',
-                    text: '<i title="column visibility" class="fa fa-eye"></i>',
+                    text: '<i title="column visibility" class="ti ti-eye"></i>',
                     columns: ':gt(0)'
                 }
             ],
@@ -171,7 +188,7 @@
             data: formData,
             method: 'POST',
             beforeSend: function () {
-                $('#table-container').html('<div class="text-center mt-4"><i class="fa fa-spin fa-spinner"></i> {{__("db.Loading")}}...</div>');
+                $('#table-container').html('<div class="text-center mt-4"><i class="ti ti-spin fa-spinner"></i> ' + @json($supplierDueLoadingText) + '...</div>');
             },
             success: function (response) {
                 $('#table-container').html(response);
@@ -184,16 +201,16 @@
         if (dt_selector.rows( '.selected' ).any() && is_calling_first) {
             var rows = dt_selector.rows( '.selected' ).indexes();
 
-            $( dt_selector.column( 4 ).footer() ).html(dt_selector.cells( rows, 4, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 5 ).footer() ).html(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 6 ).footer() ).html(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 4 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 4, { page: 'current' } ).data().sum()));
+            $( dt_selector.column( 5 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum()));
+            $( dt_selector.column( 6 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum()));
+            $( dt_selector.column( 7 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum()));
         }
         else {
-            $( dt_selector.column( 4 ).footer() ).html(dt_selector.column( 4, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 5 ).footer() ).html(dt_selector.column( 5, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 6 ).footer() ).html(dt_selector.column( 6, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 7 ).footer() ).html(dt_selector.column( 7, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 4 ).footer() ).html(formatCurrency(dt_selector.column( 4, {page:'current'} ).data().sum()));
+            $( dt_selector.column( 5 ).footer() ).html(formatCurrency(dt_selector.column( 5, {page:'current'} ).data().sum()));
+            $( dt_selector.column( 6 ).footer() ).html(formatCurrency(dt_selector.column( 6, {page:'current'} ).data().sum()));
+            $( dt_selector.column( 7 ).footer() ).html(formatCurrency(dt_selector.column( 7, {page:'current'} ).data().sum()));
         }
     }
 

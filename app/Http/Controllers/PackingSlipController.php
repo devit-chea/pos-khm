@@ -107,10 +107,10 @@ class PackingSlipController extends Controller
                     $nestedData['status'] = '<div class="badge badge-success">'.$packing_slip->status.'</div>';
 
                 $nestedData['options'] = '<div class="btn-group">
-                                            <a target="_blank" class="btn btn-sm btn-primary" href="'.route('sale.invoice', $packing_slip->sale->id).'" title="Generate Invoice"><i class="dripicons-document-new"></i></a>&nbsp;&nbsp;
-                                            <a target="_blank" class="btn btn-sm btn-dark" href="'.route('packingSlip.genInvoice', $packing_slip->id).'" title="Generate Shipping Label"><i class="dripicons-ticket"></i></a>&nbsp;&nbsp;';
+                                            <a target="_blank" class="btn btn-sm btn-primary" href="'.route('sale.invoice', $packing_slip->sale->id).'" title="Generate Invoice"><i class="ti ti-document-new"></i></a>&nbsp;&nbsp;
+                                            <a target="_blank" class="btn btn-sm btn-dark" href="'.route('packingSlip.genInvoice', $packing_slip->id).'" title="Generate Shipping Label"><i class="ti ti-ticket"></i></a>&nbsp;&nbsp;';
                 $nestedData['options'] .= '<form action="' . route("packingSlip.delete", $packing_slip->id) . '" method="POST">'.csrf_field().'' . method_field("DELETE") . '
-                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirmDelete()"><i class="dripicons-trash"></i> </button>
+                            <button type="submit" class="btn btn-danger btn-sm" data-confirm-message="' . __('db.Are you sure want to delete?') . '"><i class="ti ti-trash"></i> </button>
                         </form>
                     </div>';
 
@@ -136,6 +136,14 @@ class PackingSlipController extends Controller
     	    $sale = Sale::with('customer')->whereNull('deleted_at')->select('id', 'sale_status', 'customer_id', 'warehouse_id', 'shipping_name', 'shipping_address', 'shipping_city', 'shipping_country', 'sale_type')->find($data['sale_id']);
         else
             $sale = Sale::with('customer')->whereNull('deleted_at')->select('id', 'sale_status', 'customer_id', 'warehouse_id')->find($data['sale_id']);
+
+        if ($sale) {
+            try {
+                app(\App\Services\ZatcaIntegrationService::class)->assertExistingSaleCanEnterFiscalStatus($sale);
+            } catch (\App\Exceptions\ZatcaPhase2WorkflowUnavailable|\App\Exceptions\SaleValidationException $exception) {
+                return redirect()->back()->with('not_permitted', $exception->getMessage());
+            }
+        }
 
         if($packing_slip)
     		$reference_no = $packing_slip->reference_no + 1;
@@ -297,6 +305,11 @@ class PackingSlipController extends Controller
     public function delete($id)
     {
         $packing_slip_data = PackingSlip::with('sale')->find($id);
+        if ($packing_slip_data?->sale && app(\App\Services\ZatcaIntegrationService::class)
+            ->isSourceLocked('sale', (int) $packing_slip_data->sale_id)) {
+            return redirect()->back()->with('not_permitted',
+                'This sale has a Phase 2 fiscal invoice. Deleting its packing slip would change the issued sale and stock; use the reviewed return/credit-note workflow instead.');
+        }
         $packing_slip_product_data = PackingSlipProduct::where('packing_slip_id', $id)->get();
         foreach($packing_slip_product_data as $packingSlipProduct) {
             $product_data = Product::find($packingSlipProduct->product_id);

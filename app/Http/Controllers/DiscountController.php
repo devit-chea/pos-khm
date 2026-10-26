@@ -33,7 +33,7 @@ class DiscountController extends Controller
     {
         $lims_product_data = Product::where([
             ['code', $code],
-            ['is_active', true]
+            ['products.is_active', 1]
         ])->select('id', 'name', 'code')->first();
 
         $product[] = $lims_product_data->id;

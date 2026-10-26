@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Production extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Traits\WarehouseScoped;
     protected $fillable =[
         "reference_no",
         "user_id",
@@ -28,6 +28,7 @@ class Production extends Model
         'wastage_percent',
         'product_list',
         'product_id',
+        'variant_list',
         'qty_list',
         'price_list',
     ];

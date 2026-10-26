@@ -1,3 +1,6 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 <!DOCTYPE html>
 <html>
 @php
@@ -6,14 +9,10 @@
 
 <head>
     <link rel="icon" type="image/png" href="{{ url('images/logo_2.png') }}" />
-    <title>{{ $general_setting->site_title }} | Challan Invoice</title>
+    <title>{{ gen_setting()->site_title }} | Challan Invoice</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    @if(!config('database.connections.saleprosaas_landlord'))
-        <link rel="stylesheet" href="{{ asset('vendor/bootstrap/css/bootstrap.min.css') }}" type="text/css">
-    @else
-        <link rel="stylesheet" href="{{ asset('../../vendor/bootstrap/css/bootstrap.min.css') }}" type="text/css">
-    @endif
+    <link rel="stylesheet" href="{{ asset($asset_prefix . 'vendor/bootstrap/css/bootstrap.min.css') }}" type="text/css">
 
     @php
         $primary_color =
@@ -47,9 +46,9 @@
     <div class="hidden-print">
         <table>
             <tr>
-                <td><a href="{{ $url }}" class="btn btn-info btn-sm"><i class="fa fa-arrow-left"></i> {{ __('db.Back') }}</a></td>
-                <td><button onclick="window.print();" class="btn btn-primary btn-sm"><i class="dripicons-print"></i> {{ __('db.Print') }}</button></td>
-                <td><button class="btn btn-sm btn-danger" id="download-btn" onclick="downloadPDF()"><i class="fa fa-download"></i> {{ __('db.download_pdf') }}</button></td>
+                <td><a href="{{ $url }}" class="btn btn-info btn-sm"><i class="ti ti-arrow-left"></i> {{ __('db.Back') }}</a></td>
+                <td><button onclick="window.print();" class="btn btn-primary btn-sm"><i class="ti ti-printer"></i> {{ __('db.print') }}</button></td>
+                <td><button class="btn btn-sm btn-danger" id="download-btn" onclick="downloadPDF()"><i class="ti ti-download"></i> {{ __('db.download_pdf') }}</button></td>
             </tr>
         </table>
         <br>
@@ -62,15 +61,15 @@
             <tr>
                 <td colspan="2" style="padding:9px 0;width:40%">
                     @if(isset($show->show_warehouse_info) && $show->show_warehouse_info == 1)
-                        <h1 style="margin:0">{{ $general_setting->company_name ?? '' }}</h1>
-                        @if($general_setting->vat_registration_number && isset($show->show_vat_registration_number) && $show->show_vat_registration_number == 1)
-                            <div><span>{{ __('db.VAT Number') }}:</span>&nbsp;&nbsp;<span>{{ $general_setting->vat_registration_number }}</span></div>
+                        <h1 style="margin:0">{{ gen_setting()->company_name ?? '' }}</h1>
+                        @if(gen_setting()->vat_registration_number && isset($show->show_vat_registration_number) && $show->show_vat_registration_number == 1)
+                            <div><span>{{ __('db.VAT Number') }}:</span>&nbsp;&nbsp;<span>{{ gen_setting()->vat_registration_number }}</span></div>
                         @endif
                     @endif
                 </td>
                 <td style="width:30%;text-align:middle;vertical-align:top;">
-                    @if($general_setting->site_logo || $invoice_settings->company_logo)
-                        <img src="{{ $invoice_settings->company_logo ? url('invoices', $invoice_settings->company_logo) : url('logo', $general_setting->site_logo) }}"
+                    @if(gen_setting()->site_logo || $invoice_settings->company_logo)
+                        <img src="{{ $invoice_settings->company_logo ? url('invoices', $invoice_settings->company_logo) : url('logo', gen_setting()->site_logo) }}"
                             height="{{ $invoice_settings->logo_height ?? 'auto' }}"
                             width="{{ $invoice_settings->logo_width ?? 'auto' }}" style="margin:5px 0;">
                     @endif
@@ -82,7 +81,7 @@
                     </div>
                     <div style="display:flex;justify-content:space-between;border-bottom:1px solid #aaa">
                         <span>{{ __('db.date') }}:</span>
-                        <span>{{ date($general_setting->date_format, strtotime($challan->created_at->toDateString())) }}</span>
+                        <span>{{ date(gen_setting()->date_format, strtotime($challan->created_at->toDateString())) }}</span>
                     </div>
                     <div style="display:flex;justify-content:space-between;border-bottom:1px solid #aaa">
                         <span>{{ __('db.status') }}:</span>
@@ -95,7 +94,7 @@
                     @if($challan->closing_date)
                     <div style="display:flex;justify-content:space-between;border-bottom:1px solid #aaa">
                         <span>Closing Date:</span>
-                        <span>{{ date($general_setting->date_format, strtotime($challan->closing_date)) }}</span>
+                        <span>{{ date(gen_setting()->date_format, strtotime($challan->closing_date)) }}</span>
                     </div>
                     @endif
                 </td>
@@ -127,7 +126,7 @@
             $sum = array_sum($amount_list);
         @endphp
 
-        <table dir="@if(Config::get('app.locale') == 'ar' || $general_setting->is_rtl) rtl @endif"
+        <table dir="@if(Config::get('app.locale') == 'ar' || gen_setting()->is_rtl) rtl @endif"
             style="width:100%;border-collapse:collapse;margin-top:4px;">
             <tr class="table-header" style="background-color:{{ $primary_color }};color:white;">
                 <td style="border:1px solid #222;padding:2px 4px;width:4%;text-align:center">#</td>
@@ -254,7 +253,7 @@
                     console.error(err);
                     btn.disabled = false;
                     btn.innerHTML = '⬇ Download PDF';
-                    alert('PDF generation failed!');
+                    SaleProToast.show('PDF generation failed!');
                 });
         }
     </script>

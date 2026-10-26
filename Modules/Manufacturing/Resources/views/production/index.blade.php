@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 @if(session()->has('message'))
   <div class="alert alert-success alert-dismissible text-center"><button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>{{ session()->get('message') }}</div>
 @endif
@@ -11,7 +15,7 @@
 
         {{-- ── Action Buttons ── --}}
         <a href="{{route('manufacturing.productions.create')}}" class="btn btn-info">
-            <i class="dripicons-plus"></i> {{__('db.Add Production')}}
+            <i class="ti ti-plus"></i> {{__('db.Add Production')}}
         </a>&nbsp;
         <button class="btn btn-secondary" type="button"
             data-toggle="collapse"
@@ -19,8 +23,8 @@
             aria-expanded="false"
             aria-controls="filterSection"
             id="filter-toggle-btn">
-            <i class="fa fa-filter"></i> {{__('db.Filter')}}
-            <i class="fa fa-chevron-down ml-1" id="filter-chevron"></i>
+            <i class="ti ti-filter"></i> {{__('db.Filter')}}
+            <i class="ti ti-chevron-down ml-1" id="filter-chevron"></i>
         </button>
 
         {{-- ── Filter Card (collapsible, hidden by default) ── --}}
@@ -99,10 +103,10 @@
         <div class="container mt-3 pb-2 border-bottom">
             <div class="row">
                 <div class="col-md-6 d-print-none">
-                    <button id="print-btn" type="button" class="btn btn-default btn-sm"><i class="dripicons-print"></i> {{__('db.Print')}}</button>
+                    <button id="print-btn" type="button" class="btn btn-default btn-sm"><i class="ti ti-printer"></i> {{__('db.print')}}</button>
                 </div>
                 <div class="col-md-6 d-print-none">
-                    <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="col-md-12">
                     <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">{{$general_setting->site_title}}</h3>
@@ -118,7 +122,7 @@
             <thead>
                 <th>#</th>
                 <th>{{__('db.product')}}</th>
-                <th>{{__('db.Qty')}}</th>
+                <th>{{__('db.qty')}}</th>
                 <th>{{__('db.Wastage Percent')}}</th>
                 <th>{{__('db.Price')}}</th>
                 <th>{{__('db.Subtotal')}}</th>
@@ -133,6 +137,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     // ─── Sidebar Active ──────────────────────────────────────────────────────
@@ -141,7 +146,7 @@
     $("ul#manufacturing #production-list-menu").addClass("active");
 
     // ─── PHP Variables ───────────────────────────────────────────────────────
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
     var starting_date = <?php echo json_encode($starting_date); ?>;
     var ending_date   = <?php echo json_encode($ending_date); ?>;
     var warehouse_id  = <?php echo json_encode($warehouse_id); ?>;
@@ -265,8 +270,8 @@
                 "info":       '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
                 "search":     '{{__("db.Search")}}',
                 'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next':     '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next':     '<i class="ti ti-chevron-right"></i>'
                 }
             },
             order: [['1', 'desc']],
@@ -295,7 +300,7 @@
             buttons: [
                 {
                     extend: 'pdf',
-                    text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                    text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                     exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                     action: function(e, dt, button, config) {
                         datatable_sum(dt, true);
@@ -306,7 +311,7 @@
                 },
                 {
                     extend: 'excel',
-                    text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                    text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                     exportOptions: { columns: ':visible:not(.not-exported)', rows: ':visible' },
                     action: function(e, dt, button, config) {
                         datatable_sum(dt, true);
@@ -317,7 +322,7 @@
                 },
                 {
                     extend: 'csv',
-                    text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                     exportOptions: { columns: ':visible:not(.not-exported)', rows: ':visible' },
                     action: function(e, dt, button, config) {
                         datatable_sum(dt, true);
@@ -328,7 +333,7 @@
                 },
                 {
                     extend: 'print',
-                    text: '<i title="print" class="fa fa-print"></i>',
+                    text: '<i title="print" class="ti ti-printer"></i>',
                     exportOptions: { columns: ':visible:not(.not-exported)', rows: ':visible' },
                     action: function(e, dt, button, config) {
                         datatable_sum(dt, true);
@@ -339,7 +344,7 @@
                 },
                 {
                     extend: 'colvis',
-                    text: '<i title="column visibility" class="fa fa-eye"></i>',
+                    text: '<i title="column visibility" class="ti ti-eye"></i>',
                     columns: ':gt(0)'
                 },
             ],
@@ -395,8 +400,8 @@
                        '<br><strong>{{__("db.status")}}: </strong>' + production[2] +
                        '<br><strong>{{__("db.Warehouse")}}: </strong>' + production[4];
 
-        if (production[12])
-            htmltext += '<br><strong>{{__("db.Attach Document")}}: </strong><a href="documents/production/' + production[25] + '">Download</a>';
+        if (production[13])
+            htmltext += '<br><strong>{{__("db.Attach Document")}}: </strong><a href="documents/production/' + production[13] + '">Download</a>';
 
         $(".product-production-list tbody").remove();
 
@@ -432,8 +437,8 @@
             $("table.product-production-list").append(newBody);
         });
 
-        var htmlfooter = '<p><strong>{{__("db.Note")}}:</strong> ' + production[9] + '</p>' +
-                         '<strong>{{__("db.Created By")}}:</strong><br>' + production[10] + '<br>' + production[11];
+        var htmlfooter = '<p><strong>{{__("db.note")}}:</strong> ' + production[10] + '</p>' +
+                         '<strong>{{__("db.Created By")}}:</strong><br>' + production[11] + '<br>' + production[12];
 
         $('#production-content').html(htmltext);
         $('#production-footer').html(htmlfooter);

@@ -22,6 +22,8 @@ class UpdatePurchaseRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'currency_id' => 'required|exists:currencies,id,is_active,1',
+            'exchange_rate' => ['required', new \App\Rules\ValidTransactionExchangeRate()],
             'warehouse_id' => 'required|exists:warehouses,id',
             'product_code' => 'required|array',
             'product_code.*' => 'required|string',
@@ -31,6 +33,20 @@ class UpdatePurchaseRequest extends FormRequest
         ];
     }
     
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $defaultCurrencyId = (int) (\App\Models\GeneralSetting::latest()->value('currency') ?? 0);
+            $currencyId = (int) $this->input('currency_id');
+            $exchangeRate = (float) $this->input('exchange_rate');
+
+            if ($currencyId === $defaultCurrencyId && abs($exchangeRate - 1.0) > 0.00000001) {
+                $validator->errors()->add('exchange_rate', 'The default currency exchange rate must be 1.');
+            }
+        });
+    }
+
     public function messages()
     {
         return [
@@ -40,7 +56,7 @@ class UpdatePurchaseRequest extends FormRequest
             'qty.array' => 'The quantities must be in an array format.',
             'qty.*.required' => 'Each quantity must be provided.',
             'qty.*.numeric' => 'Each quantity must be a valid number.',
-            'qty.*.min' => 'Each quantity must be at least 1.',
+            'qty.*.min' => 'Each quantity must be at least 0.01.',
         ];
     }
 }

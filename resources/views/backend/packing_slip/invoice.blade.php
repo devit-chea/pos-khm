@@ -1,20 +1,19 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 <!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <link rel="icon" type="image/png" href="{{url('logo', $general_setting->site_logo)}}" />
-    <title>{{$general_setting->site_title}} | Shipping Label</title>
+    <link rel="icon" type="image/png" href="{{url('logo', gen_setting()->site_logo)}}" />
+    <title>{{gen_setting()->site_title}} | Shipping Label</title>
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="all,follow">
-    @if(!config('database.connections.saleprosaas_landlord'))
-        <link rel="icon" type="image/png" href="{{url('logo', $general_setting->site_logo)}}" />
-        <link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
-    @else
-        <link rel="icon" type="image/png" href="{{url('../../logo', $general_setting->site_logo)}}" />
-        <link rel="stylesheet" href="<?php echo asset('../../vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
-    @endif
+
+    <link rel="icon" type="image/png" href="{{url($asset_prefix . 'logo', gen_setting()->site_logo)}}" />
+    <link rel="stylesheet" href="{{ asset($asset_prefix . 'vendor/bootstrap/css/bootstrap.min.css') }}" type="text/css">
 
     <style type="text/css">
         * {
@@ -70,8 +69,8 @@
     <div class="hidden-print">
         <table>
             <tr>
-                <td><a href="{{route('packingSlip.index')}}" class="btn btn-info"><i class="fa fa-arrow-left"></i> Back</a> </td>
-                <td><button onclick="window.print();" class="btn btn-primary"><i class="fa fa-print"></i> Print</button></td>
+                <td><a href="{{route('packingSlip.index')}}" class="btn btn-info"><i class="ti ti-arrow-left"></i> Back</a> </td>
+                <td><button onclick="window.print();" class="btn btn-primary"><i class="ti ti-printer"></i> Print</button></td>
             </tr>
         </table>
 
@@ -82,11 +81,11 @@
             <tbody>
                 <tr>
                     <td rowspan="2" class="text-center">
-                        <img src="{{url('logo', $general_setting->site_logo)}}" style="margin:10px 0;max-height: 80px;">
+                        <img src="{{url('logo', gen_setting()->site_logo)}}" style="margin:10px 0;max-height: 80px;">
                     </td>
                     <td colspan="3">
                         <strong>From:</strong><br><br>
-                        <p><strong>{{$general_setting->site_title}}</strong></p>
+                        <p><strong>{{gen_setting()->site_title}}</strong></p>
                         <p>{{$sale->warehouse->phone}}</p>
                         <p>{{$sale->warehouse->address}}</p>
                     </td>

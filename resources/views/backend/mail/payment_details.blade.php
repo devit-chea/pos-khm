@@ -33,11 +33,11 @@
                 <table role="presentation" style="width:602px;border-collapse:collapse;border:1px solid #cccccc;border-spacing:0;text-align:left;">
                     <tr>
                         <td align="center" style="padding:40px 0 30px 0;background:#CCC;">
-                            @if($general_setting->site_logo)
-                            <a href="{{url('/')}}"><img src="{{url('logo', $general_setting->site_logo)}}" width="200" style="height:auto;display:block;"></a>
+                            @if(gen_setting()->site_logo)
+                            <a href="{{url('/')}}"><img src="{{url('logo', gen_setting()->site_logo)}}" width="200" style="height:auto;display:block;"></a>
                             @else
                             <a href="{{url('/')}}">
-                                <h1 class="d-inline">{{$general_setting->site_title}}</h1>
+                                <h1 class="d-inline">{{gen_setting()->site_title}}</h1>
                             </a>
                             @endif
                         </td>
@@ -53,7 +53,7 @@
                                         <p><strong>Payment Method: </strong>{{$payment_data['payment_method']}}</p>
                                         <p><strong>Grand Total: </strong>{{$payment_data['currency']}} {{$payment_data['grand_total']}}</p>
                                         <p><strong>Paid Amount: </strong>{{$payment_data['currency']}} {{$payment_data['paid_amount']}}</p>
-                                        <p><strong>Due: </strong>{{$payment_data['currency']}} {{number_format((float)($payment_data['due']), $general_setting->decimal, '.', '')}}</p>
+                                        <p><strong>Due: </strong>{{$payment_data['currency']}} {{number_format((float)($payment_data['due']), gen_setting()->decimal, '.', '')}}</p>
                                         <p>Thank You</p>
 
                                     </td>
@@ -67,7 +67,7 @@
                                 <tr>
                                     <td style="padding:0;width:50%;" align="center">
                                         <p style="margin:0;font-size:14px;line-height:16px;font-family:Arial,sans-serif;color:#ffffff;">
-                                            &copy; {{$general_setting->site_title}} {{date('Y')}}<br />
+                                            &copy; {{gen_setting()->site_title}} {{date('Y')}}<br />
                                         </p>
                                     </td>
                                 </tr>

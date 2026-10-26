@@ -10,7 +10,7 @@
             <div class="col-md-12">
                 <h4>{{__('db.Add Purchase')}}</h4>
                 <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
-                
+
                 <form action="{{ route('purchases.store') }}" method="POST" enctype="multipart/form-data" id="purchase-form">
                     @csrf
                     <div class="card">
@@ -19,7 +19,7 @@
                                 <div class="col-md-4">
                                     <div class="form-group">
                                         <label>{{__('db.date')}}</label>
-                                        <input type="text" name="created_at" class="form-control date" placeholder="{{__('db.Choose date')}}" value="{{date($general_setting->date_format,strtotime('now'))}}"/>
+                                        <input type="text" name="created_at" class="form-control date" placeholder="{{__('db.Choose date')}}" value="{{date(gen_setting()->date_format,strtotime('now'))}}"/>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
@@ -34,26 +34,32 @@
                                 <div class="col-md-4">
                                     <div class="form-group">
                                         <label>{{__('db.Warehouse')}} *</label>
-                                        <select name="warehouse_id" class="selectpicker form-control" data-live-search="true" title="Select warehouse..." required>
-                                            @foreach($lims_warehouse_list as $warehouse)
-                                            <option value="{{$warehouse->id}}">{{$warehouse->name}}</option>
-                                            @endforeach
-                                        </select>
+                                        <div class="input-group pos">
+                                            <select name="warehouse_id" class="selectpicker form-control" data-live-search="true" title="Select warehouse..." required>
+                                                @foreach($lims_warehouse_list as $warehouse)
+                                                <option value="{{$warehouse->id}}">{{$warehouse->name}}</option>
+                                                @endforeach
+                                            </select>
+                                            <button type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#addWarehouse"><i class="ti ti-plus"></i></button>
+                                        </div>
                                         <x-validation-error fieldName="warehouse_id" />
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
                                         <label>{{__('db.Supplier')}}</label>
-                                        <select name="supplier_id" id="supplier-select" class="selectpicker form-control" data-live-search="true" title="Select supplier...">
-                                            @foreach($lims_supplier_list as $supplier)
-                                            <option value="{{$supplier->id}}"
-                                                    data-pay-term-no="{{$supplier->pay_term_no ?? ''}}"
-                                                    data-pay-term-period="{{$supplier->pay_term_period ?? 'days'}}">
-                                                {{$supplier->name .' ('. $supplier->company_name .')'}}
-                                            </option>
-                                            @endforeach
-                                        </select>
+                                        <div class="input-group pos">
+                                            <select name="supplier_id" id="supplier-select" class="selectpicker form-control" data-live-search="true" title="Select supplier...">
+                                                @foreach($lims_supplier_list as $supplier)
+                                                <option value="{{$supplier->id}}"
+                                                        data-pay-term-no="{{$supplier->pay_term_no ?? ''}}"
+                                                        data-pay-term-period="{{$supplier->pay_term_period ?? 'days'}}">
+                                                    {{$supplier->name .' ('. $supplier->company_name .')'}}
+                                                </option>
+                                                @endforeach
+                                            </select>
+                                            <button type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#addSupplier"><i class="ti ti-plus"></i></button>
+                                        </div>
                                     </div>
                                 </div>
                                 {{-- Payment Terms --}}
@@ -67,8 +73,8 @@
                                                 class="form-control"
                                                 placeholder="e.g. 30">
                                             <select name="pay_term_period" id="pay_term_period" class="form-control ml-2">
-                                                <option value="days">{{ __('db.days') }}</option>
-                                                <option value="months">{{ __('db.months') }}</option>
+                                                <option value="days">{{ __('db.Days') }}</option>
+                                                <option value="months">{{ __('db.Months') }}</option>
                                             </select>
                                         </div>
                                     </div>
@@ -78,8 +84,8 @@
                                 <div class="col-md-4">
                                     <div class="form-group">
                                         <label>{{ __('db.due_date') }}</label>
+                                        <input type="hidden" name="due_date" id="due_date_hidden">
                                         <input type="text"
-                                            name="due_date"
                                             id="due_date"
                                             class="form-control date"
                                             placeholder="{{ __('db.Choose date') }}"
@@ -99,7 +105,7 @@
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>{{__('db.Attach Document')}}</label> <i class="dripicons-question" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
+                                        <label>{{__('db.Attach Document')}}</label> <i class="ti ti-info-circle" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
                                         <input type="file" name="document" class="form-control" >
                                         @if($errors->has('extension'))
                                             <span>
@@ -114,7 +120,7 @@
                                         <label>{{__('db.Currency')}} *</label>
                                         <select name="currency_id" id="currency-id" class="form-control selectpicker" data-toggle="tooltip" title="">
                                             @foreach($currency_list as $currency_data)
-                                            <option value="{{$currency_data->id}}" data-rate="{{$currency_data->exchange_rate}}" @if($currency_data->exchange_rate == 1){{'checked'}}@endif>{{$currency_data->code}}</option>
+                                            <option value="{{$currency_data->id}}" data-rate="{{$currency_data->exchange_rate}}" @if((int) $currency_data->id === (int) $general_setting->currency) selected @endif>{{$currency_data->code}}</option>
                                             @endforeach
                                         </select>
                                         <x-validation-error fieldName="currency_id" />
@@ -192,7 +198,7 @@
                                 <div class="col-md-12 mt-3">
                                     <label>{{__('db.Select Product')}}</label>
                                     <div class="search-box input-group">
-                                        <button class="btn btn-secondary"><i class="fa fa-barcode"></i></button>
+                                        <button class="btn btn-secondary"><i class="ti ti-barcode"></i></button>
                                         <input type="text" name="product_code_name" id="lims_productcodeSearch" placeholder="{{__('db.Please type product code and select')}}" class="form-control" />
 
                                     </div>
@@ -211,11 +217,11 @@
                                                     <th>{{__('db.Net Unit Cost')}}</th>
                                                     <th>{{__('db.Profit Margin')}}</th>
                                                     <th>{{__('db.profit_margin_type')}}</th>
-                                                    <th>{{__('db.Product Price')}}</th>
+                                                    <th>{{__('db.product_price')}}</th>
                                                     <th>{{__('db.Discount')}}</th>
                                                     <th>{{__('db.Tax')}}</th>
                                                     <th>{{__('db.Subtotal')}}</th>
-                                                    <th><i class="dripicons-trash"></i></th>
+                                                    <th><i class="ti ti-trash"></i></th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -228,10 +234,10 @@
                                                 <th></th>
                                                 <th></th>
                                                 <th></th>
-                                                <th id="total-discount">{{number_format(0, $general_setting->decimal, '.', '')}}</th>
-                                                <th id="total-tax">{{number_format(0, $general_setting->decimal, '.', '')}}</th>
-                                                <th id="total">{{number_format(0, $general_setting->decimal, '.', '')}}</th>
-                                                <th><i class="dripicons-trash"></i></th>
+                                                <th id="total-discount">{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
+                                                <th id="total-tax">{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
+                                                <th id="total">{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
+                                                <th><i class="ti ti-trash"></i></th>
                                             </tfoot>
                                         </table>
                                     </div>
@@ -304,17 +310,13 @@
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>
-                                            <strong>{{__('db.Discount')}}</strong>
-                                        </label>
+                                        <label>{{__('db.Discount')}}</label>
                                         <input type="number" name="order_discount" class="form-control" step="any" />
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>
-                                            <strong>{{__('db.Shipping Cost')}}</strong>
-                                        </label>
+                                        <label>{{__('db.Shipping Cost')}}</label>
                                         <input type="number" name="shipping_cost" class="form-control" step="any" />
                                     </div>
                                 </div>
@@ -399,7 +401,7 @@
                                     <div class="col-md-4">
                                         <div class="form-group">
                                             <label>{{__('db.Change')}}</label>
-                                            <p id="change" class="ml-2">{{ number_format(0, $general_setting->decimal, '.', '') }}</p>
+                                            <p id="change" class="ml-2">{{ number_format(0, gen_setting()->decimal, '.', '') }}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -439,7 +441,7 @@
                             <div class="row">
                                 <div class="col-md-12">
                                     <div class="form-group">
-                                        <label>{{__('db.Note')}}</label>
+                                        <label>{{__('db.note')}}</label>
                                         <textarea rows="5" class="form-control" name="note"></textarea>
                                     </div>
                                 </div>
@@ -461,22 +463,22 @@
                 </div>
                 <table class="table table-bordered table-condensed totals">
                     <td><strong>{{__('db.Items')}}</strong>
-                        <span class="pull-right" id="item">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                        <span class="pull-right" id="item">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
                     </td>
                     <td><strong>{{__('db.Total')}}</strong>
-                        <span class="pull-right" id="subtotal">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                        <span class="pull-right" id="subtotal">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
                     </td>
                     <td><strong>{{__('db.Order Tax')}}</strong>
-                        <span class="pull-right" id="order_tax">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                        <span class="pull-right" id="order_tax">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
                     </td>
                     <td><strong>{{__('db.Order Discount')}}</strong>
-                        <span class="pull-right" id="order_discount">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                        <span class="pull-right" id="order_discount">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
                     </td>
                     <td><strong>{{__('db.Shipping Cost')}}</strong>
-                        <span class="pull-right" id="shipping_cost">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                        <span class="pull-right" id="shipping_cost">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
                     </td>
                     <td><strong>{{__('db.grand total')}}</strong>
-                        <span class="pull-right" id="grand_total">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                        <span class="pull-right" id="grand_total">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
                     </td>
                 </table>
             </div>
@@ -487,7 +489,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="modal-header" class="modal-title"></h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                     <form>
@@ -495,7 +497,7 @@
                             <div class="col-md-4 form-group">
                                 <label>{{__('db.Quantity')}}</label>
                                 <input type="number" name="edit_qty" class="form-control" min="1"
-                                 step="1">
+                                 step="0.01">
                             </div>
                             <div class="col-md-4 form-group">
                                 <label>{{__('db.Unit Discount')}}</label>
@@ -517,7 +519,7 @@
                                 <input type="number" name="edit_profit_margin" class="form-control" step="0.01">
                             </div>
                             <div class="col-md-4 form-group">
-                                <label>{{__('db.Product Price')}}</label>
+                                <label>{{__('db.product_price')}}</label>
                                 <input type="number" name="edit_product_price" class="form-control" step="0.01">
                             </div>
                             <?php
@@ -549,6 +551,118 @@
         </div>
     </div>
 </section>
+
+@include('backend.warehouse.add-warehouse')
+
+<div id="addSupplier" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" class="modal fade text-left">
+    <div role="document" class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Supplier')}}</h5>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ route('supplier.store') }}" method="POST" id="supplier-form">
+                    @csrf
+
+                    <div class="row">
+
+                        {{-- Name --}}
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>{{__('db.name')}} *</label>
+                                <input type="text" name="name" required class="form-control">
+                            </div>
+                        </div>
+
+                        {{-- Company Name --}}
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>{{__('db.Company Name')}} *</label>
+                                <input type="text" name="company_name" required class="form-control">
+                            </div>
+                        </div>
+
+                        {{-- Opening Balance --}}
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>{{__('db.Opening balance')}} ({{__('db.Due')}})</label>
+                                <input type="number" name="opening_balance"
+                                    class="form-control"
+                                    value="0" step="any" min="0">
+                            </div>
+                        </div>
+
+                        {{-- Email --}}
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>{{__('db.email')}} *</label>
+                                <input type="email"
+                                    name="email"
+                                    required
+                                    class="form-control">
+                            </div>
+                        </div>
+
+                        {{-- Phone --}}
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>{{__('db.Phone Number')}} *</label>
+                                <input type="text"
+                                    name="phone_number"
+                                    required
+                                    class="form-control">
+                            </div>
+                        </div>
+
+                        {{-- WhatsApp --}}
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>{{__('db.WhatsApp Number')}}</label>
+                                <input type="text"
+                                    name="wa_number"
+                                    class="form-control">
+                            </div>
+                        </div>
+
+                        {{-- Address --}}
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>{{__('db.Address')}} *</label>
+                                <input type="text"
+                                    name="address"
+                                    required
+                                    class="form-control">
+                            </div>
+                        </div>
+
+                        {{-- City --}}
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>{{__('db.City')}} *</label>
+                                <input type="text"
+                                    name="city"
+                                    required
+                                    class="form-control">
+                            </div>
+                        </div>
+
+                        {{-- Submit --}}
+                        <div class="col-md-12">
+                            <div class="form-group mt-4">
+                                <input type="submit"
+                                    value="{{__('db.submit')}}"
+                                    class="btn btn-primary supplier-submit-btn">
+                            </div>
+                        </div>
+
+                    </div>
+
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 
 @endsection
 
@@ -599,6 +713,7 @@
     $(document).ready(function(){
         $("#submit-btn").on("click", function(e){
             e.preventDefault(); // stop normal submit
+            var form = $(this).closest("form");
             var payment_status = $('#payment_status').val();
 
             if(payment_status == 3 || payment_status == 4){
@@ -607,14 +722,20 @@
                 let grandTotal = parseFloat($('#grand_total').text()) || 0;
                 balance = currency_rate * balance;
                 if(balance < grandTotal){
-                    if(confirm("Are you sure you want to submit this form without balance?")) {
-                        $(this).closest("form").submit();
-                    }
+                    SaleProConfirm.open({
+                        message: "Are you sure you want to submit this form without balance?",
+                        confirmText: "{{__('db.Yes')}}",
+                        type: "warning"
+                    }).then(function(confirmed) {
+                        if (confirmed) {
+                            form.submit();
+                        }
+                    });
                 }else{
-                    $(this).closest("form").submit();
+                    form.submit();
                 }
             }else{
-                 $(this).closest("form").submit();
+                 form.submit();
             }
         });
 
@@ -700,7 +821,7 @@
             0. Warehouse must be selected
             =============================== */
             if ($('select[name="warehouse_id"]').val() == '') {
-                alert("Please select warehouse!");
+                SaleProToast.show("Please select warehouse!");
                 e.preventDefault();
                 return false;
             }
@@ -710,7 +831,7 @@
             =============================== */
             var rownumber = $('table.order-list tbody tr:last').index();
             if (rownumber < 0) {
-                alert("Please insert product to order table!");
+                SaleProToast.show("Please insert product to order table!");
                 e.preventDefault();
                 return false;
             }
@@ -731,7 +852,7 @@
             });
 
             if (batchError) {
-                alert('Batch No and Expired Date are required');
+                SaleProToast.show('Batch No and Expired Date are required');
                 e.preventDefault();
                 return false;
             }
@@ -756,7 +877,7 @@
                 });
 
                 if (!flag) {
-                    alert('Quantity and Recieved value is same! Please Change Purchase Status or Recieved value');
+                    SaleProToast.show('Quantity and Recieved value is same! Please Change Purchase Status or Recieved value');
                     e.preventDefault();
                     return false;
                 }
@@ -869,7 +990,7 @@
         rowindex = $(this).closest('tr').index();
         if($(this).val() < 0 && $(this).val() != '') {
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val(1);
-            alert("Quantity can't be less than 0");
+            SaleProToast.show("Quantity can't be less than 0");
         }
         checkQuantity($(this).val(), true);
     });
@@ -957,11 +1078,11 @@
         var qty = $(this).closest('tr').find('.qty').val();
         $('input[name="edit_qty"]').val(qty);
 
-        $('input[name="edit_discount"]').val(parseFloat(product_discount[rowindex]).toFixed({{$general_setting->decimal}}));
+        $('input[name="edit_discount"]').val(parseFloat(product_discount[rowindex]).toFixed({{gen_setting()->decimal}}));
 
         unitConversion();
-        $('input[name="edit_unit_cost"]').val(row_product_cost.toFixed({{$general_setting->decimal}}));
-        $('input[name="edit_profit_margin"]').val(row_profit_margin.toFixed({{$general_setting->decimal}}));
+        $('input[name="edit_unit_cost"]').val(row_product_cost.toFixed({{gen_setting()->decimal}}));
+        $('input[name="edit_profit_margin"]').val(row_profit_margin.toFixed({{gen_setting()->decimal}}));
         row_profit_margin_type = profit_margin_type[rowindex] || 'percentage';
         $('select[name="edit_profit_margin_type"]')
             .val(row_profit_margin_type)
@@ -1025,7 +1146,7 @@
         var edit_qty = $('input[name="edit_qty"]').val();
         var edit_unit_cost = $('input[name="edit_unit_cost"]').val();
         if (parseFloat(edit_discount) > parseFloat(edit_unit_cost)) {
-            alert('Invalid Discount Input!');
+            SaleProToast.show('Invalid Discount Input!');
             return;
         }
         var edit_profit_margin = $('input[name="edit_profit_margin"]').val();
@@ -1035,7 +1156,7 @@
         if(edit_qty < 0) {
             $('input[name="edit_qty"]').val(1);
             edit_qty = 1;
-            alert("Quantity can't be less than 0");
+            SaleProToast.show("Quantity can't be less than 0");
         }
 
         var row_unit_operator = unit_operator[rowindex].slice(0, unit_operator[rowindex].indexOf(","));
@@ -1108,8 +1229,8 @@
                         batch_expiry += '<input type="text" class="form-control batch-no mb-1" name="batch_no[]" placeholder="{{__("db.Batch No")}}" required/>';
                         batch_expiry += '<input type="text" class="form-control expired-date" name="expired_date[]" placeholder="{{__("db.Expired Date")}}" required/>';
                     }
-                    cols += '<td>' + data[0] + ' (' + data[1] + ') <button type="button" class="edit-product btn btn-link" data-toggle="modal" data-target="#editModal"> <i class="dripicons-document-edit"></i></button><br>'+batch_expiry+'</td>';
-                    cols += '<td><input type="text" class="form-control qty" name="qty[]" step="any" value="1" required style="font-size:13px;max-width:50px;padding: 0 0;text-align:center"/></td>';
+                    cols += '<td>' + data[0] + ' (' + data[1] + ') <button type="button" class="edit-product btn btn-link" data-toggle="modal" data-target="#editModal"> <i class="ti ti-edit"></i></button><br>'+batch_expiry+'</td>';
+                    cols += '<td><input type="number" class="form-control qty" name="qty[]" min="0.01" step="0.01" value="1" required style="font-size:13px;max-width:50px;padding: 0 0;text-align:center"/></td>';
                     if($('select[name="status"]').val() == 1)
                         cols += '<td class="recieved-product-qty d-none"><input type="text" class="form-control recieved" name="recieved[]" value="1" /></td>';
                     else if($('select[name="status"]').val() == 2)
@@ -1121,10 +1242,10 @@
                     cols += '<td class="net_unit_margin"></td>';
                     cols += '<td class="net_unit_margin_type"></td>';
                     cols += '<td class="net_unit_price"></td>';
-                    cols += '<td class="discount">{{number_format(0, $general_setting->decimal, '.', '')}}</td>';
+                    cols += '<td class="discount">{{number_format(0, gen_setting()->decimal, '.', '')}}</td>';
                     cols += '<td class="tax"></td>';
                     cols += '<td class="sub-total"></td>';
-                    cols += '<td><button type="button" class="ibtnDel btn btn-md btn-danger"><i class="dripicons-trash"></i></button></td>';
+                    cols += '<td><button type="button" class="ibtnDel btn btn-md btn-danger"><i class="ti ti-trash"></i></button></td>';
                     cols += '<input type="hidden" class="product-code" name="product_code[]" value="' + data[1] + '"/>';
                     cols += '<input type="hidden" class="product-id" name="product_id[]" value="' + data[9] + '"/>';
                     cols += '<input type="hidden" class="purchase-unit" name="purchase_unit[]" value="' + temp_unit_name[0] + '"/>';
@@ -1153,7 +1274,7 @@
                     profit_margin.splice(rowindex,0, parseFloat(data['profit_margin']));
                     profit_margin_type.splice(rowindex,0, data['profit_margin_type'] || 'percentage');
                     product_price.splice(rowindex,0, parseFloat(data['product_price']));
-                    product_discount.splice(rowindex,0, "{{number_format(0, $general_setting->decimal, '.', '')}}");
+                    product_discount.splice(rowindex,0, "{{number_format(0, gen_setting()->decimal, '.', '')}}");
                     tax_rate.splice(rowindex,0, parseFloat(data[3]));
                     tax_name.splice(rowindex,0, data[4]);
                     tax_method.splice(rowindex,0, data[5]);
@@ -1192,9 +1313,9 @@
     function calculateRowProductData(quantity) {
         //product_cost[rowindex] = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.original-cost').val() * exchangeRate;
         unitConversion();
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount').text((product_discount[rowindex] * quantity).toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount-value').val((product_discount[rowindex] * quantity).toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val(tax_rate[rowindex].toFixed({{$general_setting->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount').text((product_discount[rowindex] * quantity).toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount-value').val((product_discount[rowindex] * quantity).toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val(tax_rate[rowindex].toFixed({{gen_setting()->decimal}}));
 
         if (tax_method[rowindex] == 1) {
             var net_unit_cost = row_product_cost - product_discount[rowindex];
@@ -1206,19 +1327,19 @@
             var unit_cost = net_unit_cost + (net_unit_cost * tax_rate[rowindex] / 100);
             var sub_total = (net_unit_cost * quantity) + tax;
 
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').text(net_unit_cost.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.unit_cost').val(unit_cost.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_margin').text(net_unit_margin.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_margin').val(net_unit_margin.toFixed({{$general_setting->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').text(net_unit_cost.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.unit_cost').val(unit_cost.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_margin').text(net_unit_margin.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_margin').val(net_unit_margin.toFixed({{gen_setting()->decimal}}));
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_margin_type').text(net_unit_margin_type);
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_margin_type').val(net_unit_margin_type);
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_price').text(net_unit_price.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_price').val(net_unit_price.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax').text(tax.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text(sub_total.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total.toFixed({{$general_setting->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_price').text(net_unit_price.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_price').val(net_unit_price.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax').text(tax.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text(sub_total.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total.toFixed({{gen_setting()->decimal}}));
         } else {
             var sub_total_unit = row_product_cost - product_discount[rowindex];
             var unit_cost = sub_total_unit;
@@ -1230,19 +1351,19 @@
             var tax = (sub_total_unit - net_unit_cost) * quantity;
             var sub_total = sub_total_unit * quantity;
 
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').text(net_unit_cost.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.unit_cost').val(unit_cost.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_margin').text(net_unit_margin.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_margin').val(net_unit_margin.toFixed({{$general_setting->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').text(net_unit_cost.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.unit_cost').val(unit_cost.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_margin').text(net_unit_margin.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_margin').val(net_unit_margin.toFixed({{gen_setting()->decimal}}));
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_margin_type').text(net_unit_margin_type);
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_margin_type').val(net_unit_margin_type);
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_price').text(net_unit_price.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_price').val(net_unit_price.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax').text(tax.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text(sub_total.toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total.toFixed({{$general_setting->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_price').text(net_unit_price.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_price').val(net_unit_price.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax').text(tax.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text(sub_total.toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total.toFixed({{gen_setting()->decimal}}));
         }
 
         calculateTotal();
@@ -1282,24 +1403,24 @@
         $(".discount").each(function() {
             total_discount += parseFloat($(this).text());
         });
-        $("#total-discount").text(total_discount.toFixed({{$general_setting->decimal}}));
-        $('input[name="total_discount"]').val(total_discount.toFixed({{$general_setting->decimal}}));
+        $("#total-discount").text(total_discount.toFixed({{gen_setting()->decimal}}));
+        $('input[name="total_discount"]').val(total_discount.toFixed({{gen_setting()->decimal}}));
 
         //Sum of tax
         var total_tax = 0;
         $(".tax").each(function() {
             total_tax += parseFloat($(this).text());
         });
-        $("#total-tax").text(total_tax.toFixed({{$general_setting->decimal}}));
-        $('input[name="total_tax"]').val(total_tax.toFixed({{$general_setting->decimal}}));
+        $("#total-tax").text(total_tax.toFixed({{gen_setting()->decimal}}));
+        $('input[name="total_tax"]').val(total_tax.toFixed({{gen_setting()->decimal}}));
 
         //Sum of subtotal
         var total = 0;
         $(".sub-total").each(function() {
             total += parseFloat($(this).text());
         });
-        $("#total").text(total.toFixed({{$general_setting->decimal}}));
-        $('input[name="total_cost"]').val(total.toFixed({{$general_setting->decimal}}));
+        $("#total").text(total.toFixed({{gen_setting()->decimal}}));
+        $('input[name="total_cost"]').val(total.toFixed({{gen_setting()->decimal}}));
         calculateGrandTotal();
         payment_amount();
     }
@@ -1316,7 +1437,7 @@
                 var order_discount = parseFloat($('input[name="order_discount"]').val()) * exchangeRate;
         }
         else
-            var order_discount = {{number_format(0, $general_setting->decimal, '.', '')}};
+            var order_discount = {{number_format(0, gen_setting()->decimal, '.', '')}};
 
         if($('input[name="shipping_cost"]').val()) {
             if(!currencyChange)
@@ -1325,7 +1446,7 @@
                 var shipping_cost = parseFloat($('input[name="shipping_cost"]').val()) * exchangeRate;
         }
         else
-            var shipping_cost = {{number_format(0, $general_setting->decimal, '.', '')}};
+            var shipping_cost = {{number_format(0, gen_setting()->decimal, '.', '')}};
 
         item = ++item + '(' + total_qty + ')';
         order_tax = (subtotal - order_discount) * (order_tax / 100);
@@ -1333,15 +1454,15 @@
 
         $('#item').text(item);
         $('input[name="item"]').val($('table.order-list tbody tr:last').index() + 1);
-        $('#subtotal').text(subtotal.toFixed({{$general_setting->decimal}}));
-        $('#order_tax').text(order_tax.toFixed({{$general_setting->decimal}}));
-        $('input[name="order_tax"]').val(order_tax.toFixed({{$general_setting->decimal}}));
-        $('#order_discount').text(order_discount.toFixed({{$general_setting->decimal}}));
+        $('#subtotal').text(subtotal.toFixed({{gen_setting()->decimal}}));
+        $('#order_tax').text(order_tax.toFixed({{gen_setting()->decimal}}));
+        $('input[name="order_tax"]').val(order_tax.toFixed({{gen_setting()->decimal}}));
+        $('#order_discount').text(order_discount.toFixed({{gen_setting()->decimal}}));
         $('input[name="order_discount"]').val(order_discount);
-        $('#shipping_cost').text(shipping_cost.toFixed({{$general_setting->decimal}}));
+        $('#shipping_cost').text(shipping_cost.toFixed({{gen_setting()->decimal}}));
         $('input[name="shipping_cost"]').val(shipping_cost);
-        $('#grand_total').text(grand_total.toFixed({{$general_setting->decimal}}));
-        $('input[name="grand_total"]').val(grand_total.toFixed({{$general_setting->decimal}}));
+        $('#grand_total').text(grand_total.toFixed({{gen_setting()->decimal}}));
+        $('input[name="grand_total"]').val(grand_total.toFixed({{gen_setting()->decimal}}));
         currencyChange = false;
     }
 
@@ -1430,14 +1551,14 @@
         }
 
         // Update change
-        $("#change").text((payingAmount - paidAmount).toFixed({{$general_setting->decimal}}));
+        $("#change").text((payingAmount - paidAmount).toFixed({{gen_setting()->decimal}}));
     });
 
     $('input[name="paying_amount[]"]').on("input", function() {
         let payingAmount = parseFloat($(this).val()) || 0;
         let paidAmount   = parseFloat($('input[name="amount[]"]').val()) || 0;
 
-        $("#change").text((payingAmount - paidAmount).toFixed({{$general_setting->decimal}}));
+        $("#change").text((payingAmount - paidAmount).toFixed({{gen_setting()->decimal}}));
     });
 
     $(window).keydown(function(e){
@@ -1459,41 +1580,43 @@
         }
     });
 
-    // $('#purchase-form').on('submit',function(e){
-    //     var rownumber = $('table.order-list tbody tr:last').index();
-    //     if (rownumber < 0) {
-    //         alert("Please insert product to order table!")
-    //         e.preventDefault();
-    //     }
+    $('.supplier-submit-btn').on("click", function(e) {
+        e.preventDefault();
+        $.ajax({
+            type:'POST',
+            url:'{{route('supplier.store')}}',
+            data: $("#supplier-form").serialize(),
+            success:function(response) {
+                key = response['id'];
+                value = response['name']+' ('+response['company_name']+')';
+                $('select[name="supplier_id"]').append('<option value="'+ key +'" data-pay-term-no="'+response['pay_term_no']+'" data-pay-term-period="'+response['pay_term_period']+'">'+ value +'</option>');
+                $('select[name="supplier_id"]').val(key).trigger('change');
+                $('.selectpicker').selectpicker('refresh');
+                $("#addSupplier").modal('hide');
+            }
+        });
+    });
 
-    //     else if($('select[name="status"]').val() != 1)
-    //     {
-    //         flag = 0;
-    //         $(".qty").each(function() {
-    //             rowindex = $(this).closest('tr').index();
-    //             quantity =  $(this).val();
-    //             recieved = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.recieved').val();
+    $('.warehouse-submit-btn').on("click", function(e) {
+        e.preventDefault();
+        $.ajax({
+            type:'POST',
+            url:'{{route('warehouse.store')}}',
+            data: $("#warehouse-form").serialize(),
+            success:function(response) {
+                key = response['id'];
+                value = response['name'];
+                $('select[name="warehouse_id"]').append('<option value="'+ key +'">'+ value +'</option>');
+                $('select[name="warehouse_id"]').val(key).trigger('change');
+                $('.selectpicker').selectpicker('refresh');
+                $("#addWarehouse").modal('hide');
+            }
+        });
+    });
 
-    //             if(quantity != recieved){
-    //                 flag = 1;
-    //                 return false;
-    //             }
-    //         });
-    //         if(!flag){
-    //             alert('Quantity and Recieved value is same! Please Change Purchase Status or Recieved value');
-    //             e.preventDefault();
-    //         }
-    //         else
-    //             $(".batch-no, .expired-date").prop('disabled', false);
-    //     }
-    //     else {
-    //         $(".batch-no, .expired-date").prop('disabled', false);
-    //         $("#submit-btn").prop('disabled', true);
-    //     }
-    // });
-    // Supplier select হলে payment terms auto-fill
     // selectpicker change event
     $('#supplier-select').on('changed.bs.select', function () {
+        
         var selected = $(this).find('option:selected');
         var termNo     = selected.data('pay-term-no');
         var termPeriod = selected.data('pay-term-period');
@@ -1505,7 +1628,7 @@
     });
 
     // PHP date format টা JS variable এ রাখুন
-    var dateFormat = "{{ $general_setting->date_format }}";
+    var dateFormat = "{{ gen_setting()->date_format }}";
 
     function formatDateByFormat(date, format) {
         var y = date.getFullYear();
@@ -1547,6 +1670,7 @@
         }
 
         $('#due_date').val(formatDateByFormat(date, dateFormat));
+        $('#due_date_hidden').val(formatDateByFormat(date, 'Y-m-d'));
     }
 
     $('#pay_term_no, #pay_term_period').on('change input', function () {

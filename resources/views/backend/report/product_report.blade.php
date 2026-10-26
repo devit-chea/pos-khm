@@ -1,5 +1,14 @@
-@extends('backend.layout.main') @section('content')
-
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
+<style type="text/css">
+    .top-fields{margin-top:10px;position: relative;}
+    .top-fields label {font-size:11px;font-weight:600;margin-left:10px;padding:0 3px;position:absolute;top:-8px;z-index:9;}
+    .top-fields input{font-size:13px;height:45px}
+    .dt-buttons{width: 100%}
+</style>
 <x-error-message key="not_permitted" />
 
 <section class="forms">
@@ -12,7 +21,7 @@
                 <div class="row mb-3 product-report-filter">
                     <div class="col-md-3 offset-md-2 mt-3">
                         <div class="form-group top-fields">
-                            <label class="d-tc mt-2"><strong>{{__('db.Choose Your Date')}}</strong></label>
+                            <label>{{__('db.Choose Your Date')}}</label>
                             <div class="d-tc">
                                 <div class="input-group">
                                     <input type="text" class="daterangepicker-field form-control" value="{{$start_date}} To {{$end_date}}" required />
@@ -25,7 +34,7 @@
 
                     <div class="col-md-3 mt-3">
                         <div class="form-group top-fields">
-                            <label class="d-tc mt-2"><strong>{{__('db.Choose Warehouse')}}</strong></label>
+                            <label>{{__('db.Choose Warehouse')}}</label>
                             <select name="warehouse_id" class="selectpicker form-control" data-live-search="true">
                                 <option value="0">{{__('db.All Warehouse')}}</option>
                                 @foreach($lims_warehouse_list as $warehouse)
@@ -37,10 +46,10 @@
 
                     <div class="col-md-3 mt-3">
                         <div class="form-group top-fields">
-                            <label class="d-tc mt-2"><strong>{{__('db.category')}}</strong></label>
+                            <label>{{__('db.category')}}</label>
                             <select name="category_id" class="selectpicker form-control" data-live-search="true">
                                 <option value="0">All Category</option>
-                                @foreach($categories_list as $category)
+                                @foreach (get_active_categories() as $category)
                                     <option value="{{$category->id}}">{{$category->name}}</option>
                                 @endforeach
                             </select>
@@ -65,6 +74,7 @@
                     @endif
 
                     <th>{{ __('db.Sold Amount') }}</th>
+                    <th>{{ __('db.Tax') }} ({{ config('currency') }})</th>
                     <th>{{ __('db.Sold') }} {{ __('db.qty') }}</th>
                     <th>Returned Amount</th>
                     <th>Returned Qty</th>
@@ -74,7 +84,7 @@
                         <th>Purchase Returned Qty</th>
                     @endif
 
-                    <th>{{ __('db.profit') }}</th>
+                    <th>{{ __('db.profit') }} ({{ config('currency') }})</th>
                     <th>{{ __('db.In Stock') }}</th>
 
                     @if (auth()->user()->role_id < 3)
@@ -95,6 +105,7 @@
                         <th></th>
                     @endif
 
+                    <th></th>
                     <th></th>
                     <th></th>
                     <th></th>
@@ -120,6 +131,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
     $.ajaxSetup({
         headers: {
@@ -148,6 +160,7 @@
     }
     columns = columns.concat([
         { data: "sold_amount" },
+        { data: "tax" },
         { data: "sold_qty" },
         { data: "returned_amount" },
         { data: "returned_qty" }
@@ -168,15 +181,15 @@
         );
     }
 
-    targets = [0, 2, 3, 4, 5, 6, 7, 8, 9];
+    targets = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     if (userRole < 3)
-        targets = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+        targets = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 
     var product_report_table = $('#product-report-table').DataTable( {
         "processing": true,
         "serverSide": true,
         "ajax":{
-            url:"product_report_data",
+            url: "{{ url('report/product_report_data') }}",
             data:function(d){
                 d.start_date = $(".product-report-filter input[name=start_date]").val();
                 d.end_date = $(".product-report-filter input[name=end_date]").val();
@@ -209,8 +222,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         order:[['1', 'desc']],
@@ -240,7 +253,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -254,7 +267,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:not(.not-exported)',
                     rows: ':visible'
@@ -268,7 +281,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:not(.not-exported)',
                     rows: ':visible',
@@ -295,7 +308,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:not(.not-exported)',
                     rows: ':visible'
@@ -309,7 +322,7 @@
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],
@@ -353,41 +366,41 @@
         if (dt_selector.rows( '.selected' ).any() && is_calling_first) {
             var rows = dt_selector.rows( '.selected' ).indexes();
 
-            $( dt_selector.column( 4 ).footer() ).html(dt_selector.cells( rows, 4, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 5 ).footer() ).html(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 6 ).footer() ).html(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 8 ).footer() ).html(dt_selector.cells( rows, 8, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 9 ).footer() ).html(dt_selector.cells( rows, 9, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 4 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 4, { page: 'current' } ).data().sum()));
+            $( dt_selector.column( 5 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 5, { page: 'current' } ).data().sum()));
+            $( dt_selector.column( 6 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum()));
+            $( dt_selector.column( 7 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum()));
+            $( dt_selector.column( 8 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 8, { page: 'current' } ).data().sum()));
+            $( dt_selector.column( 9 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 9, { page: 'current' } ).data().sum()));
+            $( dt_selector.column( 10 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 10, { page: 'current' } ).data().sum()));
             if (userRole < 3) {
-                $( dt_selector.column( 10 ).footer() ).html(dt_selector.cells( rows, 10, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-                $( dt_selector.column( 11 ).footer() ).html(dt_selector.cells( rows, 11, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-                $( dt_selector.column( 12 ).footer() ).html(dt_selector.cells( rows, 12, { page: 'current' } ).data().sum().toFixed(12));
+                $( dt_selector.column( 11 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 11, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 12 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 12, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 13 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 13, { page: 'current' } ).data().sum()));
+                $( dt_selector.column( 14 ).footer() ).html(formatCurrency(dt_selector.cells( rows, 14, { page: 'current' } ).data().sum()));
 
-                $( dt_selector.column( 13 ).footer() ).html(dt_selector.cells( rows, 13, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+                [stock_worth_price, stock_worth_cost] = stock_worth_price_cost_from_string(dt_selector.column(15, { page: 'current' }).data());
 
-                [stock_worth_price, stock_worth_cost] = stock_worth_price_cost_from_string(dt_selector.column(14, { page: 'current' }).data());
-
-                $( dt_selector.column( 14 ).footer() ).html(stock_worth_price.toFixed({{$general_setting->decimal}}) + ' / ' + stock_worth_cost.toFixed({{$general_setting->decimal}}));
+                $( dt_selector.column( 15 ).footer() ).html(stock_worth_price.toFixed({{gen_setting()->decimal}}) + ' / ' + stock_worth_cost.toFixed({{gen_setting()->decimal}}));
             }
         }
         else {
-            $( dt_selector.column( 4 ).footer() ).html(dt_selector.column( 4, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 5 ).footer() ).html(dt_selector.column( 5, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 6 ).footer() ).html(dt_selector.column( 6, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 7 ).footer() ).html(dt_selector.column( 7, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 8 ).footer() ).html(dt_selector.column( 8, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 9 ).footer() ).html(dt_selector.column( 9, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 4 ).footer() ).html(formatCurrency(dt_selector.column( 4, {page:'current'} ).data().sum()));
+            $( dt_selector.column( 5 ).footer() ).html(formatCurrency(dt_selector.column( 5, {page:'current'} ).data().sum()));
+            $( dt_selector.column( 6 ).footer() ).html(formatCurrency(dt_selector.column( 6, {page:'current'} ).data().sum()));
+            $( dt_selector.column( 7 ).footer() ).html(formatCurrency(dt_selector.column( 7, {page:'current'} ).data().sum()));
+            $( dt_selector.column( 8 ).footer() ).html(formatCurrency(dt_selector.column( 8, {page:'current'} ).data().sum()));
+            $( dt_selector.column( 9 ).footer() ).html(formatCurrency(dt_selector.column( 9, {page:'current'} ).data().sum()));
+            $( dt_selector.column( 10 ).footer() ).html(formatCurrency(dt_selector.column( 10, {page:'current'} ).data().sum()));
             if (userRole < 3) {
-                $( dt_selector.column( 10 ).footer() ).html(dt_selector.column( 10, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
-                $( dt_selector.column( 11 ).footer() ).html(dt_selector.column( 11, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
-                $( dt_selector.column( 12 ).footer() ).html(dt_selector.column( 12, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
+                $( dt_selector.column( 11 ).footer() ).html(formatCurrency(dt_selector.column( 11, {page:'current'} ).data().sum()));
+                $( dt_selector.column( 12 ).footer() ).html(formatCurrency(dt_selector.column( 12, {page:'current'} ).data().sum()));
+                $( dt_selector.column( 13 ).footer() ).html(formatCurrency(dt_selector.column( 13, {page:'current'} ).data().sum()));
+                $( dt_selector.column( 14 ).footer() ).html(formatCurrency(dt_selector.column( 14, {page:'current'} ).data().sum()));
 
-                $( dt_selector.column( 13 ).footer() ).html(dt_selector.column( 13, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
+                [stock_worth_price, stock_worth_cost] = stock_worth_price_cost_from_string(dt_selector.column(15, { page: 'current' }).data());
 
-                [stock_worth_price, stock_worth_cost] = stock_worth_price_cost_from_string(dt_selector.column(14, { page: 'current' }).data());
-
-                $( dt_selector.column( 14 ).footer() ).html(stock_worth_price.toFixed({{$general_setting->decimal}}) + ' / ' + stock_worth_cost.toFixed({{$general_setting->decimal}}));
+                $( dt_selector.column( 15 ).footer() ).html(stock_worth_price.toFixed({{gen_setting()->decimal}}) + ' / ' + stock_worth_cost.toFixed({{gen_setting()->decimal}}));
             }
         }
     }

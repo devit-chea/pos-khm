@@ -146,7 +146,7 @@ class BookingController extends Controller
             'warehouse_id' => 'required|exists:warehouses,id',
             'customer_id'  => 'required|exists:customers,id',
             'start_date'   => 'required|date',
-            'end_date'     => 'required|date|after:start_date',
+            'end_date'     => 'required|date|after_or_equal:start_date',
             'status'       => 'required|in:Booked,Waiting,Completed,Cancelled',
         ]);
 
@@ -191,7 +191,7 @@ class BookingController extends Controller
             ],
         ]);
         }else{
-            return redirect()->route('booking.index')->with('success','Successfully Booked');
+            return redirect()->route('booking.index')->with('message','Successfully Booked');
         }
 
     }
@@ -209,9 +209,9 @@ class BookingController extends Controller
         $request->validate([
             'warehouse_id' => 'required|exists:warehouses,id',
             'customer_id'  => 'required|exists:customers,id',
-            'status'       => 'required|in:Booked,Completed,Cancelled',
+            'status'       => 'required|in:Booked,Completed,Cancelled,Waiting',
             'start_date'   => 'required|date',
-            'end_date'     => 'required|date|after:start_date',
+            'end_date'     => 'required|date|after_or_equal:start_date',
         ]);
 
         $booking = Booking::findOrFail($id);
@@ -257,7 +257,7 @@ class BookingController extends Controller
             ],
         ]);
         }else{
-            return redirect()->route('booking.index')->with('success','Successfully booking update');
+            return redirect()->route('booking.index')->with('message','Successfully booking update');
         }
 
     }

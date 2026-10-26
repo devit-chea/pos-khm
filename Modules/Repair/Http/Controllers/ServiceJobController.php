@@ -24,6 +24,7 @@ use Modules\Repair\Entities\ServiceJob;
 use Modules\Repair\Entities\ServiceJobItem;
 use Modules\Repair\Entities\ServiceJobUpdate;
 use Modules\Repair\Entities\ServiceVehicle;
+use App\Services\Domain\RepairDomainService;
 
 class ServiceJobController extends Controller
 {
@@ -61,7 +62,7 @@ class ServiceJobController extends Controller
             5 => "status",
             6 => "total_amount",
         ];
-        $q = ServiceJob::with("customer", "warehouse", "assignedTo")
+        $q = ServiceJob::with("customer", "warehouse", "assignedTo", "device.deviceTypeInfo", "vehicle.vehicleTypeInfo")
             ->whereDate("created_at", ">=", $request->starting_date)
             ->whereDate("created_at", "<=", $request->ending_date);
         if ($request->warehouse_id) {
@@ -123,10 +124,10 @@ class ServiceJobController extends Controller
             $nestedData["customer"] = $customerName;
             $nestedData["service_type"] =
                 $job->service_type === "device"
-                    ? '<span class="badge badge-info"><i class="fa fa-mobile"></i> ' .
+                    ? '<span class="badge badge-info"><i class="ti ti-mobile"></i> ' .
                         __("db.device") .
                         "</span>"
-                    : '<span class="badge badge-warning"><i class="fa fa-car"></i> ' .
+                    : '<span class="badge badge-warning"><i class="ti ti-car"></i> ' .
                         __("db.vehicle") .
                         "</span>";
             $nestedData["title"] = $job->title;
@@ -152,15 +153,15 @@ class ServiceJobController extends Controller
                     <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default">
                         <li><a href="' .
                 route("repair.service.show", $job->id) .
-                '" class="btn btn-link"><i class="fa fa-eye"></i> ' .
+                '" class="btn btn-link"><i class="ti ti-eye"></i> ' .
                 __("db.View") .
                 '</a></li>
                         <li><a href="' .
                 route("repair.service.parts", $job->id) .
-                '" class="btn btn-link"><i class="fa fa-wrench"></i> Parts &amp; Billing</a></li>
+                '" class="btn btn-link"><i class="ti ti-settings"></i> Parts & Billing</a></li>
                         <li><a href="' .
                 route("repair.service.edit", $job->id) .
-                '" class="btn btn-link"><i class="fa fa-edit"></i> ' .
+                '" class="btn btn-link"><i class="ti ti-edit"></i> ' .
                 __("db.edit") .
                 '</a></li>
                         <form method="POST" action="' .
@@ -170,7 +171,7 @@ class ServiceJobController extends Controller
                 csrf_field() .
                 method_field("DELETE") .
                 '
-                            <li><button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> ' .
+                            <li><button type="submit" class="btn btn-link" data-confirm-message="' . __('db.Are you sure want to delete?') . '"><i class="ti ti-trash"></i> ' .
                 __("db.delete") .
                 '</button></li>
                         </form>
@@ -180,6 +181,7 @@ class ServiceJobController extends Controller
                 "id" => $job->id,
                 "reference_no" => $job->reference_no,
                 "customer" => $customerName,
+                "customer_phone" => optional($job->customer)->phone_number ?? "",
                 "service_type" => $job->service_type,
                 "title" => $job->title,
                 "status" => $job->status,
@@ -190,6 +192,7 @@ class ServiceJobController extends Controller
                 "paid_amount" => $job->paid_amount,
                 "due_amount" => $job->due_amount,
                 "service_charge" => $job->service_charge,
+                "description" => $job->description ?? "",
                 "note" => $job->note,
                 "date" => date(
                     config("date_format"),
@@ -200,6 +203,30 @@ class ServiceJobController extends Controller
                         config("date_format")
                     )
                     : "N/A",
+                "device" => $job->service_type === 'device' && $job->device ? [
+                    "device_type" => optional($job->device->deviceTypeInfo)->name ?? $job->device->device_type,
+                    "brand" => $job->device->brand ?? "-",
+                    "model" => $job->device->model ?? "-",
+                    "serial_number" => $job->device->serial_number ?? "-",
+                    "imei" => $job->device->imei ?? "-",
+                    "password_hint" => $job->device->password_hint ?? "-",
+                    "accessories" => $job->device->accessories ?? "-",
+                    "issue_reported" => $job->device->issue_reported ?? "",
+                    "condition_notes" => $job->device->condition_notes ?? "",
+                ] : null,
+                "vehicle" => $job->service_type === 'vehicle' && $job->vehicle ? [
+                    "vehicle_type" => optional($job->vehicle->vehicleTypeInfo)->name ?? $job->vehicle->vehicle_type,
+                    "brand" => $job->vehicle->brand ?? "-",
+                    "model" => $job->vehicle->model ?? "-",
+                    "year" => $job->vehicle->year ?? "-",
+                    "registration_no" => $job->vehicle->registration_no ?? "-",
+                    "engine_no" => $job->vehicle->engine_no ?? "-",
+                    "chassis_no" => $job->vehicle->chassis_no ?? "-",
+                    "mileage" => $job->vehicle->mileage ? number_format($job->vehicle->mileage) . " km" : "-",
+                    "fuel_level" => $job->vehicle->fuel_level ? ucfirst(str_replace('_', '/', $job->vehicle->fuel_level)) : "-",
+                    "issue_reported" => $job->vehicle->issue_reported ?? "",
+                    "condition_notes" => $job->vehicle->condition_notes ?? "",
+                ] : null,
             ]);
             $data[] = $nestedData;
         }
@@ -264,95 +291,18 @@ class ServiceJobController extends Controller
             "warehouse_id" => "required",
         ]);
         try {
-            DB::beginTransaction();
-            $job = ServiceJob::create([
-                "reference_no" =>
-                    "SRV-" .
-                    date("Ymd") .
-                    "-" .
-                    strtoupper(substr(uniqid(), -5)),
-                "customer_id" => $request->customer_id,
-                "service_type" => $request->service_type,
-                "title" => $request->title,
-                "description" => $request->description,
-                "status" => $request->status ?? "pending",
-                "priority" => $request->priority ?? "medium",
-                "assigned_to" => $request->assigned_to,
-                "created_by" => Auth::id(),
-                "warehouse_id" => $request->warehouse_id,
-                "note" => $request->note,
-                "service_charge" => 0,
-                "discount" => 0,
-                "tax" => 0,
-                "total_amount" => 0,
-                "paid_amount" => 0,
-                "due_amount" => 0,
-                "expected_delivery_date" => $request->expected_delivery_date
-                    ? date(
-                        "Y-m-d",
-                        strtotime(
-                            str_replace(
-                                "/",
-                                "-",
-                                $request->expected_delivery_date
-                            )
-                        )
-                    )
-                    : null,
-            ]);
-            if ($request->service_type === "device") {
-                ServiceDevice::create([
-                    "service_job_id" => $job->id,
-                    "device_type" => $request->input("device_type", "Other"),
-                    "brand" => $request->device_brand,
-                    "model" => $request->device_model,
-                    "serial_number" => $request->serial_number,
-                    "imei" => $request->imei,
-                    "password_hint" => $request->password_hint,
-                    "accessories" => $request->accessories,
-                    "issue_reported" => $request->issue_reported,
-                    "condition_notes" => $request->input("condition_notes", ""),
-                ]);
-            } else {
-                ServiceVehicle::create([
-                    "service_job_id" => $job->id,
-                    "vehicle_type" => $request->vehicle_type ?? "other",
-                    "brand" => $request->vehicle_brand,
-                    "model" => $request->vehicle_model,
-                    "year" => $request->vehicle_year,
-                    "registration_no" => $request->registration_no,
-                    "engine_no" => $request->engine_no,
-                    "chassis_no" => $request->chassis_no,
-                    "mileage" => $request->mileage,
-                    "fuel_level" => $request->fuel_level,
-                    "condition_notes" => $request->condition_notes,
-                ]);
-            }
-            ServiceJobUpdate::create([
-                "service_job_id" => $job->id,
-                "status" => $job->status,
-                "note" => "Service job created.",
-                "updated_by" => Auth::id(),
-            ]);
-            DB::commit();
+            $data = $request->all();
+            $data['expected_delivery_date'] = $request->expected_delivery_date
+                ? date('Y-m-d', strtotime(str_replace('/', '-', $request->expected_delivery_date))) : null;
+            $job = app(RepairDomainService::class)->create($data, Auth::id());
             if ($request->input("submit_action") === "parts") {
-                return redirect()
-                    ->route("repair.service.parts", $job->id)
-                    ->with(
-                        "message",
-                        "Job created! Now add parts and billing."
-                    );
+                return redirect()->route("repair.service.parts", $job->id);
             }
 
-            return redirect()
-                ->route("repair.service.index")
-                ->with("message", "Service job created successfully.");
+            return redirect()->route("repair.service.index");
         } catch (\Throwable $e) {
-            DB::rollBack();
-            dd($e->getMessage());
             return redirect()
                 ->back()
-                ->with("not_permitted", "Error: " . $e->getMessage())
                 ->withInput();
         }
     }
@@ -363,7 +313,7 @@ class ServiceJobController extends Controller
         'customer', 'warehouse', 'items.product', 'payments.account'
         )->findOrFail($id);
         $lims_product_list = Product::where([['is_active', true], ['type', 'standard']])->get();
-        $lims_account_list = Account::where('is_active', true)->get();
+        $lims_account_list = app(\App\Services\PaymentAccountService::class)->validOperationalAccounts();
 
         // POS Setting থেকে payment options
         $lims_pos_setting_data = \App\Models\PosSetting::latest()->first();
@@ -390,42 +340,11 @@ class ServiceJobController extends Controller
             "unit_price" => "required|numeric|min:0",
         ]);
         try {
-            DB::beginTransaction();
             $job = ServiceJob::findOrFail($id);
             $product = Product::findOrFail($request->product_id);
             $qty = (float) $request->quantity;
             $price = (float) $request->unit_price;
-            $pw = Product_Warehouse::where([
-                ["product_id", $product->id],
-                ["warehouse_id", $job->warehouse_id],
-            ])->first();
-            $available = $pw ? $pw->qty : 0;
-            if ($qty > $available) {
-                return response()->json(
-                    [
-                        "success" => false,
-                        "message" => "Insufficient stock! Available: {$available}",
-                    ],
-                    422
-                );
-            }
-            $item = ServiceJobItem::create([
-                "service_job_id" => $job->id,
-                "product_id" => $product->id,
-                "quantity" => $qty,
-                "unit_price" => $price,
-                "discount" => 0,
-                "tax" => 0,
-                "total" => $qty * $price,
-            ]);
-            $product->qty -= $qty;
-            $product->save();
-            if ($pw) {
-                $pw->qty -= $qty;
-                $pw->save();
-            }
-            $job->recalculateTotals();
-            DB::commit();
+            $item = app(RepairDomainService::class)->addPart($job, $request->only('product_id', 'quantity', 'unit_price'));
             return response()->json([
                 "success" => true,
                 "item" => [
@@ -439,10 +358,9 @@ class ServiceJobController extends Controller
                 "job_totals" => $this->jobTotals($job),
             ]);
         } catch (\Throwable $e) {
-            DB::rollBack();
             return response()->json(
                 ["success" => false, "message" => $e->getMessage()],
-                500
+                $e instanceof \App\Exceptions\ZatcaPhase2WorkflowUnavailable ? 422 : 500
             );
         }
     }
@@ -456,19 +374,6 @@ class ServiceJobController extends Controller
                 ["id", $itemId],
                 ["service_job_id", $jobId],
             ])->firstOrFail();
-            $product = Product::find($item->product_id);
-            if ($product) {
-                $product->qty += $item->quantity;
-                $product->save();
-                $pw = Product_Warehouse::where([
-                    ["product_id", $item->product_id],
-                    ["warehouse_id", $job->warehouse_id],
-                ])->first();
-                if ($pw) {
-                    $pw->qty += $item->quantity;
-                    $pw->save();
-                }
-            }
             $item->delete();
             $job->recalculateTotals();
             DB::commit();
@@ -480,7 +385,7 @@ class ServiceJobController extends Controller
             DB::rollBack();
             return response()->json(
                 ["success" => false, "message" => $e->getMessage()],
-                500
+                $e instanceof \App\Exceptions\ZatcaPhase2WorkflowUnavailable ? 422 : 500
             );
         }
     }
@@ -488,11 +393,7 @@ class ServiceJobController extends Controller
     public function updateCharges(Request $request, $id)
     {
         $job = ServiceJob::findOrFail($id);
-        $job->service_charge = (float) ($request->service_charge ?? 0);
-        $job->discount = (float) ($request->discount ?? 0);
-        $job->tax = (float) ($request->tax ?? 0);
-        $job->saveQuietly();
-        $job->recalculateTotals();
+        $job = app(RepairDomainService::class)->updateCharges($job, $request->only('service_charge', 'discount', 'tax'));
         return response()->json([
             "success" => true,
             "job_totals" => $this->jobTotals($job),
@@ -506,6 +407,7 @@ class ServiceJobController extends Controller
             "paying_method" => "required|string",
             "account_id" => "required|exists:accounts,id",
         ]);
+        app(\App\Services\PaymentAccountService::class)->assertValidId((int) $request->account_id);
 
         try {
             DB::beginTransaction();
@@ -540,7 +442,8 @@ class ServiceJobController extends Controller
                 "payment_note" => $request->payment_reference,
                 "payment_at" => now(),
                 "change" => 0,
-                "exchange_rate" => 1,
+                "currency_id" => $sale->currency_id,
+                "exchange_rate" => $sale->exchange_rate,
             ]);
 
             // Totals recalculate → Sale ও update হবে
@@ -552,6 +455,14 @@ class ServiceJobController extends Controller
             $balance = $sale->grand_total - $sale->paid_amount;
             $sale->payment_status = $balance > 0.001 ? 3 : 4;
             $sale->save();
+
+            if (class_exists(\App\Services\AccountingService::class)) {
+                $posting = app(\App\Services\AccountingService::class)
+                    ->recordPayment($payment, 'repair_payment_received');
+                if (!$posting->success) {
+                    throw new \RuntimeException($posting->error ?: 'Repair Payment accounting failed.');
+                }
+            }
 
             DB::commit();
 
@@ -572,7 +483,7 @@ class ServiceJobController extends Controller
             DB::rollBack();
             return response()->json(
                 ["success" => false, "message" => $e->getMessage()],
-                500
+                $e instanceof \App\Exceptions\ZatcaPhase2WorkflowUnavailable ? 422 : 500
             );
         }
     }
@@ -583,9 +494,17 @@ class ServiceJobController extends Controller
             DB::beginTransaction();
 
             $job = ServiceJob::findOrFail($jobId);
-            Payment::where([["id", $paymentId], ["service_job_id", $jobId]])
-                ->firstOrFail()
-                ->delete();
+            $payment = Payment::where([["id", $paymentId], ["service_job_id", $jobId]])->firstOrFail();
+            
+            if (class_exists(\App\Services\AccountingService::class)) {
+                $reversal = app(\App\Services\AccountingService::class)
+                    ->reverseTransaction(get_class($payment), $payment->id, '_deleted');
+                if (!$reversal->success) {
+                    throw new \RuntimeException($reversal->error ?: 'Repair Payment accounting reversal failed.');
+                }
+            }
+            
+            $payment->delete();
 
             $job->recalculateTotals(); // ← এটাই Sale ও update করবে
 
@@ -608,7 +527,7 @@ class ServiceJobController extends Controller
             DB::rollBack();
             return response()->json(
                 ["success" => false, "message" => $e->getMessage()],
-                500
+                $e instanceof \App\Exceptions\ZatcaPhase2WorkflowUnavailable ? 422 : 500
             );
         }
     }
@@ -636,6 +555,10 @@ class ServiceJobController extends Controller
         $lims_customer_list = Customer::where("is_active", true)->get();
         $lims_technician_list = User::where("is_active", true)->get();
         $lims_brand_list = Brand::where("is_active", true)->get();
+
+        $device_types = DeviceType::active()->where("category", "device")->get();
+        $vehicle_types = DeviceType::active()->where("category", "vehicle")->get();
+
         return view(
             "repair::service.edit",
             compact(
@@ -643,7 +566,9 @@ class ServiceJobController extends Controller
                 "lims_warehouse_list",
                 "lims_customer_list",
                 "lims_technician_list",
-                "lims_brand_list"
+                "lims_brand_list",
+                "device_types",
+                "vehicle_types"
             )
         );
     }
@@ -687,19 +612,19 @@ class ServiceJobController extends Controller
             ]);
             if ($job->service_type === "device" && $job->device) {
                 $job->device->update([
-                    "device_type" => $request->input("device_type", "Other"),
+                    "device_type" => $request->device_type_id ?? "Other",
                     "brand" => $request->device_brand,
                     "model" => $request->device_model,
                     "serial_number" => $request->serial_number,
                     "imei" => $request->imei,
                     "password_hint" => $request->password_hint,
                     "accessories" => $request->accessories,
-                    "issue_reported" => $request->issue_reported,
-                    "condition_notes" => $request->input("condition_notes", ""),
+                    "issue_reported" => $request->device_issue_reported,
+                    "condition_notes" => $request->device_condition_notes,
                 ]);
             } elseif ($job->service_type === "vehicle" && $job->vehicle) {
                 $job->vehicle->update([
-                    "vehicle_type" => $request->vehicle_type ?? "other",
+                    "vehicle_type" => $request->vehicle_type_id ?? "other",
                     "brand" => $request->vehicle_brand,
                     "model" => $request->vehicle_model,
                     "year" => $request->vehicle_year,
@@ -708,7 +633,8 @@ class ServiceJobController extends Controller
                     "chassis_no" => $request->chassis_no,
                     "mileage" => $request->mileage,
                     "fuel_level" => $request->fuel_level,
-                    "condition_notes" => $request->input("condition_notes", ""),
+                    "issue_reported" => $request->vehicle_issue_reported,
+                    "condition_notes" => $request->vehicle_condition_notes,
                 ]);
             }
             if ($old_status !== $request->status) {
@@ -735,44 +661,54 @@ class ServiceJobController extends Controller
     public function destroy($id)
     {
         try {
-            DB::beginTransaction();
-            $job = ServiceJob::with("items", "payments", "sale")->findOrFail(
-                $id
-            );
-
-            // Stock restore...
-            foreach ($job->items as $item) {
-                /* existing logic */
+            $job = ServiceJob::with("items.product", "payments", "sale")->find($id);
+            if (!$job) {
+                return redirect()->route("repair.service.index");
             }
+            app(RepairDomainService::class)->cancel($job);
 
-            // Linked sale delete (soft delete)
-            if ($job->sale) {
-                $job->sale->delete();
-            }
-
-            $job->delete();
-            DB::commit();
-
-            return redirect()
-                ->route("repair.service.index")
-                ->with("message", "Deleted successfully.");
+            return redirect()->route("repair.service.index");
         } catch (\Throwable $e) {
-            DB::rollBack();
             return redirect()
                 ->back()
                 ->with("not_permitted", "Error: " . $e->getMessage());
         }
     }
 
+    public function printContent($id)
+    {
+        $job = ServiceJob::with([
+            'customer', 'warehouse', 'assignedTo', 'createdBy',
+            'device.deviceTypeInfo', 'vehicle.vehicleTypeInfo',
+            'items.product'
+        ])->findOrFail($id);
+        
+        $general_setting = DB::table('general_settings')->latest()->first();
+
+        return view('repair::service.partials.print_content', compact('job', 'general_setting'));
+    }
+
     public function addUpdate(Request $request, $id)
     {
         $job = ServiceJob::findOrFail($id);
+        $oldStatus = $job->status;
+        $oldPriority = $job->priority;
+
         $job->status = $request->status;
+        if ($request->has('priority')) {
+            $job->priority = $request->priority;
+        }
         $job->save();
+
+        $note = $request->note;
+        if (!$note && $oldPriority !== $job->priority) {
+            $note = 'Priority updated to ' . ucfirst($job->priority) . '.';
+        }
+
         ServiceJobUpdate::create([
             "service_job_id" => $id,
             "status" => $request->status,
-            "note" => $request->note,
+            "note" => $note,
             "updated_by" => Auth::id(),
         ]);
         return response()->json(["success" => true]);
@@ -874,21 +810,6 @@ class ServiceJobController extends Controller
             $item->total = $new_qty * $new_price;
             $item->save();
 
-            // Adjust product stock
-            $product->qty -= $diff_qty;
-            $product->save();
-
-            // Adjust warehouse stock
-            $pw = Product_Warehouse::where([
-                ["product_id", $product->id],
-                ["warehouse_id", $job->warehouse_id],
-            ])->first();
-
-            if ($pw) {
-                $pw->qty -= $diff_qty;
-                $pw->save();
-            }
-
             $job->recalculateTotals();
 
             DB::commit();
@@ -902,7 +823,7 @@ class ServiceJobController extends Controller
             DB::rollBack();
             return response()->json(
                 ["success" => false, "message" => $e->getMessage()],
-                500
+                $e instanceof \App\Exceptions\ZatcaPhase2WorkflowUnavailable ? 422 : 500
             );
         }
     }

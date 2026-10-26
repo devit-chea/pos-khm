@@ -60,7 +60,7 @@
                                     <div class="col-md-6">
                                         <div class="form-group">
                                             <label></label><br>
-                                            <a href="../sample_file/sample_transfer_products.csv" class="btn btn-primary btn-block btn-lg"><i class="dripicons-download"></i> {{__('db.Download Sample File')}}</a>
+                                            <a href="../sample_file/sample_transfer_products.csv" class="btn btn-primary btn-block btn-lg"><i class="ti ti-download"></i> {{__('db.Download Sample File')}}</a>
                                         </div>
                                     </div>
                                 </div>
@@ -116,7 +116,7 @@
                                 <div class="row">
                                     <div class="col-md-12">
                                         <div class="form-group">
-                                            <label>{{__('db.Note')}}</label>
+                                            <label>{{__('db.note')}}</label>
                                             <textarea rows="5" class="form-control" name="note"></textarea>
                                         </div>
                                     </div>
@@ -172,7 +172,7 @@ $('[data-toggle="tooltip"]').tooltip();
 
 $('#transfer-form').on('submit',function(e){
     if($('select[name="from_warehouse_id"]').val() == $('select[name="to_warehouse_id"]').val()){
-        alert('Both Warehouse can not be same!');
+        SaleProToast.show('Both Warehouse can not be same!');
         e.preventDefault();
     }
 });

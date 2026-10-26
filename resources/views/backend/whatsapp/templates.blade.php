@@ -1,4 +1,8 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
     <x-success-message key="message" />
     <x-error-message key="not_permitted" />
@@ -7,7 +11,7 @@
         @if (!empty($asset_id))
         <div class="container-fluid">
             <a href="https://business.facebook.com/latest/whatsapp_manager/message_templates?asset_id={{ $asset_id }}" target="_blank" class="btn btn-info">
-            <i class="dripicons-plus"></i> {{ __('db.manage_template') }}</a>
+            <i class="ti ti-plus"></i> {{ __('db.manage_template') }}</a>
         </div>
         @endif
 
@@ -32,10 +36,10 @@
                             <td>{{ $tpl['category'] ?? '' }}</td>
                             <td>{{ $tpl['status'] ?? '' }}</td>
                             <td>
-                                <form action="{{ route('whatsapp.template.delete', $tpl['name']) }}" method="POST" onsubmit="return confirmDelete()">
+                                <form action="{{ route('whatsapp.template.delete', $tpl['name']) }}" method="POST" data-confirm-message="{{ __('db.Are you sure want to delete?') }}">
                                     @csrf
                                     @method('DELETE')
-                                    <button class="btn btn-sm btn-danger"><i class="dripicons-trash"></i> {{ __('db.delete') }}</button>
+                                    <button class="btn btn-sm btn-danger"><i class="ti ti-trash"></i> {{ __('db.delete') }}</button>
                                 </form>
                             </td>
                         </tr>
@@ -47,6 +51,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
     <script type="text/javascript">
 
         $('#templates-table').DataTable({
@@ -56,8 +61,8 @@
                 "info": '<small>{{ __('db.Showing') }} _START_ - _END_ (_TOTAL_)</small>',
                 "search": '{{ __('db.Search') }}',
                 'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
                 }
             },
             'columnDefs': [{
@@ -119,7 +124,7 @@
                 },
                 {
                     extend: 'colvis',
-                    text: '<i title="" class="fa fa-eye"></i>',
+                    text: '<i title="" class="ti ti-eye"></i>',
                     columns: ':gt(0)'
                 },
             ],

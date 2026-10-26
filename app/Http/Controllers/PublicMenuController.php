@@ -6,12 +6,145 @@ use App\Models\Category;
 use App\Models\GeneralSetting;
 use App\Models\Product;
 use App\Models\Warehouse;
+use App\Models\User;
+use App\Models\Customer;
+use App\Models\Sale;
+use App\Models\Product_Sale;
+use App\Models\Currency;
+use App\Models\Biller;
+use App\Models\PosSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
 
 class PublicMenuController extends Controller
 {
+    public function placeOrder(Request $request)
+    {
+        // This channel has no reviewed Phase 2 fiscal transaction contract yet.
+        if (app(\App\Services\ZatcaIntegrationService::class)->isPhase2Configured()) {
+            return response()->json(['success' => false,
+                'message' => 'Public menu orders are not yet available in ZATCA Phase 2. Please ask the seller to create a reviewed SalePro sale.'], 422);
+        }
+        try {
+            $postData = $request->validate([
+                'billing_name' => ['required', 'string', 'max:255'],
+                'billing_phone' => ['required', 'string', 'max:50'],
+                'billing_address' => ['nullable', 'string', 'max:1000'],
+                'warehouse_id' => ['required', 'integer', 'exists:warehouses,id'],
+                'cart' => ['required', 'array', 'min:1'],
+                'cart.*.id' => ['required', 'integer'],
+                'cart.*.qty' => ['required', 'numeric', 'gt:0'],
+                'cart.*.variant_id' => ['nullable'],
+                'idempotency_key' => ['nullable', 'string', 'max:191'],
+            ]);
+
+            return DB::transaction(function () use ($postData) {
+                $generalSetting = cache()->get('general_setting') ?: GeneralSetting::firstOrFail();
+                $currency = Currency::whereKey($generalSetting->currency)->where('is_active', 1)->firstOrFail();
+                $warehouse = Warehouse::whereKey($postData['warehouse_id'])->where('is_active', 1)->firstOrFail();
+                $operator = Auth::user() ?: User::where('role_id', 1)->where('is_active', 1)->firstOrFail();
+                $customer = Customer::where('phone_number', $postData['billing_phone'])->first();
+
+                if (!$customer) {
+                    $customer = Customer::create([
+                        'name' => $postData['billing_name'],
+                        'phone_number' => $postData['billing_phone'],
+                        'address' => $postData['billing_address'] ?? 'N/A',
+                        'city' => 'N/A',
+                        'customer_group_id' => 1,
+                        'is_active' => 1,
+                    ]);
+                }
+
+                $biller = Biller::where('is_active', true)->firstOrFail();
+                $lines = collect($postData['cart'])->values()->map(function (array $item): array {
+                    $product = Product::whereKey($item['id'])->where('is_active', 1)->firstOrFail();
+                    $productVariantId = !empty($item['variant_id']) && $item['variant_id'] !== 'null'
+                        ? (int) $item['variant_id']
+                        : null;
+                    $variant = $productVariantId
+                        ? $product->variant()->wherePivot('id', $productVariantId)->firstOrFail()
+                        : null;
+                    if ($product->is_variant && !$variant) {
+                        throw new \RuntimeException("A variant selection is required for {$product->name}.");
+                    }
+                    if (!$product->is_variant && $variant) {
+                        throw new \RuntimeException("{$product->name} does not support variant selection.");
+                    }
+                    $quantity = number_format((float) $item['qty'], 4, '.', '');
+                    $unitPrice = number_format(
+                        (float) $product->price + (float) ($variant?->pivot?->additional_price ?? 0),
+                        4,
+                        '.',
+                        ''
+                    );
+                    return [
+                        'product_id' => $product->id,
+                        'product_variant_id' => $productVariantId,
+                        'qty' => $quantity,
+                        'net_unit_price' => $unitPrice,
+                        'subtotal' => number_format((float) $unitPrice * (float) $quantity, 4, '.', ''),
+                    ];
+                });
+                $total = number_format((float) $lines->sum('subtotal'), 4, '.', '');
+
+                $saleData = [
+                    'reference_no' => app(\App\Services\InvoiceService::class)->generateInvoiceName('pm-', true),
+                    'user_id' => $operator->id,
+                    'customer_id' => $customer->id,
+                    'warehouse_id' => $warehouse->id,
+                    'biller_id' => $biller->id,
+                    'product_id' => $lines->pluck('product_id')->all(),
+                    'product_variant_id' => $lines->pluck('product_variant_id')->all(),
+                    'qty' => $lines->pluck('qty')->all(),
+                    'sale_unit' => array_fill(0, $lines->count(), 'n/a'),
+                    'net_unit_price' => $lines->pluck('net_unit_price')->all(),
+                    'discount' => array_fill(0, $lines->count(), 0),
+                    'tax_rate' => array_fill(0, $lines->count(), 0),
+                    'tax' => array_fill(0, $lines->count(), 0),
+                    'subtotal' => $lines->pluck('subtotal')->all(),
+                    'item' => $lines->count(),
+                    'total_qty' => number_format((float) $lines->sum('qty'), 4, '.', ''),
+                    'total_price' => $total,
+                    'grand_total' => $total,
+                    'total_discount' => 0,
+                    'total_tax' => 0,
+                    'order_tax_rate' => 0,
+                    'order_tax' => 0,
+                    'order_discount' => 0,
+                    'shipping_cost' => 0,
+                    'sale_status' => 1,
+                    'payment_status' => 1,
+                    'paid_amount' => 0,
+                    'sale_note' => $postData['sale_note'] ?? null,
+                    'sale_type' => 'online',
+                    'payment_mode' => 'WhatsApp Order',
+                    'currency_id' => $currency->id,
+                    'exchange_rate' => (string) $currency->exchange_rate,
+                    'accounting_event_type' => 'public_menu_order_created',
+                ];
+                if (!empty($postData['idempotency_key'])) {
+                    $saleData['idempotency_key'] = $postData['idempotency_key'];
+                }
+
+                $sale = app(\App\Services\Domain\SaleDomainService::class)->createSale($saleData, $operator);
+                if (!($sale->was_replayed ?? false)) {
+                    app(\App\Services\SaleActivityLogService::class)->logCreated($sale);
+                }
+
+                return response()->json(['success' => true, 'reference' => $sale->reference_no]);
+            }, 3);
+        } catch (\Throwable $e) {
+            \Log::error('Public menu order failed', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => __('db.Something went wrong'),
+            ], 422);
+        }
+    }
+
     /**
      * Resolve a warehouse by its slug, or abort 404.
      */
@@ -79,7 +212,7 @@ class PublicMenuController extends Controller
         // Handle optional table (restaurant module)
         $table           = null;
         $isRestaurant    = false;
-        $general_setting = GeneralSetting::latest()->first();
+        $general_setting = cache()->get('general_setting');
 
         if ($general_setting && $general_setting->modules) {
             $modules      = explode(',', $general_setting->modules);
@@ -96,11 +229,18 @@ class PublicMenuController extends Controller
                 ->first();
         }
 
+        $qr_catelog_setting = \App\Models\QrCatelogSetting::latest()->first();
+
         // Build categories that actually have active products in this warehouse.
         // This prevents empty categories from appearing in the nav.
-        $productIds = DB::table('product_warehouse')
-            ->where('warehouse_id', $warehouse->id)
-            ->pluck('product_id');
+        $productWarehouseQuery = DB::table('product_warehouse')
+            ->where('warehouse_id', $warehouse->id);
+
+        if ($qr_catelog_setting && $qr_catelog_setting->show_stock_out_product == 0) {
+            $productWarehouseQuery->where('qty', '>', 0);
+        }
+
+        $productIds = $productWarehouseQuery->pluck('product_id');
 
         $activeCategoryIds = Product::whereIn('id', $productIds)
             ->where('is_active', 1)
@@ -132,38 +272,63 @@ class PublicMenuController extends Controller
         $categoryId = (int) $request->query('category_id');
         $page       = max(1, (int) $request->query('page', 1));
         $limit      = 5;
+        $general_setting = cache()->get('general_setting');
 
         $productIds = DB::table('product_warehouse')
             ->where('warehouse_id', $warehouse->id)
             ->pluck('product_id');
 
-        $query = Product::whereIn('id', $productIds)
-            ->where('is_active', 1)
+        $query = Product::join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
+            ->where('product_warehouse.warehouse_id', $warehouse->id)
+            ->where('products.is_active', 1)
             ->with(['variant' => function ($q) {
                 $q->orderBy('product_variants.position');
             }])
-            ->select('id', 'name', 'image', 'price', 'category_id', 'is_variant',
-                     'variant_option', 'variant_value');
+            ->select(
+                'products.id',
+                'products.name',
+                'products.image',
+                'products.price',
+                'products.category_id',
+                'products.is_variant',
+                'products.variant_option',
+                'products.variant_value',
+                DB::raw('SUM(product_warehouse.qty) as qty')
+            )
+            ->groupBy('products.id');
 
         if ($categoryId) {
-            $query->where('category_id', $categoryId);
+            $query->where('products.category_id', $categoryId);
         } else {
             // null category – uncategorised products
-            $query->whereNull('category_id');
+            $query->whereNull('products.category_id');
+        }
+
+        $qr_catelog_setting = \App\Models\QrCatelogSetting::latest()->first();
+        if ($qr_catelog_setting && $qr_catelog_setting->show_stock_out_product == 0) {
+            $query->having('qty', '>', 0);
         }
 
         $paginated = $query->paginate($limit, ['*'], 'page', $page);
 
         $data = $paginated->map(function (Product $product) {
-            $imageUrl = ($product->image && file_exists(public_path('images/product/' . $product->image)))
-                ? asset('images/product/' . $product->image)
-                : null;
+            // Support comma-separated image filenames (multi-image products)
+            $rawImages  = $product->image ? array_filter(array_map('trim', explode(',', $product->image))) : [];
+            $imageUrls  = [];
+            foreach ($rawImages as $filename) {
+                if ($filename && file_exists(public_path('images/product/' . $filename))) {
+                    $imageUrls[] = asset('images/product/' . $filename);
+                }
+            }
+            $primaryImage = $imageUrls[0] ?? null;
 
             return [
                 'id'                => $product->id,
                 'name'              => $product->name,
                 'price'             => (float) $product->price,
-                'image'             => $imageUrl,
+                'image'             => $primaryImage,
+                'images'            => $imageUrls,
+                'qty'               => (float) $product->qty,
                 'is_variant'        => (bool) $product->is_variant,
                 'has_variants'      => count($this->buildVariantsData($product)) > 0,
                 'variants_data'     => $this->buildVariantsData($product),

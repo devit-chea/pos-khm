@@ -25,7 +25,7 @@ if (config('database.connections.saleprosaas_landlord') && !tenant()) {
                         <a href="{{ route($routePrefix . 'themeSettings.index') }}" class="btn btn-default btn-sm">Back</a>
                     </div>
                     <div class="card-body">
-                        <p class="italic"><small>The field labels marked with are required input fields.</small></p>
+                        <p class="italic"><small>The field labels marked with are required input fields</small></p>
 
                         <form action="{{ route($routePrefix . 'themeSettings.store') }}" method="POST" enctype="multipart/form-data">
                             @csrf

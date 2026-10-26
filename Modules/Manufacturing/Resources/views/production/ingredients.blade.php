@@ -2,6 +2,7 @@
         $product_list = explode(',', $lims_product_data->product_list);
         $wastage_percent = explode(',', $lims_product_data->wastage_percent);
         $qty_list = explode(',', $lims_product_data->qty_list);
+        $combo_unit_id_list = explode(',', $lims_product_data->combo_unit_id);
         $variant_list = $lims_product_data->variant_list ? explode(',', $lims_product_data->variant_list) : null;
         $price_list = explode(',', $lims_product_data->price_list);
         ?>
@@ -10,8 +11,9 @@
                 <?php
                 $product = App\Models\Product::find($id);
                 $stock = App\Models\Product_Warehouse::where([['product_id',$product->id],['warehouse_id',$warehouse_id]])->latest()->first();
-                $combo_unit = App\Models\Unit::query()->where('id', $product->unit_id)->orWhere('base_unit', $product->unit_id)->get()->unique('id');
                 $unit = App\Models\Unit::query()->where('id', $product->unit_id)->first();
+                $actual_base_unit = $unit->base_unit ? $unit->base_unit : $unit->id;
+                $combo_unit = App\Models\Unit::query()->where('id', $actual_base_unit)->orWhere('base_unit', $actual_base_unit)->get()->unique('id');
                 if ($lims_product_data->variant_list && isset($variant_list[$key]) && $variant_list[$key] != "") {
                     $product_variant_data = App\Models\ProductVariant::select('item_code')->FindExactProduct($id, $variant_list[$key])->first();
                     $product->code = $product_variant_data->item_code;
@@ -28,28 +30,48 @@
                             <span class="input-group-text">%</span>
                         </div>
                 </td>
+                <?php
+                $is_edit = isset($lims_product_data->reference_no) ? true : false;
+                $old_qty_base = 0;
+                if ($is_edit && isset($combo_unit_id_list[$key])) {
+                    $selected_unit = App\Models\Unit::find($combo_unit_id_list[$key]);
+                    if ($selected_unit) {
+                        if ($selected_unit->operator == '*') {
+                            $old_qty_base = $qty_list[$key] * $selected_unit->operation_value;
+                        } else {
+                            $old_qty_base = $qty_list[$key] / $selected_unit->operation_value;
+                        }
+                    } else {
+                        $old_qty_base = $qty_list[$key];
+                    }
+                }
+                $current_stock = $stock->qty ?? 0;
+                $available_stock = $current_stock + $old_qty_base;
+                ?>
                 <td>
                     <div class="input-group" style="max-width: unset">
                         <input type="number" class="form-control qty" name="product_qty[]" data-qty="{{ $qty_list[$key] }}"
-                            value="{{ $qty_list[$key] ?? 1 }}" step="any" placeholder="Qty" aria-label="Quantity" data-stock="{{ $stock->qty ?? 0 }}">
+                            value="{{ $qty_list[$key] ?? 1 }}" step="any" placeholder="Qty" aria-label="Quantity" data-stock="{{ $available_stock }}" data-old_qty="{{ $old_qty_base }}" data-current_stock="{{ $current_stock }}">
 
                         <div class="input-group-append">
-                            <select name="production_unit_ids[]" style="width: 112px;"
-                                class="btn btn-outline-secondary form-control production_unit_ids"
+                            <select name="production_unit_ids[]" style="width: 112px; border-top-left-radius: 0; border-bottom-left-radius: 0;"
+                                class="form-control production_unit_ids"
                                 onchange="calculate_price()">
                                 @foreach ($combo_unit as $row)
                                     <option value="{{ $row->id }}"
                                         data-operation_value="{{ $row->operation_value }}"
                                         data-unit_name="{{ $row->unit_name }}"
                                         data-operator="{{ $row->operator }}"
-                                        @if ($lims_product_data->unit_id == $row->id) 'selected' @endif>
+                                        @if (isset($combo_unit_id_list[$key]) && $combo_unit_id_list[$key] == $row->id) selected @elseif(!isset($combo_unit_id_list[$key]) && $product->unit_id == $row->id) selected @endif>
                                         {{ $row->unit_name }}
                                     </option>
                                 @endforeach
                             </select>
                         </div>
-                        <input type="hidden" name="stock_list[]" value="{{ $stock->qty ?? 0 }}">
-                            <span class="text-danger qty-error"></span>
+                        <input type="hidden" name="stock_list[]" value="{{ $current_stock }}">
+                    </div>
+                    <div class="mt-1">
+                        <span class="text-danger qty-error" style="font-size: 12px; display: block;"></span>
                     </div>
                 </td>
 

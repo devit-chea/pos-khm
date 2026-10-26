@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#0f172a" id="meta-theme-color">
     <title>{{ $warehouse->name }} – Menu</title>
     <meta name="description" content="Browse and order from {{ $warehouse->name }} easily via WhatsApp.">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <script>
         (function() {
@@ -341,6 +342,36 @@
             display: flex;
             justify-content: center;
         }
+
+        /* ─── Out of Stock Styling ──────────────────────────────── */
+        .pm-out-of-stock {
+            filter: grayscale(0.6);
+            opacity: 0.8;
+            pointer-events: none;
+        }
+        .pm-out-of-stock .pm-add-btn {
+            background: #94a3b8;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+        .pm-out-of-stock .pm-item-price {
+            color: var(--text-muted);
+        }
+        .pm-item-badge-oos {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ef4444;
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 999px;
+            text-transform: uppercase;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+        }
+        .pm-item-card { position: relative; }
 
         .pm-add-btn {
             width: 34px;
@@ -822,6 +853,81 @@
             letter-spacing: .03em;
         }
         #pm-end-notice.active { display: block; }
+        /* ─── Checkout Form Styles ────────────────────────── */
+        .pm-checkout-form {
+            padding: 16px;
+            border-top: 1px solid var(--border);
+            background: var(--bg-surface);
+        }
+        .pm-form-group {
+            margin-bottom: 12px;
+        }
+        .pm-form-group label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            margin-bottom: 6px;
+            color: var(--text-muted);
+        }
+        .pm-form-group input, .pm-form-group textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+            transition: var(--transition);
+        }
+        .pm-form-group input:focus, .pm-form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-alpha);
+        }
+        .pm-cart-sheet {
+            max-height: 95vh !important;
+        }
+
+        /* ─── Image Slideshow ──────────────────────────────────── */
+        .pm-slideshow {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        .pm-slide {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity .5s ease;
+        }
+        .pm-slide img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        /* Dots indicator */
+        .pm-slide-dots {
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 4px;
+            z-index: 2;
+        }
+        .pm-slide-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.5);
+            transition: background .3s;
+        }
+        .pm-slide-dot.active {
+            background: #fff;
+        }
     </style>
 </head>
 <body>
@@ -874,7 +980,7 @@
 <main class="pm-main">
 
     @if($categories->count())
-        @foreach($categories as $category)
+        @foreach ($categories as $category)
         <section class="pm-category-section" data-category-id="{{ $category->id }}">
             <div class="pm-category-title">
                 {{ $category->name }}
@@ -911,6 +1017,22 @@
             <button id="pm-cart-close" aria-label="Close cart">✕</button>
         </div>
         <div id="pm-cart-list"></div>
+
+        <div class="pm-checkout-form" id="pm-checkout-form">
+            <div class="pm-form-group">
+                <label for="pm-name">Full Name *</label>
+                <input type="text" id="pm-name" placeholder="Enter your name" required>
+            </div>
+            <div class="pm-form-group">
+                <label for="pm-phone">Phone Number *</label>
+                <input type="tel" id="pm-phone" placeholder="Enter phone number" required>
+            </div>
+            <div class="pm-form-group">
+                <label for="pm-address">Address / Note</label>
+                <textarea id="pm-address" rows="2" placeholder="Delivery address or special requests"></textarea>
+            </div>
+        </div>
+
         <div class="pm-cart-footer">
             <div class="pm-cart-total-row">
                 <span class="pm-cart-total-label">Total</span>
@@ -945,11 +1067,13 @@
 <script>
 window.MENU_CONFIG = {
     baseUrl: "{{ url('/') }}",
-    warehouse_id:    {{ $warehouse->id }},
     warehouse_name:  @json($warehouse->name),
     whatsapp_number: @json(preg_replace('/\D/', '', $warehouse->phone ?? '')),
     table_name:      @json($table ? $table->name : null),
-    slug:            @json($slug)
+    slug:            @json($slug),
+    warehouse_id:    @json($warehouse->id),
+    currency_symbol: @json(gen_setting()->currency ? \App\Models\Currency::find(gen_setting()->currency)->symbol : '$'),
+    place_order_url: @json(route('public.menu.placeOrder'))
 };
 
 window.appConfig = {
@@ -968,6 +1092,7 @@ function formatCurrency(amount) {
     return formatted + ' ' + window.appConfig.currency;
 }
 </script>
+<x-toast />
 <script>
     document.getElementById('pm-theme-toggle').addEventListener('click', () => {
         const root = document.documentElement;
@@ -985,7 +1110,10 @@ function formatCurrency(amount) {
         }
     });
 </script>
-<script src="{{ asset('js/public-menu.js') }}?v={{ time() }}"></script>
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
+<script src="{{ asset($asset_prefix . 'js/public-menu.js') }}?v={{ time() }}"></script>
 
 </body>
 </html>

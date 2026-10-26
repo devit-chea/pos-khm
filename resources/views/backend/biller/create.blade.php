@@ -40,7 +40,7 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label>{{__('db.Email')}} *</label>
+                                    <label>{{__('db.email')}} *</label>
                                     <input type="email" name="email" placeholder="example@example.com" required class="form-control">
                                     <x-validation-error fieldName="email" />
                                 </div>

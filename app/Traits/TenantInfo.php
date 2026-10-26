@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\Artisan;
 use Database\Seeders\Tenant\TenantDatabaseSeeder;
 use Modules\Ecommerce\Database\Seeders\EcommerceDatabaseSeeder;
 use Modules\Restaurant\Database\Seeders\RestaurantDatabaseSeeder;
+use App\Services\AffiliateService;
+use App\Models\landlord\TenantPayment as TenantPaymentModel;
 
 trait TenantInfo
 {
@@ -28,118 +30,187 @@ trait TenantInfo
         return tenant()->id;
     }
 
+    public function addonFeatures()
+    {
+        $addons = [
+            'manufacturing' => [
+                'path' => 'Modules/Manufacturing',
+                'name' => __('db.manufacturing'),
+                'default' => false,
+                'permission_names' => implode(',', \App\Services\ModuleRegistry::permissionNames('manufacturing'))
+            ],
+            'repair' => [
+                'path' => 'Modules/Repair',
+                'name' => __('db.repair'),
+                'default' => false,
+                'permission_names' => implode(',', \App\Services\ModuleRegistry::permissionNames('repair'))
+            ],
+            'project' => [
+                'path' => 'Modules/Project',
+                'name' => __('db.project'),
+                'default' => false,
+                'permission_names' => implode(',', \App\Services\ModuleRegistry::permissionNames('project'))
+            ],
+            'aiassistant' => [
+                'path' => 'Modules/AIAssistant',
+                'name' => __('db.ai_assistant'),
+                'default' => false,
+                'permission_names' => implode(',', \App\Services\ModuleRegistry::permissionNames('aiassistant'))
+            ],
+            'restaurant' => [
+                'path' => 'Modules/Restaurant',
+                'name' => __('db.restaurant'),
+                'default' => false,
+                'permission_names' => implode(',', \App\Services\ModuleRegistry::permissionNames('restaurant'))
+            ],
+            'indiagst' => [
+                'path' => 'Modules/IndiaGST',
+                'name' => __('db.indiagst'),
+                'default' => false,
+                'permission_names' => implode(',', \App\Services\ModuleRegistry::permissionNames('indiagst'))
+            ],
+            'socialcommerce' => [
+                'path' => 'Modules/SocialCommerce',
+                'name' => __('db.social_commerce'),
+                'default' => false,
+                'permission_names' => implode(',', \App\Services\ModuleRegistry::permissionNames('socialcommerce'))
+            ],
+            'gym' => [
+                'path' => 'Modules/Gym',
+                'name' => __('db.gym'),
+                'default' => false,
+                'permission_names' => implode(',', \App\Services\ModuleRegistry::permissionNames('gym'))
+            ],
+            'ecommerce' => [
+                'path' => 'Modules/Ecommerce',
+                'name' => __('db.ecommerce'),
+                'default' => false,
+                'permission_names' => implode(',', \App\Services\ModuleRegistry::permissionNames('ecommerce'))
+            ],
+            'woocommerce' => [
+                'path' => 'Modules/Woocommerce',
+                'name' => __('db.woocommerce'),
+                'default' => false,
+                'permission_names' => implode(',', \App\Services\ModuleRegistry::permissionNames('woocommerce'))
+            ],
+            'zatcaintegrationksa' => [
+                'path' => 'Modules/ZatcaIntegrationKsa',
+                'name' => __('db.zatcaintegrationksa'),
+                'default' => false,
+                'permission_names' => implode(',', \App\Services\ModuleRegistry::permissionNames('zatcaintegrationksa'))
+            ],
+            'vcardnfc' => [
+                'path' => 'Modules/VCardNfc',
+                'name' => __('db.vcard_nfc'),
+                'default' => false,
+                'permission_names' => implode(',', \App\Services\ModuleRegistry::permissionNames('vcardnfc'))
+            ],
+            'tailoring' => [
+                'path' => 'Modules/Tailoring',
+                'name' => __('db.tailoring'),
+                'default' => false,
+                'permission_names' => implode(',', \App\Services\ModuleRegistry::permissionNames('tailoring'))
+            ],
+            'api' => [
+                'path' => 'app/Http/Controllers/Api',
+                'name' => __('db.mobile_app'),
+                'default' => false,
+                'permission_names' => 'mobile_app,theme_settings'
+            ],
+        ];
+
+        $available = [];
+        foreach ($addons as $key => $data) {
+            if (file_exists(base_path($data['path']))) {
+                unset($data['path']);
+                $available[$key] = $data;
+            }
+        }
+
+        return $available;
+    }
+
+    public function addonList()
+    {
+        return array_keys($this->addonFeatures());
+    }
+
     public function features()
     {
         $features = [
             'product_and_categories' => [
-                'name' => 'Product and Categories',
+                'name' => __('db.product_and_categories'),
                 'default' => true,
                 'permission_names' => ''
             ],
             'purchase_and_sale' => [
-                'name' => 'Purchase and Sale',
+                'name' => __('db.purchase_and_sale'),
                 'default' => true,
                 'permission_names' => ''
             ],
             'sale_return' => [
-                'name' => 'Sale Return',
+                'name' => __('db.sale_return'),
                 'default' => false,
                 'permission_names' => 'returns-index,returns-view,returns-add,returns-edit,returns-delete'
             ],
             'purchase_return' => [
-                'name' => 'Purchase Return',
+                'name' => __('db.purchase_return'),
                 'default' => false,
                 'permission_names' => 'purchase-return-index,purchase-return-view,purchase-return-add,purchase-return-edit,purchase-return-delete'
             ],
             'expense' => [
-                'name' => 'Expense',
+                'name' => __('db.expense'),
                 'default' => false,
                 'permission_names' => 'expenses-index,expenses-view,expenses-add,expenses-edit,expenses-delete,expense-categories,sidebar_expense'
             ],
             'income' => [
-                'name' => 'Income',
+                'name' => __('db.income'),
                 'default' => false,
                 'permission_names' => 'incomes-index,incomes-view,incomes-add,incomes-edit,incomes-delete,income-categories,sidebar_income'
             ],
             'transfer' => [
-                'name' => 'Stock Transfer',
+                'name' => __('db.stock_transfer'),
                 'default' => false,
                 'permission_names' => 'transfers-index,transfers-view,transfers-add,transfers-edit,transfers-delete,transfers-import,sidebar_transfer'
             ],
             'quotation' => [
-                'name' => 'Quotation',
+                'name' => __('db.quotation'),
                 'default' => false,
                 'permission_names' => 'quotes-index,quotes-view,quotes-add,quotes-edit,quotes-delete,sidebar_quotation'
             ],
             'delivery' => [
-                'name' => 'Product Delivery',
+                'name' => __('db.product_delivery'),
                 'default' => false,
                 'permission_names' => 'delivery'
             ],
             'stock_count_and_adjustment' => [
-                'name' => 'Stock Count and Adjustment',
+                'name' => __('db.stock_count_and_adjustment'),
                 'default' => false,
                 'permission_names' => 'stock_count,adjustment'
             ],
             'report' => [
-                'name' => 'Report',
+                'name' => __('db.report'),
                 'default' => false,
-                'permission_names' => 'product-report,purchase-report,sale-report,customer-report,due-report,profit-loss,best-seller,daily-sale,monthly-sale,daily-purchase,monthly-purchase,payment-report,warehouse-stock-report,product-qty-alert,supplier-report,user-report,warehouse-report,product-expiry-report,sale-report-chart,dso-report,supplier-due-report,biller-report,sidebar_reports'
+                'permission_names' => 'product-report,stock-report,purchase-report,sale-report,customer-report,due-report,profit-loss,best-seller,daily-sale,monthly-sale,daily-purchase,monthly-purchase,payment-report,warehouse-stock-report,product-qty-alert,supplier-report,user-report,warehouse-report,product-expiry-report,sale-report-chart,dso-report,supplier-due-report,biller-report,sidebar_reports'
             ],
             'hrm' => [
-                'name' => 'HRM',
+                'name' => __('db.hrm'),
                 'default' => false,
                 'permission_names' => 'hrm_setting,department,attendance,payroll,employees-index,employees-view,employees-add,employees-edit,employees-delete,holiday,sidebar_hrm,hrm-panel,sale-agents,designations,shift,overtime,leave-type,leave'
             ],
             'accounting' => [
-                'name' => 'Accounting',
+                'name' => __('db.accounting'),
                 'default' => false,
-                'permission_names' => 'account-index,account-view,balance-sheet,account-statement,account-selection,money-transfer,sidebar_accounting,account-statement-permission,account-selection-permission'
+                'permission_names' => 'account-index,account-add,chart-of-accounts-manage,semantic-account-mappings-manage,money-transfer,balance-sheet,account-statement-permission,account-selection-permission,account-view,sidebar_accounting'
             ],
             'whatsapp_cloud_api' => [
-                'name' => 'WhatsApp Cloud API',
+                'name' => __('db.whatsapp_cloud_api'),
                 'default' => false,
                 'permission_names' => 'sidebar_whatsapp'
             ],
         ];
 
-        if(file_exists(base_path('Modules/Manufacturing'))){
-            $features['manufacturing'] = [
-                'name' => 'Manufacturing',
-                'default' => false,
-                'permission_names' => 'sidebar_manufacturing,production-view,production-add,production-edit,production-delete,recipe-view,recipe-add,recipe-edit,recipe-delete'
-            ];
-        }
-        if(file_exists(base_path('Modules/Ecommerce'))) {
-            $features['ecommerce'] = [
-                'name' => 'Ecommerce',
-                'default' => false,
-                'permission_names' => ''
-            ];
-        }
-        if(file_exists(base_path('Modules/Woocommerce'))){
-            $features['woocommerce'] = [
-                'name' => 'Woocommerce',
-                'default' => false,
-                'permission_names' => ''
-            ];
-        }
-        if(file_exists(base_path('Modules/Restaurant'))){
-            $features['restaurant'] = [
-                'name' => 'Restaurant',
-                'default' => false,
-                'permission_names' => ''
-            ];
-        }
-        if(file_exists(base_path('app/Http/Controllers/Api'))){
-            $features['api'] = [
-                'name' => 'Mobile App',
-                'default' => false,
-                'permission_names' => ''
-            ];
-        }
-
-        return $features;
+        return array_merge($features, $this->addonFeatures());
     }
 
     //This function is called from tenantCheckout() in payment controller
@@ -152,45 +223,56 @@ trait TenantInfo
         }
 
         $package = Package::findOrFail($request->package_id);
+        $profitCommission = $package->billing_model === 'profit_commission';
+        if ($profitCommission) {
+            \Illuminate\Support\Facades\Validator::make([
+                'commission_terms' => $request->commission_terms ?? null,
+                'commission_rate_accepted' => $request->commission_rate_accepted ?? null,
+            ], ['commission_terms' => 'accepted', 'commission_rate_accepted' => 'required|numeric|min:0.01|max:100'])->validate();
+            if (\App\Services\Billing\CommissionMoney::amount($request->commission_rate_accepted) !== \App\Services\Billing\CommissionMoney::amount($package->profit_commission_rate)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['commission_terms' => 'The package rate changed. Reload and accept the current rate before registering.']);
+            }
+            abort_unless($package->is_active, 422, 'This package is unavailable.');
+            $request->subscription_type = 'profit_commission';
+            $request->price = 0;
+            $request->pending_manual_payment = false;
+            $currencyCode = strtoupper(trim((string) $general_setting->currency));
+            \Illuminate\Support\Facades\Validator::make(['currency' => $currencyCode], [
+                'currency' => ['required', 'regex:/^[A-Z]{3}$/'],
+            ])->validate();
+        }
         $packageFeatures = json_decode($package->features);
+        if ($profitCommission) $packageFeatures = array_values(array_unique(array_merge($packageFeatures ?? [], ['accounting'])));
         $modules = [];
-        if (in_array('manufacturing', $packageFeatures)) {
-            $modules[] = 'manufacturing';
+
+        foreach (array_keys(\App\Services\ModuleRegistry::all()) as $moduleSlug) {
+            if (in_array($moduleSlug, $packageFeatures, true)) {
+                $modules[] = $moduleSlug;
+            }
         }
-        if (in_array('ecommerce', $packageFeatures)) {
-            $modules[] = 'ecommerce';
-        }
-        if (in_array('woocommerce', $packageFeatures)) {
-            $modules[] = 'woocommerce';
-        }
-        if (in_array('restaurant', $packageFeatures)) {
-            $modules[] = 'restaurant';
-        }
-        if (in_array('api', $packageFeatures)) {
+        if (in_array('api', $packageFeatures, true)) {
             $modules[] = 'api';
         }
 
         if (count($modules)) {
             $modules = implode(",", $modules);
-        }
-        else {
+        } else {
             $modules = Null;
         }
 
-        if ($request->subscription_type == 'free trial' || (!isset($request->created_by_admin) && $package->is_free_trial)) {
+        if ($profitCommission) {
+            $numberOfDaysToExpired = 0;
+        } elseif ($request->subscription_type == 'free trial' || (!isset($request->created_by_admin) && $package->is_free_trial)) {
             $numberOfDaysToExpired = $general_setting->free_trial_limit;
-        }
-        elseif ($request->subscription_type == 'monthly') {
+        } elseif ($request->subscription_type == 'monthly') {
             $numberOfDaysToExpired = 30;
-        }
-        elseif ($request->subscription_type == 'yearly') {
+        } elseif ($request->subscription_type == 'yearly') {
             $numberOfDaysToExpired = 365;
         }
 
-        if (isset($request->payment_method)) {
+        if (!$profitCommission && isset($request->payment_method)) {
             $paid_by = $request->payment_method;
-        }
-        else {
+        } else {
             $paid_by = '';
         }
 
@@ -211,20 +293,53 @@ trait TenantInfo
             DB::rollBack();
             return redirect()->back()->with(
                 'not_permitted',
-                __('db.failed_create_tenant'). ' - ' . $e->getMessage()
+                __('db.failed_create_tenant') . ' - ' . $e->getMessage()
             );
         }
         //////creating tenant end/////////
 
+        // ─── Affiliate Hook #1: Mark referral as 'registered' ──────────────────────────
+        try {
+            $affiliateReferralId = null;
+            if (request()->session()->has('affiliate_referral_id')) {
+                $affiliateReferralId = (int) request()->session()->get('affiliate_referral_id');
+            } elseif (request()->hasCookie('affiliate_referral_id')) {
+                $affiliateReferralId = (int) request()->cookie('affiliate_referral_id');
+            }
+
+            if ($affiliateReferralId) {
+                app(AffiliateService::class)->markReferralRegistered($affiliateReferralId, $tenant->id);
+                // Link referral to tenant record
+                DB::table('tenants')->where('id', $tenant->id)
+                    ->update(['affiliate_referral_id' => $affiliateReferralId]);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Affiliate referral marking failed: ' . $e->getMessage());
+        }
+        // ───────────────────────────────────────────────────────────────────────
+
 
         if ($paid_by) {
-            TenantPayment::create([
-                'tenant_id'       => $tenant->id,
-                'amount'          => $request->price,
-                'paid_by'         => $paid_by,
-                'payment_proof'   => $request->payment_proof ?? null,
+            $payment = TenantPayment::create([
+                'tenant_id' => $tenant->id,
+                'amount' => $request->price,
+                'paid_by' => $paid_by,
+                'payment_proof' => $request->payment_proof ?? null,
                 'transaction_ref' => $request->transaction_ref ?? null,
             ]);
+
+            // ─── Affiliate Hook #2: Generate commission for paid subscriptions ───────
+            try {
+                app(AffiliateService::class)->generateCommission($payment, $tenant->id);
+                // Clear affiliate cookie + session after commission is generated
+                if (isset($affiliateReferralId) && $affiliateReferralId) {
+                    request()->session()->forget('affiliate_referral_id');
+                    \Cookie::queue(\Cookie::forget('affiliate_referral_id'));
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('Affiliate commission generation failed: ' . $e->getMessage());
+            }
+            // ─────────────────────────────────────────────────────────────────────
         }
 
         ///////////////Start if someone wants ecommerce demo as his own demo////////////////
@@ -239,12 +354,13 @@ trait TenantInfo
         $tenantData = [
             //set general_setting information
             'site_title' => $general_setting->site_title,
+            'commission_currency' => $profitCommission ? $currencyCode : null,
             'site_logo' => $general_setting->site_logo,
             'package_id' => $request->package_id,
             'subscription_type' => $request->subscription_type,
             'developed_by' => $general_setting->developed_by,
             'modules' => $modules,
-            'expiry_date' => date("Y-m-d", strtotime("+" . $numberOfDaysToExpired . " days")),
+            'expiry_date' => $profitCommission ? null : date("Y-m-d", strtotime("+" . $numberOfDaysToExpired . " days")),
             //set user information
             'name' => $request->name,
             'email' => $request->email,
@@ -264,7 +380,11 @@ trait TenantInfo
         ]);
         //End running TenantDatabaseSeeder
 
-        copy(public_path("landlord/images/logo/") . $general_setting->site_logo, public_path("logo/") . $general_setting->site_logo);
+        $siteLogoPath = public_path("landlord/images/logo/") . $general_setting->site_logo;
+
+        if ($general_setting->site_logo && is_file($siteLogoPath)) {
+            copy($siteLogoPath, public_path("logo/") . $general_setting->site_logo);
+        }
 
         //Start running Ecommerce seeder for tenant if package has ecommerce module
         if (isset($modules) && str_contains($modules, 'ecommerce')) {
@@ -299,7 +419,11 @@ trait TenantInfo
                 DB::table('products')->update(['is_online' => 1]);
             });
 
-            copy(public_path("logo/") . $general_setting->site_logo, public_path("frontend/images/") . $general_setting->site_logo);
+            $tenantLogoPath = public_path("logo/") . $general_setting->site_logo;
+
+            if ($general_setting->site_logo && is_file($tenantLogoPath)) {
+                copy($tenantLogoPath, public_path("frontend/images/") . $general_setting->site_logo);
+            }
         }
         //End running Ecommerce seeder if package has ecommerce module
 
@@ -318,7 +442,11 @@ trait TenantInfo
         }
 
         //updating tenant others information on landlord DB
-        $tenant->update(['package_id' => $request->package_id, 'subscription_type' => $request->subscription_type, 'company_name' => $request->company_name, 'phone_number' => $request->phone_number, 'email' => $request->email, 'expiry_date' => date("Y-m-d", strtotime("+" . $numberOfDaysToExpired . " days")), 'status' => !empty($request->pending_manual_payment) ? 0 : 1]);
+        $tenant->update(['package_id' => $request->package_id, 'subscription_type' => $request->subscription_type, 'company_name' => $request->company_name, 'phone_number' => $request->phone_number, 'email' => $request->email, 'expiry_date' => $profitCommission ? null : date("Y-m-d", strtotime("+" . $numberOfDaysToExpired . " days")), 'status' => $profitCommission || !empty($request->pending_manual_payment) ? 0 : 1]);
+        if ($profitCommission) {
+            app(\App\Services\Billing\CommissionBillingService::class)->enroll($tenant, $package);
+            $tenant->update(['status' => 1]);
+        }
 
         // Below section no use for frontend signup as it is redirect to tenants domain
         // check PaymentController@tenantCheckout function
@@ -380,26 +508,19 @@ trait TenantInfo
 
             $packageFeatures = json_decode($packageFeatures);
             $modules = [];
-            if (in_array('manufacturing', $packageFeatures)) {
-                $modules[] = 'manufacturing';
+
+            foreach (array_keys(\App\Services\ModuleRegistry::all()) as $moduleSlug) {
+                if (in_array($moduleSlug, $packageFeatures, true)) {
+                    $modules[] = $moduleSlug;
+                }
             }
-            if (in_array('ecommerce', $packageFeatures)) {
-                $modules[] = 'ecommerce';
-            }
-            if (in_array('woocommerce', $packageFeatures)) {
-                $modules[] = 'woocommerce';
-            }
-            if (in_array('restaurant', $packageFeatures)) {
-                $modules[] = 'restaurant';
-            }
-            if (in_array('api', $packageFeatures)) {
+            if (in_array('api', $packageFeatures, true)) {
                 $modules[] = 'api';
             }
 
             if (count($modules)) {
                 $modules = implode(",", $modules);
-            }
-            else {
+            } else {
                 $modules = Null;
             }
 
@@ -422,7 +543,9 @@ trait TenantInfo
             }
 
             // ২. মডিউল চেক করে addons হ্যান্ডেল করা
-            if (empty($modules)) {
+            $hasAddon = !empty(array_intersect($packageFeatures, $this->addonList()));
+
+            if (!$hasAddon) {
                 $excluded_permission_names[] = 'addons';
             }
 
@@ -462,7 +585,7 @@ trait TenantInfo
                 if (!isset($existingMap[$id])) {
                     $data_to_insert[] = [
                         'permission_id' => $id,
-                        'role_id'       => 1
+                        'role_id' => 1
                     ];
                 }
             }
@@ -490,7 +613,7 @@ trait TenantInfo
                 $this->brandSlug();
                 $this->productSlug();
 
-                if($general_setting->site_logo && file_exists(public_path("logo/") . $general_setting->site_logo)){
+                if ($general_setting->site_logo && file_exists(public_path("logo/") . $general_setting->site_logo)) {
                     copy(public_path("logo/") . $general_setting->site_logo, public_path("frontend/images/") . $general_setting->site_logo);
                 }
             }
@@ -502,10 +625,7 @@ trait TenantInfo
         $subdomain = $tenant->id;
         if (env('SERVER_TYPE') == 'cpanel') {
             $url = "https://" . env('CENTRAL_DOMAIN') . ":2083/json-api/cpanel?cpanel_jsonapi_func=addsubdomain&cpanel_jsonapi_module=SubDomain&cpanel_jsonapi_version=2&domain=" . $subdomain . "&rootdomain=" . env('CENTRAL_DOMAIN');
-            if (env('ROOT_DOMAIN'))
-                $url .= "&dir=public_html";
-            else
-                $url .= "&dir=" . env('CENTRAL_DOMAIN');
+            $url .= "&dir=" . basename($_SERVER['DOCUMENT_ROOT']);
             //return $url;
             $curl = curl_init($url);
             curl_setopt($curl, CURLOPT_URL, $url);

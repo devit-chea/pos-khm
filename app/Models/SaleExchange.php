@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class SaleExchange extends Model
 {
+    use \App\Traits\WarehouseScoped;
+
     protected $table = 'sale_exchanges';
 
     protected $fillable = [

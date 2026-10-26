@@ -18,7 +18,7 @@
         {{-- Product Name & Code --}}
         <td class="product-title">
             <strong class="edit-product btn btn-link pl-0 pr-0" data-toggle="modal" data-target="#editModal">
-                {{ $product->name }} <i class="dripicons-document-edit"></i>
+                {{ $product->name }} <i class="ti ti-edit"></i>
             </strong>
             <br>
             <span>{{ $product->code }}</span>
@@ -47,7 +47,7 @@
             <div class="input-group">
                 <span class="input-group-btn">
                     <button type="button" class="btn btn-default minus mr-1" style="padding:5px 8px">
-                        <i class="dripicons-minus"></i>
+                        <i class="ti ti-minus"></i>
                     </button>
                 </span>
                 <input type="number"
@@ -60,7 +60,7 @@
                     onchange="checkQuantity(this.value, true, 'table.return-order-list')">
                 <span class="input-group-btn">
                     <button type="button" class="btn btn-default plus ml-1" style="padding:5px 8px">
-                        <i class="dripicons-plus"></i>
+                        <i class="ti ti-plus"></i>
                     </button>
                 </span>
             </div>
@@ -68,22 +68,22 @@
 
         {{-- Net Unit Price --}}
         <td class="product-price">
-            {{ number_format($product_sale->net_unit_price, $general_setting->decimal) }}
+            {{ number_format($product_sale->net_unit_price, gen_setting()->decimal) }}
         </td>
 
         {{-- Discount --}}
         <td class="discount">
-            {{ number_format($product_sale->discount, $general_setting->decimal) }}
+            {{ number_format($product_sale->discount, gen_setting()->decimal) }}
         </td>
 
         {{-- Tax --}}
         <td class="tax">
-            {{ number_format($product_sale->tax, $general_setting->decimal) }}
+            {{ number_format($product_sale->tax, gen_setting()->decimal) }}
         </td>
 
         {{-- Subtotal --}}
         <td class="sub-total">
-            {{ number_format($product_sale->total, $general_setting->decimal) }}
+            {{ number_format($product_sale->total, gen_setting()->decimal) }}
         </td>
 
         {{-- Exchange Checkbox --}}

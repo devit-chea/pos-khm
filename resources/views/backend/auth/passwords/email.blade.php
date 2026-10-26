@@ -1,22 +1,25 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{$general_setting->site_title}}</title>
+    <title>{{gen_setting()->site_title}}</title>
     @if(!config('database.connections.saleprosaas_landlord'))
-    <link rel="icon" type="image/png" href="{{url('logo', $general_setting->site_logo)}}" />
+    <link rel="icon" type="image/png" href="{{url('logo', gen_setting()->site_logo)}}" />
     <!-- Bootstrap CSS-->
-    <link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
+    <link rel="stylesheet" href="<?php echo asset($asset_prefix . 'vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
     @else
-    <link rel="icon" type="image/png" href="{{url('../../logo', $general_setting->site_logo)}}" />
+    <link rel="icon" type="image/png" href="{{url('../../logo', gen_setting()->site_logo)}}" />
     <!-- Bootstrap CSS-->
-    <link rel="stylesheet" href="<?php echo asset('../../vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
+    <link rel="stylesheet" href="<?php echo asset($asset_prefix . 'vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
     @endif
 
     <!-- Google fonts -->
-    @if($general_setting->font_css)
-      {!! $general_setting->font_css !!}
+    @if(gen_setting()->font_css)
+      {!! gen_setting()->font_css !!}
     @else
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,7 +27,7 @@
     @endif
 
     <!-- Custom CSS from general settings -->
-    {!! $general_setting->auth_css !!}
+    {!! gen_setting()->auth_css !!}
 
     <style>
         body { font-size: 14px;font-family: 'Inter', sans-serif;}
@@ -139,10 +142,10 @@
         <div class="col-lg-6 d-flex align-items-center position-relative">
             <div class="login-container w-100">
                 <div class="mb-5" style="margin: auto; text-align: center;">
-                    @if($general_setting->site_logo)
-                    <img src="{{url('logo', $general_setting->site_logo)}}" width="120">
+                    @if(gen_setting()->site_logo)
+                    <img src="{{url('logo', gen_setting()->site_logo)}}" width="120">
                     @else
-                    <span>{{$general_setting->site_title}}</span>
+                    <span>{{gen_setting()->site_title}}</span>
                     @endif
                 </div>
 
@@ -159,7 +162,7 @@
                     @csrf
 
                     <div class="form-group-material">
-                        <label class="font-weight-600">{{__('db.Email')}}</label>
+                        <label class="font-weight-600">{{__('db.email')}}</label>
                         <input id="email" type="email" name="email" required class="input-material form-control{{ $errors->has('email') ? ' is-invalid' : '' }}" value="{{ old('email') }}">
                         @if ($errors->has('email'))
                             <span class="invalid-feedback">

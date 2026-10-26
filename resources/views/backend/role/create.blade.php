@@ -1,4 +1,8 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
 
 <validation-error fieldName="name" />
@@ -7,7 +11,7 @@
 
 <section>
     <div class="container-fluid">
-        <a href="#" data-toggle="modal" data-target="#createModal" class="btn btn-info"><i class="dripicons-plus"></i> {{__('db.Add Role')}} </a>
+        <a href="#" data-toggle="modal" data-target="#createModal" class="btn btn-info"><i class="ti ti-plus"></i> {{__('db.Add Role')}} </a>
     </div>
     <div class="table-responsive">
         <table id="role-table" class="table table-hover">
@@ -33,19 +37,19 @@
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                                 <li>
-                                    <button type="button" data-id="{{$role->id}}" class="open-EditroleDialog btn btn-link" data-toggle="modal" data-target="#editModal"><i class="dripicons-document-edit"></i> {{__('db.edit')}}
+                                    <button type="button" data-id="{{$role->id}}" class="open-EditroleDialog btn btn-link" data-toggle="modal" data-target="#editModal"><i class="ti ti-edit"></i> {{__('db.edit')}}
                                 </button>
                                 </li>
                                 <li class="divider"></li>
                                 <li>
-                                    <a href="{{ route('role.permission', ['id' => $role->id]) }}" class="btn btn-link"><i class="dripicons-lock-open"></i> {{__('db.Change Permission')}}</a>
+                                    <a href="{{ route('role.permission', ['id' => $role->id]) }}" class="btn btn-link"><i class="ti ti-lock-open"></i> {{__('db.Change Permission')}}</a>
                                 </li>
                                 @if($role->id > 2 && $role->id != 5)
                                 <form action="{{ route('role.destroy', $role->id) }}" method="POST">
                                     @csrf
                                     @method('DELETE')
                                     <li>
-                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> {{__('db.delete')}}</button>
+                                        <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> {{__('db.delete')}}</button>
                                     </li>
                                 </form>
                                 @endif
@@ -66,18 +70,18 @@
                 @csrf
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Role')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
                 <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
                 <form>
                     <div class="form-group">
                     <label>{{__('db.name')}} *</label>
-                    <input type="text" name="name" value="{{ old('name') }}" required class="form-control" placeholder="{{ __('db.Type role name') }}">
+                    <input type="text" name="name" value="{{ old('name') }}" required class="form-control" placeholder="{{ __('db.type_role_name') }}">
                     </div>
                     <div class="form-group">
                         <label>{{__('db.Description')}}</label>
-                        <textarea name="description" rows="5" class="form-control" placeholder="{{ __('db.Type role description') }}">{{ old('description') }}</textarea>
+                        <textarea name="description" rows="5" class="form-control" placeholder="{{ __('db.type_role_description') }}">{{ old('description') }}</textarea>
                     </div>
                     <input type="hidden" name="is_active" value="1">
                     <input type="hidden" name="guard_name" value="web">
@@ -97,7 +101,7 @@
 		      @method('PUT')
 		    <div class="modal-header">
 		      <h5 id="exampleModalLabel" class="modal-title">{{__('db.Update Role')}}</h5>
-		      <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+		      <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
 		    </div>
 		    <div class="modal-body">
 		      <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -105,11 +109,11 @@
 		            <input type="hidden" name="role_id">
 		            <div class="form-group">
 		                <label>{{__('db.name')}} *</label>
-		                <input type="text" name="name" value="{{ old('name') }}" required class="form-control" placeholder="{{ __('db.Type role name') }}">
+		                <input type="text" name="name" value="{{ old('name') }}" required class="form-control" placeholder="{{ __('db.type_role_name') }}">
 		            </div>
 		            <div class="form-group">
 		                <label>{{__('db.Description')}}</label>
-		                <textarea name="description" rows="5" class="form-control" placeholder="{{ __('db.Type role description') }}">{{ old('description') }}</textarea>
+		                <textarea name="description" rows="5" class="form-control" placeholder="{{ __('db.type_role_description') }}">{{ old('description') }}</textarea>
 		            </div>
 		            <input type="submit" value="{{__('db.submit')}}" class="btn btn-primary">
 		        </form>
@@ -122,18 +126,14 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $("ul#setting").siblings('a').attr('aria-expanded','true');
     $("ul#setting").addClass("show");
     $("ul#setting #role-menu").addClass("active");
 
-	 function confirmDelete() {
-        if (confirm("Are you sure want to delete?")) {
-            return true;
-        }
-        return false;
-    }
+	 function confirmDelete() { return true; }
 
     $(document).ready(function() {
     $(document).on('click', '.open-EditroleDialog', function() {
@@ -161,8 +161,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -191,7 +191,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -199,7 +199,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -207,7 +207,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -215,7 +215,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -223,7 +223,7 @@
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],

@@ -91,10 +91,10 @@
                                                     <label>{{ __('db.date') }}</label>
                                                     @can('change_sale_date')
                                                         <input type="text" name="created_at" class="form-control date"
-                                                            value="{{ date($general_setting->date_format, strtotime(@$lims_sale_data->created_at?->toDateString())) }}" />
+                                                            value="{{ date(gen_setting()->date_format, strtotime(@$lims_sale_data->created_at?->toDateString())) }}" />
                                                     @else
                                                         <input type="text" name="created_at" class="form-control date"
-                                                            value="{{ date($general_setting->date_format, strtotime(@$lims_sale_data->created_at?->toDateString())) }}"
+                                                            value="{{ date(gen_setting()->date_format, strtotime(@$lims_sale_data->created_at?->toDateString())) }}"
                                                             readonly />
                                                     @endcan
                                                 </div>
@@ -180,7 +180,7 @@
                                                         placeholder="Enter reference number">
 
                                                     <a href="#" class="btn btn-primary" id="saleSearchBtn">
-                                                        <i class="fa fa-search"></i> Search
+                                                        <i class="ti ti-search"></i> Search
                                                     </a>
                                                 </div>
                                             </div>
@@ -236,7 +236,7 @@
                                                                         <th>{{ __('db.Discount') }}</th>
                                                                         <th>{{ __('db.Tax') }}</th>
                                                                         <th>{{ __('db.Subtotal') }}</th>
-                                                                        <th><i class="dripicons-trash"></i></th>
+                                                                        <th><i class="ti ti-trash"></i></th>
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody>
@@ -291,7 +291,7 @@
                                                                 <th>{{ __('db.Discount') }}</th>
                                                                 <th>{{ __('db.Tax') }}</th>
                                                                 <th>{{ __('db.Subtotal') }}</th>
-                                                                <th><i class="dripicons-trash"></i></th>
+                                                                <th><i class="ti ti-trash"></i></th>
                                                             </tr>
                                                         </thead>
                                                         <tbody></tbody>
@@ -395,7 +395,7 @@
                                             <div class="col-md-4">
                                                 <div class="form-group">
                                                     <label>{{ __('db.Attach Document') }}</label>
-                                                    <i class="dripicons-question" data-toggle="tooltip"
+                                                    <i class="ti ti-info-circle" data-toggle="tooltip"
                                                         title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
                                                     <input type="file" name="document" class="form-control" />
                                                     @if ($errors->has('extension'))
@@ -510,7 +510,7 @@
                     <div class="modal-header">
                         <h5 id="modal_header" class="modal-title"></h5>
                         <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                            <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                            <span aria-hidden="true"><i class="ti ti-x"></i></span>
                         </button>
                     </div>
                     <div class="modal-body">
@@ -621,7 +621,7 @@
 
                 var warehouse_id = $('#warehouse_id').val();
                 if (!warehouse_id) {
-                    alert('Please select warehouse');
+                    SaleProToast.show('Please select warehouse');
                     return;
                 }
 
@@ -712,36 +712,50 @@
             var click = 0;
             $newProductInput.on('input', function() {
                 const value = $(this).val().trim();
+                clearTimeout(typingTimer);
                 if (value.length >= 3) {
                     click = 0;
-                    clearTimeout(typingTimer);
                     typingTimer = setTimeout(() => searchProducts(value, 'new'), doneTypingInterval);
                 } else {
                     clearResults('new');
                 }
             });
             $newProductInput.on('paste', function(e) {
-                const pastedData = (e.originalEvent || e).clipboardData.getData('text');
-                if (pastedData.length >= 3) {
+                e.preventDefault();
+                clearTimeout(typingTimer);
+                const clipboard = (e.originalEvent || e).clipboardData || window.clipboardData;
+                const pastedData = clipboard ? clipboard.getData('text') : '';
+                const cleanPasted = String(pastedData || '').trim();
+                $(this).val(cleanPasted);
+                if (cleanPasted.length >= 3) {
                     click = 0;
-                    searchProducts(pastedData.trim(), 'new');
+                    searchProducts(cleanPasted, 'new');
+                } else {
+                    clearResults('new');
                 }
             });
             $saleProductInput.on('input', function() {
                 const value = $(this).val().trim();
+                clearTimeout(typingTimer);
                 if (value.length >= 3) {
                     click = 0;
-                    clearTimeout(typingTimer);
                     typingTimer = setTimeout(() => searchProducts(value, 'return'), doneTypingInterval);
                 } else {
                     clearResults('return');
                 }
             });
             $saleProductInput.on('paste', function(e) {
-                const pastedData = (e.originalEvent || e).clipboardData.getData('text');
-                if (pastedData.length >= 3) {
+                e.preventDefault();
+                clearTimeout(typingTimer);
+                const clipboard = (e.originalEvent || e).clipboardData || window.clipboardData;
+                const pastedData = clipboard ? clipboard.getData('text') : '';
+                const cleanPasted = String(pastedData || '').trim();
+                $(this).val(cleanPasted);
+                if (cleanPasted.length >= 3) {
                     click = 0;
-                    searchProducts(pastedData.trim(), 'return');
+                    searchProducts(cleanPasted, 'return');
+                } else {
+                    clearResults('return');
                 }
             });
             $(document).on('click', function(e) {
@@ -808,7 +822,7 @@
                 $.ajax({
                     type: 'GET',
                     async: false,
-                    url: '{{ route('package.fetchData', $general_setting->package_id) }}',
+                    url: '{{ route('package.fetchData', gen_setting()->package_id) }}',
                     success: function(data) {
                         if (data['number_of_invoice'] > 0 && data['number_of_invoice'] <= numberOfInvoice) {
                             localStorage.setItem("message",
@@ -823,9 +837,9 @@
 
         var currency = <?php echo json_encode($currency); ?>;
         var currencyChange = false;
-        var without_stock = <?php echo json_encode($general_setting->without_stock); ?>;
+        var without_stock = <?php echo json_encode(gen_setting()->without_stock); ?>;
         var authUser = <?php echo json_encode($authUser); ?>;
-        var decimal = <?php echo json_encode($general_setting->decimal); ?>;
+        var decimal = <?php echo json_encode(gen_setting()->decimal); ?>;
         var exchangeValue = 0,
             newProductsTotal = 0;
         $('#currency').val(currency['id']);
@@ -910,7 +924,7 @@
                 '.discount').text());
             var quantity = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val());
             exist_qty.push(quantity);
-            product_discount.push((total_discount / quantity).toFixed({{ $general_setting->decimal }}));
+            product_discount.push((total_discount / quantity).toFixed({{ gen_setting()->decimal }}));
             tax_rate.push(parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate')
                 .val()));
             tax_name.push($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-name').val());
@@ -1038,7 +1052,7 @@
             var order_tax = parseFloat($('select[name="order_tax_rate"]').val());
             var order_discount_type = $('select[name="order_discount_type"]').val();
             var order_discount_value = parseFloat($('input[name="order_discount_value"]').val());
-            if (!order_discount_value) order_discount_value = {{ number_format(0, $general_setting->decimal, '.', '') }};
+            if (!order_discount_value) order_discount_value = {{ number_format(0, gen_setting()->decimal, '.', '') }};
             var order_discount = (order_discount_type == 'Flat') ? (currencyChange ? parseFloat(order_discount_value *
                 currency['exchange_rate']) : parseFloat(order_discount_value)) : parseFloat(subtotal * (
                 order_discount_value / 100));
@@ -1048,13 +1062,13 @@
             $('input[name="order_discount_type"]').val(order_discount_type);
             var shipping_cost = currencyChange ? parseFloat($('input[name="shipping_cost"]').val() * currency[
                 'exchange_rate']) : parseFloat($('input[name="shipping_cost"]').val());
-            if (!shipping_cost) shipping_cost = {{ number_format(0, $general_setting->decimal, '.', '') }};
+            if (!shipping_cost) shipping_cost = {{ number_format(0, gen_setting()->decimal, '.', '') }};
             item = ++item + '(' + total_qty + ')';
             order_tax = (subtotal - order_discount) * (order_tax / 100);
             var grand_total = (subtotal + order_tax + shipping_cost) - order_discount;
             var coupon_discount = currencyChange ? parseFloat($('input[name="coupon_discount"]').val() * currency[
                 'exchange_rate']) : parseFloat($('input[name="coupon_discount"]').val());
-            if (!coupon_discount) coupon_discount = {{ number_format(0, $general_setting->decimal, '.', '') }};
+            if (!coupon_discount) coupon_discount = {{ number_format(0, gen_setting()->decimal, '.', '') }};
             grand_total -= coupon_discount;
             $('#item').text(item);
             $('input[name="item"]').val($('table.order-list tbody tr:last').index() + 1);
@@ -1147,13 +1161,13 @@
                 edit_qty = $('input[name="edit_qty"]').val(),
                 edit_unit_price = $('input[name="edit_unit_price"]').val();
             if (parseFloat(edit_discount) > parseFloat(edit_unit_price)) {
-                alert('Invalid Discount Input!');
+                SaleProToast.show('Invalid Discount Input!');
                 return;
             }
             if (edit_qty < 0) {
                 $('input[name="edit_qty"]').val(1);
                 edit_qty = 1;
-                alert("Quantity can't be less than 0");
+                SaleProToast.show("Quantity can't be less than 0");
             }
             var tax_rate_all = <?php echo json_encode($tax_rate_all); ?>;
             tax_rate[rowindex] = parseFloat(tax_rate_all[$('select[name="edit_tax_rate"]').val()]);
@@ -1202,7 +1216,7 @@
             var max_qty = $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ') .qty').attr('max');
             if (!qty) qty = 1;
             else if (max_qty && qty >= max_qty) {
-                alert("Quantity cannot exceed available stock (" + max_qty + ").");
+                SaleProToast.show("Quantity cannot exceed available stock (" + max_qty + ");.");
                 return;
             } else qty = parseFloat(qty) + 1;
             if (is_variant[rowindex]) {
@@ -1243,7 +1257,7 @@
                 warehouse_id,
                 function(data) {
                     if (data['message'] != 'ok') {
-                        alert(data['message']);
+                        SaleProToast.show(data['message']);
                         $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find('.batch-no').val(
                             '');
                         $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find(
@@ -1270,7 +1284,7 @@
             if (data.type === 'new' && without_stock == 'no') {
                 var stock_qty = parseFloat(data.qty);
                 if (stock_qty <= 0) {
-                    alert('{{ __('db.Out of Stock!') }}');
+                    SaleProToast.show('{{ __('db.out_of_stock');}}');
                     clearResults('new');
                     return;
                 }
@@ -1281,12 +1295,12 @@
         function productSearch(data) {
             var product_type = data.type;
             if (data.embedded == 1) {
-                alert('{{ __('db.This product has been added using the weight scale machine.') }}');
+                SaleProToast.show('{{ __('db.product_added_using_scale_weight');}}');
                 return;
             }
             // ✅ শুধুমাত্র new product-এ স্টক চেক
             if (data.type === 'new' && without_stock == 'no' && parseFloat(data[19]) <= 0) {
-                alert('⚠️ Out of Stock!');
+                SaleProToast.show('⚠️ Out of Stock!');
                 $('#product-search-input').val('');
                 clearResults('new');
                 return;
@@ -1307,7 +1321,7 @@
                         if (imeiNumbers && imeiNumbers.trim() !== '') {
                             imeiNumbersArray = imeiNumbers.split(",");
                             if (imeiNumbersArray.includes(data.imei)) {
-                                alert('Same imei or serial number is not allowed!');
+                                SaleProToast.show('Same imei or serial number is not allowed!');
                                 flag = false;
                                 $('#product-search-input').val('');
                                 $('#sale-product-search-input').val('');
@@ -1337,6 +1351,7 @@
                         data: product
                     },
                     success: function(data) {
+                        data = legacyProductRow(data);
                         if (data[23]) {
                             data[15] = 1;
                             pre_qty = 0;
@@ -1373,6 +1388,15 @@
                     }
                 });
             }
+        }
+
+        // sales/lims_product_search now returns named fields; this screen still reads them by position
+        function legacyProductRow(d) {
+            if (Array.isArray(d)) return d;
+            return [d.name, d.code, d.price, d.tax_rate, d.tax_name, d.tax_method, d.unit_name, d.unit_operator,
+                d.unit_operation_value, d.id, d.variant_id, d.promotion, d.is_batch, d.is_imei, d.is_variant, d.qty,
+                d.wholesale_price, d.cost, d.imei_number, d.warehouse_qty, d.type, d.batch_id, d.batch_no,
+                (d.modifiers && d.modifiers.length) ? d.modifiers : null, d.group_price];
         }
 
         // Markup for a product search result: none when the server already applied a fixed customer group price (data[24])
@@ -1416,7 +1440,7 @@
             } else {
                 cols +=
                     '<td class="product-title"><strong class="edit-product btn btn-link pl-0 pr-0" data-toggle="modal" data-target="#editModal">' +
-                    productName + ' <i class="dripicons-document-edit"></i></strong><br><span>' + productCode + '</span>' +
+                    productName + ' <i class="ti ti-edit"></i></strong><br><span>' + productCode + '</span>' +
                     stockDisplay + ' <strong class="product-price d-md-none"></strong>';
             }
 
@@ -1437,14 +1461,14 @@
             cols += '<td><div class="input-group"><span class="input-group-btn">';
             if (!imeiNumber || imeiNumber == 'null') {
                 cols +=
-                    '<button type="button" class="btn btn-default minus mr-1" style="padding:5px 8px"><i class="dripicons-minus"></i></button></span>';
+                    '<button type="button" class="btn btn-default minus mr-1" style="padding:5px 8px"><i class="ti ti-minus"></i></button></span>';
             }
             cols +=
                 '<input type="number" name="qty[]" class="form-control qty numkey input-number" style="font-size:13px;max-width:50px;padding:0 0;text-align:center" step="any" value="' +
                 productQty + '" max="' + maxStock + '" required><span class="input-group-btn">';
             if (!imeiNumber || imeiNumber == 'null') {
                 cols +=
-                    '<button type="button" class="btn btn-default plus ml-1" style="padding:5px 8px"><i class="dripicons-plus"></i></button>';
+                    '<button type="button" class="btn btn-default plus ml-1" style="padding:5px 8px"><i class="ti ti-plus"></i></button>';
             }
             cols += '</span></div></td>';
 
@@ -1461,7 +1485,7 @@
                     '" onchange="calculateExchangeValue()" style="width: 18px; height: 18px; cursor: pointer;"></td>';
             } else {
                 cols +=
-                    '<td><button type="button" class="ibtnDel btn btn-danger btn-sm mr-2"><i class="dripicons-trash"></i></button></td>';
+                    '<td><button type="button" class="ibtnDel btn btn-danger btn-sm mr-2"><i class="ti ti-trash"></i></button></td>';
             }
 
             // ✅ হিডেন ফিল্ডস - সব ভ্যালু NaN-প্রুফ
@@ -1553,6 +1577,43 @@
             $('.selectpicker').selectpicker('refresh');
         }
 
+        function getRowUnitData(tableSelector) {
+            var $row = $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')');
+            var operator = ($row.find('.sale-unit-operator').val() || '').split(',');
+            var operationValue = ($row.find('.sale-unit-operation-value').val() || '').split(',');
+
+            return {
+                operator: operator[0] || '*',
+                operationValue: parseFloat(operationValue[0]) || 1
+            };
+        }
+
+        function getPendingReturnQtyForProduct(productId, productCode) {
+            var pendingReturnQty = 0;
+
+            $('table.return-order-list tbody tr').each(function() {
+                var $row = $(this);
+                var rowProductId = String($row.find('.product-id').val() || '');
+                var rowProductCode = String($row.find('.product-code').val() || '');
+
+                if (!$row.find('.exchange-checkbox').is(':checked')) {
+                    return;
+                }
+
+                if (rowProductId === String(productId || '') || rowProductCode === String(productCode || '')) {
+                    var qty = parseFloat($row.find('.qty').val()) || 0;
+                    var operator = ($row.find('.sale-unit-operator').val() || '').split(',');
+                    var operationValue = ($row.find('.sale-unit-operation-value').val() || '').split(',');
+                    var unitOperator = operator[0] || '*';
+                    var unitOperationValue = parseFloat(operationValue[0]) || 1;
+
+                    pendingReturnQty += unitOperator === '*' ? qty * unitOperationValue : qty / unitOperationValue;
+                }
+            });
+
+            return pendingReturnQty;
+        }
+
         function edit() {
             $(".imei-section").remove();
             var tableSelector = 'table.order-list',
@@ -1597,7 +1658,7 @@
                 }
             @endif
             $('input[name="edit_discount"]').val(parseFloat(product_discount[rowindex]).toFixed(
-                {{ $general_setting->decimal }}));
+                {{ gen_setting()->decimal }}));
             var tax_name_all = <?php echo json_encode($tax_name_all); ?>;
             pos = tax_name_all.indexOf(tax_name[rowindex]);
             $('select[name="edit_tax_rate"]').val(pos);
@@ -1623,7 +1684,7 @@
                 row_product_price = product_price[rowindex];
                 $("#edit_unit").hide();
             }
-            $('input[name="edit_unit_price"]').val(row_product_price.toFixed({{ $general_setting->decimal }}));
+            $('input[name="edit_unit_price"]').val(row_product_price.toFixed({{ gen_setting()->decimal }}));
             $('.selectpicker').selectpicker('refresh');
         }
 
@@ -1684,21 +1745,26 @@
         }
 
         function checkQuantity(sale_qty, flag, tableSelector = 'table.order-list') {
-            var row_product_code = $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product-code')
-                .val();
-            var qty = parseFloat($(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').attr('max'));
-            var product_type = $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product_type').val();
+            var $row = $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')');
+            var row_product_code = $row.find('.product-code').val();
+            var row_product_id = $row.find('.product-id').val();
+            var qty = parseFloat($row.find('.qty').attr('max'));
+            var product_type = $row.find('.product_type').val();
             var isReturnTable = tableSelector.includes('return-order-list');
             // ✅ শুধুমাত্র order-list (new product) এর জন্য স্টক চেক
             if (without_stock == 'no' && !isReturnTable) {
                 if (product_type && (product_type.trim() == 'standard' || product_type.trim() == 'combo')) {
-                    var operator = unit_operator[rowindex].split(','),
-                        operation_value = unit_operation_value[rowindex].split(',');
-                    var total_qty = (operator[0] == '*') ? sale_qty * operation_value[0] : sale_qty / operation_value[0];
-                    if (total_qty > qty) {
-                        alert('Quantity exceeds stock quantity!');
+                    var unitData = getRowUnitData(tableSelector);
+                    var parsedSaleQty = parseFloat(sale_qty) || 0;
+                    var total_qty = (unitData.operator == '*') ?
+                        parsedSaleQty * unitData.operationValue :
+                        parsedSaleQty / unitData.operationValue;
+                    var availableQty = (isNaN(qty) ? 0 : qty) + getPendingReturnQtyForProduct(row_product_id, row_product_code);
+
+                    if (total_qty > availableQty) {
+                        SaleProToast.show('Quantity exceeds stock quantity!');
                         if (flag) {
-                            sale_qty = (sale_qty - 1);
+                            sale_qty = Math.max(1, parsedSaleQty - 1);
                             checkQuantity(sale_qty, true, tableSelector);
                         } else {
                             edit();
@@ -1707,7 +1773,7 @@
                     }
                 }
             }
-            $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val(sale_qty);
+            $row.find('.qty').val(sale_qty);
             if (!flag) {
                 $('#editModal').modal('hide');
             }
@@ -1751,22 +1817,18 @@
                 tax = (sub_total_unit - net_unit_price) * quantity;
                 sub_total = sub_total_unit * quantity;
             }
-            var topping_price = ($(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find('.topping-price')
-                .val() * quantity) || 0;
             $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount-value').val((product_discount[
-                rowindex] * quantity).toFixed({{ $general_setting->decimal }}));
+                rowindex] * quantity).toFixed({{ gen_setting()->decimal }}));
             $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val(tax_rate[rowindex]
-                .toFixed({{ $general_setting->decimal }}));
+                .toFixed({{ gen_setting()->decimal }}));
             $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_price').val(net_unit_price
-                .toFixed({{ $general_setting->decimal }}));
+                .toFixed({{ gen_setting()->decimal }}));
             $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed(
-                {{ $general_setting->decimal }}));
+                {{ gen_setting()->decimal }}));
             $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product-price').text(sub_total_unit
-                .toFixed({{ $general_setting->decimal }}));
-            $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text((sub_total +
-                topping_price).toFixed({{ $general_setting->decimal }}));
-            $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val((sub_total +
-                topping_price).toFixed({{ $general_setting->decimal }}));
+                .toFixed({{ gen_setting()->decimal }}));
+            $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text(sub_total.toFixed({{ gen_setting()->decimal }}));
+            $(tableSelector + ' tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total.toFixed({{ gen_setting()->decimal }}));
             // ❌ calculateTotal(), calculateNewProductsTotal() এখানে কল করবেন না - recalculateAll() করবে
         }
 
@@ -1812,15 +1874,15 @@
             var rownumber = $('table.order-list tbody tr:last').index();
             $("table.order-list tbody .qty, table.return-order-list tbody .qty").each(function() {
                 if ($(this).val() == '') {
-                    alert('One of products has no quantity!');
+                    SaleProToast.show('One of products has no quantity!');
                     e.preventDefault();
                 }
             });
             if (rownumber < 0) {
-                alert("Please insert product to order table!");
+                SaleProToast.show("Please insert product to order table!");
                 e.preventDefault();
             } else if (parseFloat($('input[name="total_qty"]').val()) <= 0) {
-                alert('Product quantity is 0');
+                SaleProToast.show('Product quantity is 0');
                 e.preventDefault();
             } else {
                 $("#submit-button").prop('disabled', true);
@@ -1838,7 +1900,7 @@
         $('#saleSearchBtn').on('click', function() {
             let reference = $('#sale_product_search').val().trim();
             if (reference === '') {
-                alert('Please enter a reference number');
+                SaleProToast.show('Please enter a reference number');
                 return;
             }
 
@@ -1860,11 +1922,11 @@
                                 'checked', true).trigger('change');
                         }, 100);
                     } else {
-                        alert(res.message || 'Sale not found');
+                        SaleProToast.show(res.message || 'Sale not found');
                     }
                 },
                 error: function() {
-                    alert('Error searching reference number');
+                    SaleProToast.show('Error searching reference number');
                 }
             });
         });
@@ -1875,7 +1937,7 @@
             let ref = document.getElementById('sale_product_search').value;
 
             if (!ref) {
-                alert('Please enter reference number');
+                SaleProToast.show('Please enter reference number');
                 return;
             }
 

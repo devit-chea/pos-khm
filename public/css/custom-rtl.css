@@ -48,7 +48,6 @@ nav.navbar .nav-item a i {
 }
 
 .side-navbar li a[data-toggle="collapse"]::before {
-    content: '\f105';
     left: 0;
     right: auto;
 }

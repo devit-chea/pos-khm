@@ -1,4 +1,8 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 
 @section('content')
 
@@ -20,10 +24,10 @@
 
         {{-- ── Action Buttons ── --}}
         <a href="{{ route('repair.service.create') }}" class="btn btn-info btn-icon">
-            <i class="dripicons-plus"></i> {{ __('db.add_service_job') }}
+            <i class="ti ti-plus"></i> {{ __('db.add_service_job') }}
         </a>&nbsp;
         <button class="btn btn-warning btn-icon" type="button" id="toggle-filter">
-            <i class="dripicons-experiment"></i> {{ __('db.filter_service_jobs') }}
+            <i class="ti ti-filter"></i> {{ __('db.filter_service_jobs') }}
         </button>
 
         {{-- ── Filter Card ── --}}
@@ -123,41 +127,19 @@
                 <div class="row">
                     <div class="col-md-6 d-print-none">
                         <button id="print-btn" type="button" class="btn btn-default btn-sm">
-                            <i class="dripicons-print"></i> {{ __('db.Print') }}
+                            <i class="ti ti-printer"></i> {{ __('db.print') }}
                         </button>
                     </div>
                     <div class="col-md-6 d-print-none">
                         <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                            <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                            <span aria-hidden="true"><i class="ti ti-x"></i></span>
                         </button>
-                    </div>
-                    <div class="col-md-12">
-                        <h3 id="jobModalLabel" class="modal-title text-center container-fluid">{{ $general_setting->site_title }}</h3>
-                    </div>
-                    <div class="col-md-12 text-center">
-                        <i style="font-size: 15px;">{{ __('db.service_job_details') }}</i>
                     </div>
                 </div>
             </div>
-
-            <div id="job-modal-content" class="modal-body"></div>
-            <br>
-
-            {{-- Parts Table --}}
-            <table class="table table-bordered product-service-list">
-                <thead>
-                    <th>#</th>
-                    <th>{{ __('db.product') }}</th>
-                    <th>{{ __('db.Quantity') }}</th>
-                    <th>{{ __('db.Unit Price') }}</th>
-                    <th>{{ __('db.Discount') }}</th>
-                    <th>{{ __('db.Tax') }}</th>
-                    <th>{{ __('db.Subtotal') }}</th>
-                </thead>
-                <tbody></tbody>
-            </table>
-
-            <div id="job-modal-footer" class="modal-body"></div>
+            <div id="job-modal-content" class="modal-body p-4" style="background:#fff;">
+                <div class="text-center"><i class="ti ti-loader ti-spin"></i> Loading...</div>
+            </div>
         </div>
     </div>
 </div>
@@ -165,6 +147,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <style>
     .btn-icon i { margin-right: 5px; }
     .top-fields { margin-top: 10px; position: relative; }
@@ -202,7 +185,7 @@
     });
 
     function confirmDelete() {
-        return confirm('{{ __('db.delete_confirmation') }}');
+        return true;
     }
 
     var serviceTable = $('#service-table').DataTable({
@@ -242,8 +225,8 @@
             'info': '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             'search': '{{__("db.Search")}}',
             'paginate': {
-                'previous': '<i class="dripicons-chevron-left"></i>',
-                'next': '<i class="dripicons-chevron-right"></i>'
+                'previous': '<i class="ti ti-chevron-left"></i>',
+                'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         order: [[1, 'desc']],
@@ -269,31 +252,31 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                 footer: true
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: { columns: ':visible:not(.not-exported)', rows: ':visible' },
                 footer: true
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: { columns: ':visible:not(.not-exported)', rows: ':visible' },
                 footer: true
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: { columns: ':visible:not(.not-exported)', rows: ':visible' },
                 footer: true
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             }
         ],
@@ -324,121 +307,21 @@
 
     function showJobDetails(job) {
         currentJob = job;
-
-        var htmltext = '{{ __("db.date") }}: ' + job.date
-            + '<br>{{ __("db.reference") }}: ' + job.reference_no
-            + '<br>{{ __("db.status") }}: ' + job.status
-            + '<br>{{ __("db.priority") }}: ' + job.priority
-            + '<br>{{ __("db.service_type") }}: ' + job.service_type;
-
-        if (job.expected_date && job.expected_date !== 'N/A') {
-            htmltext += '<br>{{ __("db.expected_delivery") }}: ' + job.expected_date;
-        }
-        if (job.note) {
-            htmltext += '<br>{{ __("db.Note") }}: ' + job.note;
-        }
-
-        htmltext += '<br><br><div class="row">'
-            + '<div class="col-md-6"><strong>{{ __("db.customer") }}:</strong><br>' + job.customer + '</div>'
-            + '<div class="col-md-6"><div class="float-right"><strong>{{ __("db.Warehouse") }}:</strong><br>'
-            + job.warehouse + '<br><strong>{{ __("db.technician") }}:</strong><br>' + job.technician
-            + '</div></div></div>';
-
-        $(".product-service-list tbody").remove();
-
-        $.get('{{ url("repair/service") }}/' + job.id + '/parts-data', function (data) {
-            var newBody = $("<tbody>");
-
-            if (!data || data === 'Something is wrong!') {
-                var newRow = $("<tr>");
-                newRow.append('<td colspan="7">{{ __("db.no_parts_added") }}</td>');
-                newBody.append(newRow);
-            } else {
-                var items = data.items || [];
-                $.each(items, function (index, item) {
-                    var newRow = $("<tr>");
-                    var cols = '';
-                    cols += '<td>' + (index + 1) + '</td>';
-                    cols += '<td>' + item.product_name + '</td>';
-                    cols += '<td>' + item.quantity + '</td>';
-                    cols += '<td>' + item.unit_price + '</td>';
-                    cols += '<td>' + item.discount + '</td>';
-                    cols += '<td>' + item.tax + '</td>';
-                    cols += '<td>' + item.total + '</td>';
-                    newRow.append(cols);
-                    newBody.append(newRow);
-                });
-
-                var rows = [
-                    ['{{ __("db.parts_total") }}',    data.parts_total],
-                    ['{{ __("db.service_charge") }}', data.service_charge],
-                    ['{{ __("db.Discount") }}',       data.discount],
-                    ['{{ __("db.Tax") }}',            data.tax],
-                    ['{{ __("db.grand total") }}',    data.total_amount],
-                    ['{{ __("db.Paid Amount") }}',    data.paid_amount],
-                    ['{{ __("db.Due") }}',            data.due_amount],
-                ];
-                $.each(rows, function (i, r) {
-                    var tr = $("<tr>");
-                    tr.append('<td colspan="6">' + r[0] + ':</td><td>' + r[1] + '</td>');
-                    newBody.append(tr);
-                });
-            }
-
-            $("table.product-service-list").append(newBody);
-        }).fail(function () {
-            var newBody = $("<tbody><tr><td colspan='7'>{{ __('db.no_parts_added') }}</td></tr></tbody>");
-            $("table.product-service-list").append(newBody);
-        });
-
-        var htmlfooter = '<p>{{ __("db.Note") }}: ' + (job.note || '') + '</p>'
-            + '{{ __("db.Total") }}: ' + parseFloat(job.total_amount).toFixed({{ $general_setting->decimal }})
-            + ' | {{ __("db.Paid") }}: ' + parseFloat(job.paid_amount).toFixed({{ $general_setting->decimal }})
-            + ' | {{ __("db.Due") }}: ' + parseFloat(job.due_amount).toFixed({{ $general_setting->decimal }});
-
-        $('#job-modal-content').html(htmltext);
-        $('#job-modal-footer').html(htmlfooter);
+        $('#job-modal-content').html('<div class="text-center"><i class="ti ti-loader ti-spin"></i> Loading...</div>');
         $('#job-details-modal').modal('show');
+        
+        $.get('{{ url("repair/service") }}/' + job.id + '/print-content', function (data) {
+            $('#job-modal-content').html(data);
+        }).fail(function() {
+            $('#job-modal-content').html('<div class="text-danger text-center">Failed to load details.</div>');
+        });
     }
 
     $('#print-btn').on('click', function () {
-        var job = currentJob;
         var a = window.open('');
         a.document.write('<html><head>');
-        a.document.write('<style>');
-        a.document.write('body{font-family:sans-serif;line-height:1.5;font-size:13px;}');
-        a.document.write('h3{text-align:center;margin-bottom:2px;}');
-        a.document.write('table{width:100%;border-collapse:collapse;margin-top:15px;}');
-        a.document.write('th,td{border:1px solid #000;padding:7px;text-align:left;}');
-        a.document.write('.no-border td{border:none;padding:0;vertical-align:top;}');
-        a.document.write('</style>');
         a.document.write('</head><body>');
-        a.document.write('<h3>{{ $general_setting->site_title }}</h3>');
-        a.document.write('<p style="text-align:center"><i>{{ __("db.service_job_details") }}</i></p>');
-        a.document.write('<table class="no-border" style="margin-top:5px;"><tr>');
-        a.document.write('<td style="width:50%;padding-left:0;vertical-align:top;">');
-        a.document.write('<span>{{ __("db.date") }}:</span> '         + job.date         + '<br>');
-        a.document.write('<span>{{ __("db.reference") }}:</span> '    + job.reference_no  + '<br>');
-        a.document.write('<span>{{ __("db.service_type") }}:</span> ' + job.service_type  + '<br>');
-        a.document.write('<span>{{ __("db.status") }}:</span> '       + job.status        + '<br>');
-        a.document.write('<span>{{ __("db.priority") }}:</span> '     + job.priority      + '<br>');
-        if (job.expected_date && job.expected_date !== 'N/A')
-            a.document.write('<span>{{ __("db.expected_delivery") }}:</span> ' + job.expected_date + '<br>');
-        a.document.write('</td>');
-        a.document.write('<td style="width:50%;padding-right:0;vertical-align:top;text-align:right;">');
-        a.document.write('<strong>{{ __("db.customer") }}:</strong><br>');
-        a.document.write((job.customer   || '') + '<br><br>');
-        a.document.write('<strong>{{ __("db.Warehouse") }}:</strong><br>');
-        a.document.write((job.warehouse  || '') + '<br><br>');
-        a.document.write('<strong>{{ __("db.technician") }}:</strong><br>');
-        a.document.write((job.technician || '') + '<br>');
-        a.document.write('</td></tr></table>');
-        var tableHTML = document.querySelector("table.product-service-list").outerHTML;
-        a.document.write(tableHTML);
-        a.document.write('<br>');
-        a.document.write('<p><strong>{{ __("db.Total") }}:</strong> ' + parseFloat(job.total_amount).toFixed({{ $general_setting->decimal }}) + '</p>');
-        a.document.write('<p><strong>{{ __("db.Paid") }}:</strong> '  + parseFloat(job.paid_amount).toFixed({{ $general_setting->decimal }})  + '</p>');
-        a.document.write('<p><strong>{{ __("db.Due") }}:</strong> '   + parseFloat(job.due_amount).toFixed({{ $general_setting->decimal }})   + '</p>');
+        a.document.write($('#job-modal-content').html());
         a.document.write('</body></html>');
         a.document.close();
         a.focus();

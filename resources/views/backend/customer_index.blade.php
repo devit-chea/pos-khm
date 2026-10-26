@@ -1,4 +1,11 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
 
 <x-success-message key="message" />
@@ -37,7 +44,7 @@
               <a class="nav-link" href="#customer-payment" role="tab" data-toggle="tab">{{__('db.Payment')}}</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="#customer-quotation" role="tab" data-toggle="tab">{{__('db.Quotation')}}</a>
+              <a class="nav-link" href="#customer-quotation" role="tab" data-toggle="tab">{{__('db.quotation')}}</a>
             </li>
             <li class="nav-item">
               <a class="nav-link" href="#customer-return" role="tab" data-toggle="tab">{{__('db.return')}}</a>
@@ -76,6 +83,10 @@
                               $status = __('db.Completed');
                             elseif($sale->sale_status == 2)
                               $status = __('db.Pending');
+                            elseif($sale->sale_status == 5)
+                              $status = __('db.Processing');
+                            elseif($sale->sale_status == 6)
+                              $status = __('db.cooked');
                             else
                               $status = __('db.Draft');
 
@@ -83,9 +94,9 @@
                             $staff_note = preg_replace('/\s+/S', " ", $sale->staff_note);
                         ?>
 
-                      <tr data-sale='["{{date($general_setting->date_format, strtotime($sale->created_at->toDateString()))}}", "{{$sale->reference_no}}", "{{$status}}", "{{$sale->biller->name}}", "{{$sale->biller->company_name}}", "{{$sale->biller->email}}", "{{$sale->biller->phone_number}}", "{{$sale->biller->address}}", "{{$sale->biller->city}}", "{{$sale->customer->name}}", "{{$sale->customer->phone_number}}", "{{$sale->customer->address}}", "{{$sale->customer->city}}", "{{$sale->id}}", "{{$sale->total_tax}}", "{{$sale->total_discount}}", "{{$sale->total_price}}", "{{$sale->order_tax}}", "{{$sale->order_tax_rate}}", "{{$sale->order_discount}}", "{{$sale->shipping_cost}}", "{{$sale->grand_total}}", "{{$sale->paid_amount}}", "{{$sale_note}}", "{{$staff_note}}", "{{$sale->user->name}}", "{{$sale->user->email}}", "{{$sale->warehouse->name}}", "{{$coupon_code}}", "{{$sale->coupon_discount}}"]'>
+                      <tr data-sale='["{{date(gen_setting()->date_format, strtotime($sale->created_at->toDateString()))}}", "{{$sale->reference_no}}", "{{$status}}", "{{$sale->biller->name}}", "{{$sale->biller->company_name}}", "{{$sale->biller->email}}", "{{$sale->biller->phone_number}}", "{{$sale->biller->address}}", "{{$sale->biller->city}}", "{{$sale->customer->name}}", "{{$sale->customer->phone_number}}", "{{$sale->customer->address}}", "{{$sale->customer->city}}", "{{$sale->id}}", "{{$sale->total_tax}}", "{{$sale->total_discount}}", "{{$sale->total_price}}", "{{$sale->order_tax}}", "{{$sale->order_tax_rate}}", "{{$sale->order_discount}}", "{{$sale->shipping_cost}}", "{{$sale->grand_total}}", "{{$sale->paid_amount}}", "{{$sale_note}}", "{{$staff_note}}", "{{$sale->user->name}}", "{{$sale->user->email}}", "{{$sale->warehouse->name}}", "{{$coupon_code}}", "{{$sale->coupon_discount}}"]'>
                         <td>{{$key}}</td>
-                        <td>{{ date($general_setting->date_format, strtotime($sale->created_at->toDateString())) }}</td>
+                        <td>{{ date(gen_setting()->date_format, strtotime($sale->created_at->toDateString())) }}</td>
                         <td>{{$sale->reference_no}}</td>
                         <td>{{$sale->biller->name}}</td>
                         <td>{{$sale->warehouse->name}}</td>
@@ -93,6 +104,8 @@
                         <td><div class="badge badge-success">{{$status}}</div></td>
                         @elseif($sale->sale_status == 2)
                         <td><div class="badge badge-danger">{{$status}}</div></td>
+                        @elseif($sale->sale_status == 5 || $sale->sale_status == 6)
+                        <td><div class="badge badge-primary">{{$status}}</div></td>
                         @else
                         <td><div class="badge badge-warning">{{$status}}</div></td>
                         @endif
@@ -108,7 +121,7 @@
                         <td>{{number_format($sale->grand_total, 2)}}</td>
                         <td>{{number_format($sale->paid_amount, 2)}}</td>
                         <td>{{number_format($sale->grand_total - $sale->paid_amount, 2)}}</td>
-                        <td><button type="button" class="btn btn-info btn-sm sale-view-btn" title="{{__('db.View')}}"><i class="dripicons-preview"></i></button></td>
+                        <td><button type="button" class="btn btn-info btn-sm sale-view-btn" title="{{__('db.View')}}"><i class="ti ti-eye"></i></button></td>
                       </tr>
                       @endforeach
                     </tbody>
@@ -121,9 +134,9 @@
                           <th></th>
                           <th></th>
                           <th></th>
-                          <th>{{number_format(0, $general_setting->decimal, '.', '')}}</th>
-                          <th>{{number_format(0, $general_setting->decimal, '.', '')}}</th>
-                          <th>{{number_format(0, $general_setting->decimal, '.', '')}}</th>
+                          <th>{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
+                          <th>{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
+                          <th>{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
                           <th></th>
                       </tr>
                     </tfoot>
@@ -148,7 +161,7 @@
                             @foreach($lims_payment_data as $key=>$payment)
                                 <tr>
                                     <td>{{$key}}</td>
-                                    <td>{{date($general_setting->date_format, strtotime($payment->created_at))}}</td>
+                                    <td>{{date(gen_setting()->date_format, strtotime($payment->created_at))}}</td>
                                     <td>{{$payment->payment_reference}}</td>
                                     <td>{{$payment->sale_reference}}</td>
                                     <td>{{$payment->amount}}</td>
@@ -162,7 +175,7 @@
                                 <th>Total:</th>
                                 <th></th>
                                 <th></th>
-                                <th>{{number_format(0, $general_setting->decimal, '.', '')}}</th>
+                                <th>{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
                                 <th></th>
                             </tr>
                         </tfoot>
@@ -194,9 +207,9 @@
                                 else
                                     $status = __('db.Sent');
                             ?>
-                            <tr class="quotation-link" data-quotation='["{{date($general_setting->date_format, strtotime($quotation->created_at->toDateString()))}}", "{{$quotation->reference_no}}", "{{$status}}", "{{$quotation->biller->name}}", "{{$quotation->biller->company_name}}","{{$quotation->biller->email}}", "{{$quotation->biller->phone_number}}", "{{$quotation->biller->address}}", "{{$quotation->biller->city}}", "{{$quotation->customer->name}}", "{{$quotation->customer->phone_number}}", "{{$quotation->customer->address}}", "{{$quotation->customer->city}}", "{{$quotation->id}}", "{{$quotation->total_tax}}", "{{$quotation->total_discount}}", "{{$quotation->total_price}}", "{{$quotation->order_tax}}", "{{$quotation->order_tax_rate}}", "{{$quotation->order_discount}}", "{{$quotation->shipping_cost}}", "{{$quotation->grand_total}}", "{{$quotation->note}}", "{{$quotation->user->name}}", "{{$quotation->user->email}}"]'>
+                            <tr class="quotation-link" data-quotation='["{{date(gen_setting()->date_format, strtotime($quotation->created_at->toDateString()))}}", "{{$quotation->reference_no}}", "{{$status}}", "{{$quotation->biller->name}}", "{{$quotation->biller->company_name}}","{{$quotation->biller->email}}", "{{$quotation->biller->phone_number}}", "{{$quotation->biller->address}}", "{{$quotation->biller->city}}", "{{$quotation->customer->name}}", "{{$quotation->customer->phone_number}}", "{{$quotation->customer->address}}", "{{$quotation->customer->city}}", "{{$quotation->id}}", "{{$quotation->total_tax}}", "{{$quotation->total_discount}}", "{{$quotation->total_price}}", "{{$quotation->order_tax}}", "{{$quotation->order_tax_rate}}", "{{$quotation->order_discount}}", "{{$quotation->shipping_cost}}", "{{$quotation->grand_total}}", "{{$quotation->note}}", "{{$quotation->user->name}}", "{{$quotation->user->email}}"]'>
                                 <td>{{$key}}</td>
-                                <td>{{ date($general_setting->date_format, strtotime($quotation->created_at->toDateString())) . ' '. $quotation->created_at->toTimeString() }}</td>
+                                <td>{{ date(gen_setting()->date_format, strtotime($quotation->created_at->toDateString())) . ' '. $quotation->created_at->toTimeString() }}</td>
                                 <td>{{ $quotation->reference_no }}</td>
                                 <td>{{ $quotation->biller->name }}</td>
                                 <td>{{ $quotation->customer->name }}</td>
@@ -211,7 +224,7 @@
                                     <td><div class="badge badge-success">{{$status}}</div></td>
                                 @endif
                                 <td>{{ $quotation->grand_total }}</td>
-                                <td><button type="button" class="btn btn-info btn-sm quotation-view-btn" title="{{__('db.View')}}"><i class="dripicons-preview"></i></button></td>
+                                <td><button type="button" class="btn btn-info btn-sm quotation-view-btn" title="{{__('db.View')}}"><i class="ti ti-eye"></i></button></td>
                             </tr>
                             @endforeach
                         </tbody>
@@ -247,15 +260,15 @@
                         </thead>
                         <tbody>
                             @foreach($lims_return_data as $key=>$return)
-                            <tr class="return-link" data-return='["{{date($general_setting->date_format, strtotime($return->created_at->toDateString()))}}", "{{$return->reference_no}}", "{{$return->warehouse->name}}", "{{$return->biller->name}}", "{{$return->biller->company_name}}","{{$return->biller->email}}", "{{$return->biller->phone_number}}", "{{$return->biller->address}}", "{{$return->biller->city}}", "{{$return->customer->name}}", "{{$return->customer->phone_number}}", "{{$return->customer->address}}", "{{$return->customer->city}}", "{{$return->id}}", "{{$return->total_tax}}", "{{$return->total_discount}}", "{{$return->total_price}}", "{{$return->order_tax}}", "{{$return->order_tax_rate}}", "{{$return->grand_total}}", "{{$return->return_note}}", "{{$return->staff_note}}", "{{$return->user->name}}", "{{$return->user->email}}"]'>
+                            <tr class="return-link" data-return='["{{date(gen_setting()->date_format, strtotime($return->created_at->toDateString()))}}", "{{$return->reference_no}}", "{{$return->warehouse->name}}", "{{$return->biller->name}}", "{{$return->biller->company_name}}","{{$return->biller->email}}", "{{$return->biller->phone_number}}", "{{$return->biller->address}}", "{{$return->biller->city}}", "{{$return->customer->name}}", "{{$return->customer->phone_number}}", "{{$return->customer->address}}", "{{$return->customer->city}}", "{{$return->id}}", "{{$return->total_tax}}", "{{$return->total_discount}}", "{{$return->total_price}}", "{{$return->order_tax}}", "{{$return->order_tax_rate}}", "{{$return->grand_total}}", "{{$return->return_note}}", "{{$return->staff_note}}", "{{$return->user->name}}", "{{$return->user->email}}"]'>
                                 <td>{{$key}}</td>
-                                <td>{{ date($general_setting->date_format, strtotime($return->created_at->toDateString())) . ' '. $return->created_at->toTimeString() }}</td>
+                                <td>{{ date(gen_setting()->date_format, strtotime($return->created_at->toDateString())) . ' '. $return->created_at->toTimeString() }}</td>
                                 <td>{{ $return->reference_no }}</td>
                                 <td>{{ $return->biller->name }}</td>
                                 <td>{{ $return->customer->name }}</td>
                                 <td>{{$return->warehouse->name}}</td>
                                 <td class="grand-total">{{ $return->grand_total }}</td>
-                                <td><button type="button" class="btn btn-info btn-sm return-view-btn" title="{{__('db.View')}}"><i class="dripicons-preview"></i></button></td>
+                                <td><button type="button" class="btn btn-info btn-sm return-view-btn" title="{{__('db.View')}}"><i class="ti ti-eye"></i></button></td>
                             </tr>
                             @endforeach
                         </tbody>
@@ -285,13 +298,13 @@
             <div class="container mt-3 pb-2 border-bottom">
                 <div class="row">
                     <div class="col-md-3">
-                        <button id="sale-print-btn" type="button" class="btn btn-default btn-sm d-print-none"><i class="dripicons-print"></i> {{__('db.Print')}}</button>
+                        <button id="sale-print-btn" type="button" class="btn btn-default btn-sm d-print-none"><i class="ti ti-printer"></i> {{__('db.print')}}</button>
                     </div>
                     <div class="col-md-6">
-                        <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">{{$general_setting->site_title}}</h3>
+                        <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">{{gen_setting()->site_title}}</h3>
                     </div>
                     <div class="col-md-3">
-                        <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close d-print-none"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                        <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close d-print-none"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                     </div>
                     <div class="col-md-12 text-center">
                         <i style="font-size: 15px;">{{__('db.Sale Details')}}</i>
@@ -305,7 +318,7 @@
                 <thead>
                     <th>#</th>
                     <th>{{__('db.product')}}</th>
-                    <th>{{__('db.Qty')}}</th>
+                    <th>{{__('db.qty')}}</th>
                     <th>{{__('db.Unit Price')}}</th>
                     <th>{{__('db.Tax')}}</th>
                     <th>{{__('db.Discount')}}</th>
@@ -325,13 +338,13 @@
         <div class="container mt-3 pb-2 border-bottom">
             <div class="row">
                 <div class="col-md-3">
-                    <button id="quotation-print-btn" type="button" class="btn btn-default btn-sm d-print-none"><i class="dripicons-print"></i> {{__('db.Print')}}</button>
+                    <button id="quotation-print-btn" type="button" class="btn btn-default btn-sm d-print-none"><i class="ti ti-printer"></i> {{__('db.print')}}</button>
                 </div>
                 <div class="col-md-6">
-                    <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">{{$general_setting->site_title}}</h3>
+                    <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">{{gen_setting()->site_title}}</h3>
                 </div>
                 <div class="col-md-3">
-                    <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close d-print-none"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close d-print-none"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="col-md-12 text-center">
                     <i style="font-size: 15px;">{{__('db.Quotation Details')}}</i>
@@ -365,13 +378,13 @@
         <div class="container mt-3 pb-2 border-bottom">
         <div class="row">
             <div class="col-md-3">
-                <button id="print-btn" type="button" class="btn btn-default btn-sm d-print-none"><i class="dripicons-print"></i> {{__('db.Print')}}</button>
+                <button id="print-btn" type="button" class="btn btn-default btn-sm d-print-none"><i class="ti ti-printer"></i> {{__('db.print')}}</button>
             </div>
             <div class="col-md-6">
-                <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">{{$general_setting->site_title}}</h3>
+                <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">{{gen_setting()->site_title}}</h3>
             </div>
             <div class="col-md-3">
-                <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close d-print-none"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close d-print-none"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="col-md-12 text-center">
                 <i style="font-size: 15px;">{{__('db.Return Details')}}</i>
@@ -385,7 +398,7 @@
                 <thead>
                     <th>#</th>
                     <th>{{__('db.product')}}</th>
-                    <th>{{__('db.Qty')}}</th>
+                    <th>{{__('db.qty')}}</th>
                     <th>{{__('db.Unit Price')}}</th>
                     <th>{{__('db.Tax')}}</th>
                     <th>{{__('db.Discount')}}</th>
@@ -403,6 +416,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
     $(document).on("click", ".sale-view-btn", function() {
         var sale = $(this).parent().parent().data('sale');
@@ -423,7 +437,7 @@
       var divToPrint=document.getElementById('sale-details');
       var newWin=window.open('','Print-Window');
       newWin.document.open();
-      newWin.document.write('<link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css"><style type="text/css">@media print {.modal-dialog { max-width: 1000px;} }</style><body onload="window.print()">'+divToPrint.innerHTML+'</body>');
+      newWin.document.write('<link rel="stylesheet" href="{{ asset($asset_prefix . 'vendor/bootstrap/css/bootstrap.min.css') }}" type="text/css"><style type="text/css">@media print {.modal-dialog { max-width: 1000px;} }</style><body onload="window.print()">'+divToPrint.innerHTML+'</body>');
       newWin.document.close();
       setTimeout(function(){newWin.close();},10);
     });
@@ -432,7 +446,7 @@
       var divToPrint=document.getElementById('quotation-details');
       var newWin=window.open('','Print-Window');
       newWin.document.open();
-      newWin.document.write('<link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css"><style type="text/css">@media print {.modal-dialog { max-width: 1000px;} }</style><body onload="window.print()">'+divToPrint.innerHTML+'</body>');
+      newWin.document.write('<link rel="stylesheet" href="{{ asset($asset_prefix . 'vendor/bootstrap/css/bootstrap.min.css') }}" type="text/css"><style type="text/css">@media print {.modal-dialog { max-width: 1000px;} }</style><body onload="window.print()">'+divToPrint.innerHTML+'</body>');
       newWin.document.close();
       setTimeout(function(){newWin.close();},10);
     });
@@ -441,7 +455,7 @@
       var divToPrint=document.getElementById('return-details');
       var newWin=window.open('','Print-Window');
       newWin.document.open();
-      newWin.document.write('<link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css"><style type="text/css">@media print {.modal-dialog { max-width: 1000px;} }</style><body onload="window.print()">'+divToPrint.innerHTML+'</body>');
+      newWin.document.write('<link rel="stylesheet" href="{{ asset($asset_prefix . 'vendor/bootstrap/css/bootstrap.min.css') }}" type="text/css"><style type="text/css">@media print {.modal-dialog { max-width: 1000px;} }</style><body onload="window.print()">'+divToPrint.innerHTML+'</body>');
       newWin.document.close();
       setTimeout(function(){newWin.close();},10);
     });
@@ -464,7 +478,7 @@
                 cols += '<td><strong>' + (index+1) + '</strong></td>';
                 cols += '<td>' + name_code[index] + '</td>';
                 cols += '<td>' + qty[index] + ' ' + unit_code[index] + '</td>';
-                cols += '<td>' + parseFloat(subtotal[index] / qty[index]).toFixed({{$general_setting->decimal}}) + '</td>';
+                cols += '<td>' + parseFloat(subtotal[index] / qty[index]).toFixed({{gen_setting()->decimal}}) + '</td>';
                 cols += '<td>' + tax[index] + '(' + tax_rate[index] + '%)' + '</td>';
                 cols += '<td>' + discount[index] + '</td>';
                 cols += '<td>' + subtotal[index] + '</td>';
@@ -527,7 +541,7 @@
             var newRow = $("<tr>");
             cols = '';
             cols += '<td colspan=6><strong>{{__("db.Due")}}:</strong></td>';
-            cols += '<td>' + parseFloat(sale[21] - sale[22]).toFixed({{$general_setting->decimal}}) + '</td>';
+            cols += '<td>' + parseFloat(sale[21] - sale[22]).toFixed({{gen_setting()->decimal}}) + '</td>';
             newRow.append(cols);
             newBody.append(newRow);
 
@@ -558,7 +572,7 @@
                 cols += '<td><strong>' + (index+1) + '</strong></td>';
                 cols += '<td>' + name_code[index] + '</td>';
                 cols += '<td>' + qty[index] + ' ' + unit_code[index] + '</td>';
-                cols += '<td>' + parseFloat(subtotal[index] / qty[index]).toFixed({{$general_setting->decimal}}) + '</td>';
+                cols += '<td>' + parseFloat(subtotal[index] / qty[index]).toFixed({{gen_setting()->decimal}}) + '</td>';
                 cols += '<td>' + tax[index] + '(' + tax_rate[index] + '%)' + '</td>';
                 cols += '<td>' + discount[index] + '</td>';
                 cols += '<td>' + subtotal[index] + '</td>';
@@ -605,7 +619,7 @@
 
             $("table.product-quotation-list").append(newBody);
         });
-        //var htmlfooter = '<p><strong>{{__("db.Note")}}:</strong> '+quotation[22]+'</p><strong>{{__("db.Created By")}}:</strong><br>'+quotation[23]+'<br>'+quotation[24];
+        //var htmlfooter = '<p><strong>{{__("db.note")}}:</strong> '+quotation[22]+'</p><strong>{{__("db.Created By")}}:</strong><br>'+quotation[23]+'<br>'+quotation[24];
         $('#quotation-content').html(htmltext);
         //$('#quotation-footer').html(htmlfooter);
         $('#quotation-details').modal('show');
@@ -749,14 +763,14 @@
         if (dt_selector.rows( '.selected' ).any() && is_calling_first) {
             var rows = dt_selector.rows( '.selected' ).indexes();
 
-            $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 8 ).footer() ).html(dt_selector.cells( rows, 8, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 9 ).footer() ).html(dt_selector.cells( rows, 9, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
+            $( dt_selector.column( 8 ).footer() ).html(dt_selector.cells( rows, 8, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
+            $( dt_selector.column( 9 ).footer() ).html(dt_selector.cells( rows, 9, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
         else {
-            $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 8 ).footer() ).html(dt_selector.column( 8, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
-            $( dt_selector.column( 9 ).footer() ).html(dt_selector.column( 9, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
+            $( dt_selector.column( 8 ).footer() ).html(dt_selector.column( 8, {page:'current'} ).data().sum().toFixed({{gen_setting()->decimal}}));
+            $( dt_selector.column( 9 ).footer() ).html(dt_selector.column( 9, {page:'current'} ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
     }
 
@@ -840,10 +854,10 @@
         if (dt_selector.rows( '.selected' ).any() && is_calling_first) {
             var rows = dt_selector.rows( '.selected' ).indexes();
 
-            $( dt_selector.column( 4 ).footer() ).html(dt_selector.cells( rows, 4, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 4 ).footer() ).html(dt_selector.cells( rows, 4, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
         else {
-            $( dt_selector.column( 4 ).footer() ).html(dt_selector.column( 4, {page:'current'} ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 4 ).footer() ).html(dt_selector.column( 4, {page:'current'} ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
     }
 
@@ -875,7 +889,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -889,7 +903,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -903,7 +917,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -917,7 +931,7 @@
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],
@@ -931,10 +945,10 @@
         if (dt_selector.rows( '.selected' ).any() && is_calling_first) {
             var rows = dt_selector.rows( '.selected' ).indexes();
 
-            $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
         else {
-            $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 7 ).footer() ).html(dt_selector.cells( rows, 7, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
     }
 
@@ -966,7 +980,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -980,7 +994,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -994,7 +1008,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -1008,7 +1022,7 @@
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],
@@ -1022,10 +1036,10 @@
         if (dt_selector.rows( '.selected' ).any() && is_calling_first) {
             var rows = dt_selector.rows( '.selected' ).indexes();
 
-            $( dt_selector.column( 6 ).footer() ).html(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 6 ).footer() ).html(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
         else {
-            $( dt_selector.column( 6 ).footer() ).html(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 6 ).footer() ).html(dt_selector.cells( rows, 6, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
     }
 </script>

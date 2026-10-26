@@ -11,6 +11,7 @@ class ProductExchange extends Model
     protected $fillable = [
         'exchange_id',
         'product_id',
+        'variant_id',
         'qty',
         'sale_unit_id',
         'net_unit_price',

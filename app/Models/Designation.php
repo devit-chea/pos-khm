@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use App\Traits\WarehouseScoped;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Designation extends Model
 {
-    use HasFactory;
+    use HasFactory, WarehouseScoped;
 
     protected $fillable = [
         'name',
+        'warehouse_id',
         'is_active',
     ];
 
@@ -20,6 +22,11 @@ class Designation extends Model
     public function employees()
     {
         return $this->hasMany(Employee::class, 'designation_id');
+    }
+
+    public function warehouse()
+    {
+        return $this->belongsTo(Warehouse::class);
     }
 
     /**

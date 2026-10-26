@@ -9,6 +9,9 @@ use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Cache;
 use DB;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Carbon;
 
 class LoginController extends Controller
@@ -54,27 +57,37 @@ class LoginController extends Controller
 
     public function login(Request $request)
     {
-
-        $input = $request->all();
-
-        $this->validate($request, [
+        $credentials = $request->validate([
             'name' => 'required',
             'password' => 'required',
         ]);
 
-        $fieldType = filter_var($request->name, FILTER_VALIDATE_EMAIL) ? 'email' : 'name';
+        $login = trim($credentials['name']);
+        $field = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'name';
+        $user = User::where($field, $login)->first();
 
-        if(auth()->attempt(array($fieldType => $input['name'], 'password' => $input['password'])))
-        {
-            if(config('database.connections.saleprosaas_landlord')) {
-                tenant()->update(['last_login_at' => Carbon::now()->timezone(config('app.timezone'))->format('Y-m-d h:i:s A')]);
-            }
-            setcookie('login_now', 1, time() + (86400 * 1), "/");
-            return redirect()->intended('/dashboard');
+        if (!$user) {
+            return back()
+                ->withErrors(['name' => 'Username is incorrect.'])
+                ->onlyInput('name');
         }
-        else {
-            return redirect()->route('login')->with('error', __('db.Username And Password Are Wrong.'));
+
+        if (!Hash::check($credentials['password'], $user->password)) {
+            return back()
+                ->withErrors(['password' => 'Password is incorrect.'])
+                ->onlyInput('name');
         }
+
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        if(config('database.connections.saleprosaas_landlord')) {
+            tenant()->update(['last_login_at' => Carbon::now()->timezone(config('app.timezone'))->format('Y-m-d h:i:s A')]);
+        }
+
+        setcookie('login_now', 1, time() + (86400 * 1), "/");
+
+        return redirect()->intended('/dashboard');
     }
 
     public function logout(Request $request)

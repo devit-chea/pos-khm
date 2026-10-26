@@ -25,6 +25,7 @@ class Handler extends ExceptionHandler
     protected $dontFlash = [
         'password',
         'password_confirmation',
+        'webhook_secret',
     ];
 
     /**
@@ -51,8 +52,34 @@ class Handler extends ExceptionHandler
      */
     public function render($request, Throwable $exception)
     {
+        if ($exception instanceof ZatcaPhase2WorkflowUnavailable) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $exception->getMessage()], 422);
+            }
+
+            return redirect()->back()->with('not_permitted', $exception->getMessage());
+        }
+
         if ($exception instanceof TenantCouldNotBeIdentifiedOnDomainException) {
             return redirect($request->getScheme(). '://' . env('CENTRAL_DOMAIN'));
+        }
+
+        if (($request->expectsJson() || $request->ajax())
+            && !$this->isHttpException($exception)
+            && !($exception instanceof \Illuminate\Validation\ValidationException)
+            && !($exception instanceof \Illuminate\Auth\AuthenticationException)
+            && !($exception instanceof \Illuminate\Auth\Access\AuthorizationException)
+            && !($exception instanceof \Illuminate\Database\Eloquent\ModelNotFoundException)
+        ) {
+            $message = __('db.We could not complete this action. Please try again.');
+            if ($message === 'db.We could not complete this action. Please try again.') {
+                $message = 'We could not complete this action. Please try again.';
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+            ], 500);
         }
 
         return parent::render($request, $exception);

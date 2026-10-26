@@ -4,8 +4,24 @@ use Illuminate\Support\Facades\Route;
 use Modules\Repair\Http\Controllers\DeviceTypeController;
 use Modules\Repair\Http\Controllers\RepairController;
 use Modules\Repair\Http\Controllers\ServiceJobController;
+use Stancl\Tenancy\Middleware\InitializeTenancyByDomain;
+use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
-Route::prefix('repair')->name('repair.')->middleware(['auth', 'verified', 'common'])->group(function () {
+// 1. Determine if this is a SaaS Landlord environment
+$isSaaS = (bool) config('database.connections.saleprosaas_landlord');
+
+// 2. Build Tenancy middleware array dynamically
+$tenancyMiddleware = $isSaaS ? [InitializeTenancyByDomain::class, PreventAccessFromCentralDomains::class] : [];
+
+// ==========================================
+// ADMIN/COMMON ROUTES
+// ==========================================
+$middlewares = array_merge(
+    $tenancyMiddleware,
+    ['auth', 'verified', 'common', 'warehouse.access', 'module.access:repair']
+);
+
+Route::prefix('repair')->name('repair.')->middleware($middlewares)->group(function () {
 
 
     // ── Dashboard ──────────────────────────────────────────────────────────
@@ -21,6 +37,10 @@ Route::prefix('repair')->name('repair.')->middleware(['auth', 'verified', 'commo
     // Parts & Billing page
     Route::get('service/{id}/parts', [ServiceJobController::class, 'partsAndBilling'])
         ->name('service.parts');
+
+    // Fetch Print / Details Content HTML
+    Route::get('service/{id}/print-content', [ServiceJobController::class, 'printContent'])
+        ->name('service.print_content');
 
     // Parts Data AJAX
     Route::get('service/{id}/parts-data', [ServiceJobController::class, 'partsData'])
@@ -62,14 +82,18 @@ Route::prefix('repair')->name('repair.')->middleware(['auth', 'verified', 'commo
     Route::post('device-types/export', [DeviceTypeController::class, 'exportDeviceType'])
         ->name('device-types.export');
 
-    Route::get('device-types-for-category', [DeviceTypeController::class, 'forCategory'])
-        ->name('device-types.for-category');
+    if (method_exists(DeviceTypeController::class, 'forCategory')) {
+        Route::get('device-types-for-category', [DeviceTypeController::class, 'forCategory'])
+            ->name('device-types.for-category');
+    }
 
     // ✅ Resource route পরে
-    Route::resource('device-types', DeviceTypeController::class);
+    Route::resource('device-types', DeviceTypeController::class)->except(['create', 'show']);
 
     // toggle এ {device_type} আছে তাই এটা resource এর পরে থাকলেও সমস্যা নেই
-    Route::post('device-types/{device_type}/toggle', [DeviceTypeController::class, 'toggleActive'])
-        ->name('device-types.toggle');
+    if (method_exists(DeviceTypeController::class, 'toggleActive')) {
+        Route::post('device-types/{device_type}/toggle', [DeviceTypeController::class, 'toggleActive'])
+            ->name('device-types.toggle');
+    }
 });
 

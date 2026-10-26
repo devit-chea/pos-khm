@@ -12,6 +12,7 @@
                         <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
                         <form action="{{ route('qty_adjustment.store') }}" method="POST" enctype="multipart/form-data" id="adjustment-form">
                             @csrf
+                            <input type="hidden" name="idempotency_key" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
                             <div class="row">
                                 <div class="col-md-12">
                                     <div class="row">
@@ -36,7 +37,7 @@
                                     <div class="col-md-12">
                                         <label>{{__('db.Select Product')}}</label>
                                         <div class="search-box input-group">
-                                            <button type="button" class="btn btn-secondary btn-lg"><i class="fa fa-barcode"></i></button>
+                                            <button type="button" class="btn btn-secondary btn-lg"><i class="ti ti-barcode"></i></button>
                                             <input type="text" name="product_code_name" id="lims_productcodeSearch" placeholder="{{ __('db.Please type product code and select') }}" class="form-control" />
                                         </div>
                                     </div>
@@ -53,7 +54,7 @@
                                                         <th>{{__('db.Unit Cost')}}</th>
                                                         <th>{{__('db.Quantity')}}</th>
                                                         <th>{{__('db.action')}}</th>
-                                                        <th><i class="dripicons-trash"></i></th>
+                                                        <th><i class="ti ti-trash"></i></th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -61,7 +62,7 @@
                                                 <tfoot class="tfoot active">
                                                     <th colspan="3">{{__('db.Total')}}</th>
                                                     <th id="total-qty" colspan="2">0</th>
-                                                    <th><i class="dripicons-trash"></i></th>
+                                                    <th><i class="ti ti-trash"></i></th>
                                                 </tfoot>
                                             </table>
                                         </div>
@@ -78,7 +79,7 @@
                                 <div class="row">
                                     <div class="col-md-12">
                                         <div class="form-group">
-                                            <label>{{__('db.Note')}}</label>
+                                            <label>{{__('db.note')}}</label>
                                             <textarea rows="5" class="form-control" name="note"></textarea>
                                         </div>
                                     </div>
@@ -115,41 +116,59 @@
 
 
 
-	$('select[name="warehouse_id"]').on('change', function() {
-	    var id = $(this).val();
-	    $.get('getproduct/' + id, function(data) {
-	        lims_product_array = [];
-	        product_code = data[0];
-	        product_name = data[1];
-	        product_qty = data[2];
-	        unit_cost = data[3];
-	        $.each(product_code, function(index) {
-	            lims_product_array.push(product_code[index] + ' (' + product_name[index] + ')' + '|' + unit_cost[index]);
-	        });
-	    });
-	});
+// 	$('select[name="warehouse_id"]').on('change', function() {
+// 	    var id = $(this).val();
+// 	    $.get('getproduct/' + id, function(data) {
+// 	        lims_product_array = [];
+// 	        product_code = data[0];
+// 	        product_name = data[1];
+// 	        product_qty = data[2];
+// 	        unit_cost = data[3];
+// 	        $.each(product_code, function(index) {
+// 	            lims_product_array.push(product_code[index] + ' (' + product_name[index] + ')' + '|' + unit_cost[index]);
+// 	        });
+// 	    });
+// 	});
+
+    <?php $productArray = []; ?>
+    var lims_product_code = [
+        @foreach($lims_product_list_without_variant as $product)
+            <?php
+                $productArray[] = htmlspecialchars($product->code) . '|' . preg_replace('/[\n\r]/', "<br>", htmlspecialchars($product->name));
+            ?>
+        @endforeach
+        @foreach($lims_product_list_with_variant as $product)
+            <?php
+                $productArray[] = htmlspecialchars($product->item_code) . '|' . preg_replace('/[\n\r]/', "<br>", htmlspecialchars($product->name));
+            ?>
+        @endforeach
+
+        <?php
+            echo  '"'.implode('","', $productArray).'"';
+        ?>
+    ];
 
 	var lims_productcodeSearch = $('#lims_productcodeSearch');
 
 	lims_productcodeSearch.autocomplete({
-	    source: function(request, response) {
-	        var matcher = new RegExp(".?" + $.ui.autocomplete.escapeRegex(request.term), "i");
-	        response($.grep(lims_product_array, function(item) {
-	            return matcher.test(item);
-	        }));
-	    },
-	    response: function(event, ui) {
-	        if (ui.content.length == 1) {
-	            var data = ui.content[0].value;
-	            $(this).autocomplete( "close" );
-	            productSearch(data);
-	        };
-	    },
-	    select: function(event, ui) {
-	        var data = ui.item.value;
-	        productSearch(data);
-	    }
-	});
+        source: function(request, response) {
+            var matcher = new RegExp(".?" + $.ui.autocomplete.escapeRegex(request.term), "i");
+            response($.grep(lims_product_code, function(item) {
+                return matcher.test(item);
+            }));
+        },
+        response: function(event, ui) {
+            if (ui.content.length == 1) {
+                var data = ui.content[0].value;
+                $(this).autocomplete( "close" );
+                productSearch(data);
+            };
+        },
+        select: function(event, ui) {
+            var data = ui.item.value;
+            productSearch(data);
+        }
+    });
 
 	$("#myTable").on('input', '.qty', function() {
 	    rowindex = $(this).closest('tr').index();
@@ -184,8 +203,7 @@
 	$('#adjustment-form').on('submit',function(e){
 	    var rownumber = $('table.order-list tbody tr:last').index();
 	    if (rownumber < 0) {
-	        alert("Please insert product to order table!")
-	        e.preventDefault();
+	        SaleProToast.show("Please insert product to order table!");e.preventDefault();
 	    }
 	});
 
@@ -214,12 +232,12 @@
                     var cols = '';
                     cols += '<td>' + data[0] + '</td>';
                     cols += '<td>' + data[1] + '</td>';
-                    cols += '<td>' + data[4] + '<input type="hidden" name="unit_cost[]" value="'+data[4]+'" /></td>';
+                    cols += '<td>' + data[2] + '<input type="hidden" name="unit_cost[]" value="'+data[2]+'" /></td>';
                     cols += '<td><input type="number" class="form-control qty" name="qty[]" value="1" required step="any" /></td>';
                     cols += '<td class="action"><select name="action[]" class="form-control act-val"><option value="-">{{__("db.Subtraction")}}</option><option value="+">{{__("db.Addition")}}</option></select></td>';
                     cols += '<td><button type="button" class="ibtnDel btn btn-md btn-danger">{{__("db.delete")}}</button></td>';
                     cols += '<input type="hidden" class="product-code" name="product_code[]" value="' + data[1] + '"/>';
-                    cols += '<input type="hidden" class="product-id" name="product_id[]" value="' + data[2] + '"/>';
+                    cols += '<input type="hidden" class="product-id" name="product_id[]" value="' + data[9] + '"/>';
 
                     newRow.append(cols);
                     $("table.order-list tbody").append(newRow);
@@ -236,7 +254,7 @@
 	    var pos = product_code.indexOf(row_product_code);
 
 	    if ( (qty > parseFloat(product_qty[pos])) && (action == '-') ) {
-	        alert('Quantity exceeds stock quantity!');
+	        SaleProToast.show('Quantity exceeds stock quantity!');
             var row_qty = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val();
             row_qty = row_qty.substring(0, row_qty.length - 1);
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val(row_qty);

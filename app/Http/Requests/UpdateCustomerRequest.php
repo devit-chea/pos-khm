@@ -32,7 +32,8 @@ class UpdateCustomerRequest extends FormRequest
                 'max:255'
             ],
             'customer_group_id' => 'required|max:255',
-            'customer_name' => 'required'
+            'customer_name' => 'required',
+            'credit_limit' => ['nullable', 'numeric', 'min:0']
         ];
     }
 }

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use Mail;
-use App\Models\Account;
 use App\Models\Payment;
 use App\Models\Customer;
 use App\Models\Purchase;
@@ -11,20 +10,31 @@ use App\Models\Supplier;
 use App\Models\MailSetting;
 use App\Mail\CustomerCreate;
 use App\Mail\SupplierCreate;
-use App\Models\CashRegister;
 use Illuminate\Http\Request;
 use App\Models\CustomerGroup;
 use App\Models\PurchaseProductReturn;
 use App\Models\ReturnPurchase;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Auth;
-use Spatie\Permission\Models\Permission;
+use App\Services\PaymentAccountService;
+use App\Services\SupplierDuePaymentService;
+use App\Services\SupplierOpeningBalanceService;
+use Throwable;
 
 class SupplierController extends Controller
 {
     use \App\Traits\MailInfo;
+
+    public function __construct(
+        public \App\Services\AccountingService $accountingService,
+        private SupplierDuePaymentService $supplierDuePayments,
+        private PaymentAccountService $paymentAccounts,
+        private SupplierOpeningBalanceService $openingBalances,
+    ) {
+    }
 
     public function index()
     {
@@ -36,53 +46,60 @@ class SupplierController extends Controller
             if (empty($all_permission))
                 $all_permission[] = 'dummy text';
             $lims_supplier_all = Supplier::where('is_active', true)->get();
-            return view('backend.supplier.index', compact('lims_supplier_all', 'all_permission'));
+            $lims_supplier_all->each(function (Supplier $supplier) {
+                $supplier->authorized_due = $this->supplierDuePayments->dueForSupplier($supplier->id);
+            });
+            $lims_account_list = $this->paymentAccounts->validSupplierPaymentSourceAccounts();
+            return view('backend.supplier.index', compact('lims_supplier_all', 'all_permission', 'lims_account_list'));
         } else
             return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
     }
 
     public function clearDue(Request $request)
     {
-        $lims_due_purchase_data = Purchase::select('id', 'warehouse_id', 'grand_total', 'paid_amount', 'payment_status')
-            ->whereNull('deleted_at')
-            ->where([
-                ['payment_status', 1],
-                ['supplier_id', $request->supplier_id]
-            ])->get();
-        $total_paid_amount = $request->amount;
-        foreach ($lims_due_purchase_data as $key => $purchase_data) {
-            if ($total_paid_amount == 0)
-                break;
-            $due_amount = $purchase_data->grand_total - $purchase_data->paid_amount;
+        $this->authorizeClearDue();
 
-            if ($request->cash_register)
-                $cash_register_id = $request->cash_register;
-            else
-                $cash_register_id = null;
-            $account_data = Account::select('id')->where('is_default', 1)->first();
-            if ($total_paid_amount >= $due_amount) {
-                $paid_amount = $due_amount;
-                $payment_status = 2;
-            } else {
-                $paid_amount = $total_paid_amount;
-                $payment_status = 1;
-            }
-            Payment::create([
-                'payment_reference' => 'ppr-' . date("Ymd") . '-' . date("his"),
-                'purchase_id' => $purchase_data->id,
-                'user_id' => Auth::id(),
-                'cash_register_id' => $cash_register_id,
-                'account_id' => $account_data->id,
-                'amount' => $paid_amount,
-                'change' => 0,
-                'paying_method' => 'Cash',
-                'payment_note' => $request->note
+        try {
+            $data = $request->validate([
+                'supplier_id' => ['required', 'integer'],
+                'amount' => ['required', 'numeric', 'min:0.01'],
+                'account_id' => ['required', 'integer'],
+                'paid_by_id' => ['required', 'in:Cash,Bank,Cheque'],
+                'cheque_no' => ['nullable', 'required_if:paid_by_id,Cheque', 'string', 'max:255'],
+                'cash_register' => ['nullable', 'integer'],
+                'note' => ['nullable', 'string', 'max:1000'],
             ]);
-            $purchase_data->paid_amount += $paid_amount;
-            $purchase_data->payment_status = $payment_status;
-            $purchase_data->save();
-            $total_paid_amount -= $paid_amount;
+
+            $supplier = Supplier::whereKey($data['supplier_id'])
+                ->where('is_active', true)
+                ->firstOrFail();
+
+            $this->supplierDuePayments->clear(
+                $supplier,
+                (float) $data['amount'],
+                (int) $data['account_id'],
+                $data['paid_by_id'],
+                $data['note'] ?? null,
+                $data['cheque_no'] ?? null,
+                isset($data['cash_register']) ? (int) $data['cash_register'] : null,
+            );
+        } catch (ValidationException $exception) {
+            if ($request->expectsJson()) {
+                throw $exception;
+            }
+
+            return redirect()->back()
+                ->withInput()
+                ->with('not_permitted', collect($exception->errors())->flatten()->first());
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return redirect()->back()->with(
+                'not_permitted',
+                __('db.supplier_payment_failed_safe')
+            );
         }
+
         return redirect()->back()->with('message', __('db.Due cleared successfully'));
     }
 
@@ -113,6 +130,7 @@ class SupplierController extends Controller
                 }),
             ],
             'image' => 'image|mimes:jpg,jpeg,png,gif|max:100000',
+            'opening_balance' => 'nullable|numeric|min:0',
         ]);
 
         //validation for customer if create both user and supplier
@@ -126,6 +144,9 @@ class SupplierController extends Controller
                 ],
             ]);
         }
+
+        try {
+        DB::beginTransaction();
 
         $lims_supplier_data = $request->except('image');
         $lims_supplier_data['is_active'] = true;
@@ -142,10 +163,12 @@ class SupplierController extends Controller
         // create dummy purchase if supplier has opening balance (due)
         if (isset($lims_supplier_data['opening_balance']) && $lims_supplier_data['opening_balance'] > 0) {
             $lims_purchase_data = new Purchase();
-            $lims_purchase_data->reference_no = 'sob-' . date("Ymd") . '-' . date("his"); //customer opening balance
+            $lims_purchase_data->reference_no = 'sob-' . $create_supplier->id . '-' . date('YmdHis');
             $lims_purchase_data->supplier_id = $create_supplier->id;
             $lims_purchase_data->user_id = Auth::id();
-            $lims_purchase_data->warehouse_id = 1;
+            $lims_purchase_data->warehouse_id = $this->openingBalances->openingWarehouseId();
+            $lims_purchase_data->currency_id = app(\App\Services\Accounting\CurrencyNormalizationService::class)->getBaseCurrencyId();
+            $lims_purchase_data->exchange_rate = 1;
             $lims_purchase_data->item = 0;
             $lims_purchase_data->total_qty = 0;
             $lims_purchase_data->total_discount = 0;
@@ -157,6 +180,10 @@ class SupplierController extends Controller
             $lims_purchase_data->paid_amount = 0;
             $lims_purchase_data->purchase_type = 'Opening balance';
             $lims_purchase_data->save();
+
+            if (!$this->accountingService->recordSupplierOpeningBalance($create_supplier)->isSuccess()) {
+                throw new \RuntimeException('Supplier opening balance accounting posting failed.');
+            }
         }
 
         $message = 'Supplier';
@@ -164,6 +191,31 @@ class SupplierController extends Controller
             Customer::create($lims_supplier_data);
             $message .= ' and Customer';
         }
+
+        if ($request->has('gstin') || $request->has('state_id') || $request->has('registration_type')) {
+            \Modules\IndiaGST\Entities\IndiaGstSupplierProfile::updateOrCreate(
+                ['supplier_id' => $create_supplier->id],
+                [
+                    'registration_type' => $request->input('registration_type', 'regular'),
+                    'gstin' => $request->input('gstin', $request->input('vat_number')),
+                    'state_id' => $request->input('state_id'),
+                    'is_sez' => (bool)$request->input('is_sez', false),
+                    'pan' => $request->input('pan'),
+                ]
+            );
+        }
+
+        DB::commit();
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Supplier creation failed: ' . $e->getMessage());
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['error' => $e->getMessage()], 500);
+            }
+            return redirect()->back()->with('not_permitted', 'Supplier creation failed: ' . $e->getMessage());
+        }
+
         $mail_setting = MailSetting::latest()->first();
         if ($lims_supplier_data['email'] && $mail_setting) {
             $this->setMailInfo($mail_setting);
@@ -176,6 +228,20 @@ class SupplierController extends Controller
                 $message .= ' created successfully. Please setup your <a href="setting/mail_setting">mail setting</a> to send mail.';
             }
         }
+
+        // if ajax - from create purchase page
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'id'      => $create_supplier->id,
+                'name'    => $create_supplier->name, 
+                'company_name' => $create_supplier->company_name,
+                'pay_term_no' => $create_supplier->pay_term_no, 
+                'pay_term_period' => $create_supplier->pay_term_period,
+                'type'    => 'supplier'
+            ]);
+        }
+
         return redirect('supplier')->with('message', $message);
     }
 
@@ -199,6 +265,8 @@ class SupplierController extends Controller
         if ($total_purchase_amount == 0) {
             $total_paid = Payment::join('purchases', 'purchases.id', '=', 'payments.purchase_id')
                 ->where('purchases.supplier_id', $supplier->id)
+                ->whereNull('payments.return_id')
+                ->whereNull('payments.purchase_return_id')
                 ->whereNull('purchases.deleted_at')
                 ->sum('payments.amount');
             $balance_due = $opening_balance - $total_paid;
@@ -206,18 +274,23 @@ class SupplierController extends Controller
 
             $total_paid = Payment::join('purchases', 'purchases.id', '=', 'payments.purchase_id')
                 ->where('purchases.supplier_id', $supplier->id)
+                ->whereNull('payments.return_id')
+                ->whereNull('payments.purchase_return_id')
                 ->whereNull('purchases.deleted_at')
                 ->sum('payments.amount');
 
-            $total_returns = ReturnPurchase::where('supplier_id', $supplier->id)->sum('grand_total');
+            $total_returns = $this->actualPurchaseReturnTotalForSupplier($supplier->id);
 
             $balance_due = $opening_balance + $total_purchase_amount - $total_returns - $total_paid;
         }
 
+        $net_purchase = $total_purchase_amount - $total_returns;
+
         return view('backend.supplier.view', [
             'lims_supplier_data' => $supplier,
             'opening_balance' => $opening_balance,
-            'total_purchase' => $total_purchases,
+            'total_purchase' => $total_purchase_amount,
+            'net_purchase' => $net_purchase,
             'total_paid' => $total_paid,
             'total_returns' => $total_returns,
             'balance_due' => $balance_due,
@@ -239,43 +312,78 @@ class SupplierController extends Controller
         });
 
         // Supplier Payments (must check correct column)
-        $payments = [];
-        foreach ($purchases as $purchase) {
-            $purchasePayments = Payment::where('purchase_id', $purchase['id'])->get()->map(function ($p) {
-                return [
-                    'id'        => $p->id,
-                    'date'      => $p->date ?? $p->created_at->format('Y-m-d'),
-                    'type'      => 'Payment',
-                    'reference' => $p->payment_reference ?? '-',
-                    'debit'     => 0,
-                    'credit'    => floatval($p->amount),
-                ];
-            })->toArray(); // convert collection to array
+        // $payments = [];
+        // foreach ($purchases as $purchase) {
+        //     $purchasePayments = Payment::where('purchase_id', $purchase['id'])->get()->map(function ($p) {
+        //         return [
+        //             'id'        => $p->id,
+        //             'date'      => $p->date ?? $p->created_at->format('Y-m-d'),
+        //             'type'      => 'Payment',
+        //             'reference' => $p->payment_reference ?? '-',
+        //             'debit'     => 0,
+        //             'credit'    => floatval($p->amount),
+        //         ];
+        //     })->toArray(); // convert collection to array
 
-            $payments = array_merge($payments, $purchasePayments);
-        }
+        //     $payments = array_merge($payments, $purchasePayments);
+        // }
+        $payments = Payment::whereIn('purchase_id', $purchases->pluck('id'))
+                    ->whereNull('return_id')
+                    ->whereNull('purchase_return_id')
+                    ->get()
+                    ->map(function ($p) {
+                        return [
+                            'id'        => $p->id,
+                            'date'      => $p->date ?? $p->created_at,
+                            'type'      => 'Payment',
+                            'reference' => $p->payment_reference ?? '-',
+                            'debit'     => 0,
+                            'credit'    => floatval($p->amount),
+                        ];
+                    });
 
         // Supplier Returns (no supplier_id directly → join through purchase)
-        $returns = ReturnPurchase::where('supplier_id', $id)->get()->map(function ($r) {
+        $returns = ReturnPurchase::with('refundPayments')->where('supplier_id', $id)->get()->map(function ($r) {
             return [
                 'id' => $r->id,
                 'date' => $r->created_at,
                 'type' => 'Purchase Return',
                 'reference' => $r->reference_no,
                 'debit' => 0,
-                'credit' => floatval($r->grand_total),
+                'credit' => floatval($r->display_grand_total),
             ];
         });
 
+        $seq = 1;
+
+        $purchases = $purchases->map(function ($row) use (&$seq) {
+            $row['sequence'] = $seq++;
+            return $row;
+        });
+
+        $payments = $payments->map(function ($row) use (&$seq) {
+            $row['sequence'] = $seq++;
+            return $row;
+        });
+
+        $returns = $returns->map(function ($row) use (&$seq) {
+            $row['sequence'] = $seq++;
+            return $row;
+        });
+
         // Merge All
-        $ledger = $purchases->merge($payments)->merge($returns)->sortBy('date')->values()->toArray();
+        $ledger = $purchases->merge($payments)->merge($returns)->sortBy('sequence')->values();
 
         // Running Balance
         $balance = 0;
-        foreach ($ledger as $key => $row) {
-            $balance += ($row['debit'] - $row['credit']); // debit increases payable
-            $ledger[$key]['balance'] = number_format($balance, 2);
-        }
+
+        $ledger = $ledger->map(function ($row) use (&$balance) {
+            $balance += ($row['debit'] - $row['credit']);
+            $row['balance'] = round($balance, 2);
+            return $row;
+        });
+
+        $ledger = $ledger->reverse()->values();
 
         return response()->json(['data' => $ledger]);
     }
@@ -308,11 +416,15 @@ class SupplierController extends Controller
                 }),
             ],
             'image' => 'image|mimes:jpg,jpeg,png,gif|max:100000',
+            'opening_balance' => 'nullable|numeric|min:0',
         ]);
 
-        $lims_supplier_data = Supplier::findOrFail($id);
+        try {
+        DB::beginTransaction();
 
-        $input = $request->except('image');
+        $lims_supplier_data = Supplier::whereKey($id)->lockForUpdate()->firstOrFail();
+
+        $input = $request->except('image', 'opening_balance');
         $image = $request->image;
         if ($image) {
             $this->fileDelete(public_path('images/supplier/'), $lims_supplier_data->image);
@@ -325,7 +437,31 @@ class SupplierController extends Controller
         }
 
         $lims_supplier_data->update($input);
+        if ($request->exists('opening_balance')) {
+            $this->openingBalances->change($lims_supplier_data, (float) ($request->input('opening_balance') ?: 0));
+        }
+
+        if ($request->has('gstin') || $request->has('state_id') || $request->has('registration_type')) {
+            \Modules\IndiaGST\Entities\IndiaGstSupplierProfile::updateOrCreate(
+                ['supplier_id' => $lims_supplier_data->id],
+                [
+                    'registration_type' => $request->input('registration_type', 'regular'),
+                    'gstin' => $request->input('gstin', $request->input('vat_number')),
+                    'state_id' => $request->input('state_id'),
+                    'is_sez' => (bool)$request->input('is_sez', false),
+                    'pan' => $request->input('pan'),
+                ]
+            );
+        }
+
+        DB::commit();
         return redirect('supplier')->with('message', __('db.Data updated successfully'));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Supplier update failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Supplier update failed: ' . $e->getMessage());
+        }
     }
 
     public function deleteBySelection(Request $request)
@@ -342,12 +478,22 @@ class SupplierController extends Controller
 
     public function destroy($id)
     {
+        try {
+        DB::beginTransaction();
+
         $lims_supplier_data = Supplier::findOrFail($id);
         $lims_supplier_data->is_active = false;
         $lims_supplier_data->save();
         $this->fileDelete(public_path('images/supplier/'), $lims_supplier_data->image);
 
+        DB::commit();
         return redirect('supplier')->with('not_permitted', __('db.Data deleted successfully'));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Supplier deletion failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Supplier deletion failed: ' . $e->getMessage());
+        }
     }
 
     public function importSupplier(Request $request)
@@ -420,28 +566,16 @@ class SupplierController extends Controller
 
     public function supplierDue($id)
     {
-        $lims_due_purchase_data = Purchase::where([
-            ['payment_status', 1],
-            ['supplier_id', $id]
-        ])
-            ->whereNull('deleted_at')
-            ->get();
-        $due = 0;
-        foreach ($lims_due_purchase_data as $key => $purchase_data) {
-            $due += ($purchase_data->grand_total - $purchase_data->paid_amount);
-        }
+        $this->authorizeClearDue();
+        Supplier::whereKey($id)->where('is_active', true)->firstOrFail();
 
-        $returned_amount = DB::table('purchases')
-            ->join('return_purchases', 'purchases.id', '=', 'return_purchases.purchase_id')
-            ->where([
-                ['purchases.supplier_id', $id],
-                ['purchases.payment_status', 1]
-            ])
-            ->whereNull('purchases.deleted_at')
-            ->sum('return_purchases.grand_total');
-        $due -= $returned_amount;
+        return response()->json([$this->supplierDuePayments->dueForSupplier((int) $id)]);
+    }
 
-        return response()->json([$due]);
+    private function authorizeClearDue(): void
+    {
+        $role = Role::find(Auth::user()?->role_id);
+        abort_unless($role && $role->hasPermissionTo('suppliers-edit'), 403);
     }
 
     public function supplierPayments($supplier_id)
@@ -449,6 +583,8 @@ class SupplierController extends Controller
         $payments = DB::table('payments')
             ->join('purchases', 'payments.purchase_id', '=', 'purchases.id')
             ->where('purchases.supplier_id', $supplier_id)
+            ->whereNull('payments.return_id')
+            ->whereNull('payments.purchase_return_id')
             ->whereNull('purchases.deleted_at')
             ->select(
                 'payments.id',
@@ -458,8 +594,9 @@ class SupplierController extends Controller
                 'payments.paying_method',
                 'payments.payment_at'
             )
-            ->latest('payments.created_at')
-            ->get()
+            ->latest('payments.created_at');
+        app(\App\Services\WarehouseAccessService::class)->scope($payments, 'purchases.warehouse_id');
+        $payments = $payments->get()
             ->map(function ($payment) {
                 return [
                     'id' => $payment->id,
@@ -472,5 +609,59 @@ class SupplierController extends Controller
             });
 
         return response()->json(['data' => $payments]);
+    }
+
+    public function supplierReturns($id)
+    {
+        $returns = ReturnPurchase::leftJoin('purchases', 'return_purchases.purchase_id', '=', 'purchases.id')
+            ->leftJoin('warehouses', 'return_purchases.warehouse_id', '=', 'warehouses.id')
+            ->leftJoin(DB::raw('(select purchase_return_id, sum(amount) as refunded_amount from payments where purchase_return_id is not null group by purchase_return_id) as purchase_return_refunds'), 'purchase_return_refunds.purchase_return_id', '=', 'return_purchases.id')
+            ->where('return_purchases.supplier_id', $id)
+            ->select(
+                'return_purchases.id',
+                'return_purchases.created_at',
+                'return_purchases.reference_no',
+                'return_purchases.item',
+                'return_purchases.total_qty',
+                DB::raw('COALESCE(purchase_return_refunds.refunded_amount, return_purchases.grand_total) as grand_total'),
+                'return_purchases.return_note',
+                'return_purchases.staff_note',
+                'purchases.reference_no as purchase_reference',
+                'warehouses.name as warehouse_name'
+            )
+            ->latest('return_purchases.created_at')
+            ->get()
+            ->map(function ($return) {
+                return [
+                    'id' => $return->id,
+                    'date' => $return->created_at ? date(config('date_format'), strtotime($return->created_at)) : '-',
+                    'reference' => $return->reference_no ?? '-',
+                    'purchase_reference' => $return->purchase_reference ?? '-',
+                    'warehouse' => $return->warehouse_name ?? '-',
+                    'item' => number_format($return->item ?? 0, 0),
+                    'total_qty' => number_format($return->total_qty ?? 0, cache()->get('general_setting')->decimal),
+                    'grand_total' => number_format($return->grand_total ?? 0, cache()->get('general_setting')->decimal),
+                    'return_note' => $return->return_note ?: '-',
+                    'staff_note' => $return->staff_note ?: '-',
+                ];
+            });
+
+        return response()->json(['data' => $returns]);
+    }
+
+    private function actualPurchaseReturnTotalForPurchase(int $purchaseId): float
+    {
+        return (float) DB::table('return_purchases')
+            ->leftJoin(DB::raw('(select purchase_return_id, sum(amount) as refunded_amount from payments where purchase_return_id is not null group by purchase_return_id) as purchase_return_refunds'), 'purchase_return_refunds.purchase_return_id', '=', 'return_purchases.id')
+            ->where('return_purchases.purchase_id', $purchaseId)
+            ->sum(DB::raw('COALESCE(purchase_return_refunds.refunded_amount, return_purchases.grand_total)'));
+    }
+
+    private function actualPurchaseReturnTotalForSupplier(int $supplierId): float
+    {
+        return (float) DB::table('return_purchases')
+            ->leftJoin(DB::raw('(select purchase_return_id, sum(amount) as refunded_amount from payments where purchase_return_id is not null group by purchase_return_id) as purchase_return_refunds'), 'purchase_return_refunds.purchase_return_id', '=', 'return_purchases.id')
+            ->where('return_purchases.supplier_id', $supplierId)
+            ->sum(DB::raw('COALESCE(purchase_return_refunds.refunded_amount, return_purchases.grand_total)'));
     }
 }

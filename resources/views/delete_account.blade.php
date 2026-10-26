@@ -1,36 +1,29 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 <!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>{{$general_setting->site_title}} - Delete Account</title>
+    <title>{{gen_setting()->site_title}} - Delete Account</title>
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="all,follow">
-    <link rel="manifest" href="{{url('manifest.json')}}">
-    @if(!config('database.connections.saleprosaas_landlord'))
-    <link rel="icon" type="image/png" href="{{url('logo', $general_setting->site_logo)}}" />
+    
+
+    <link rel="icon" type="image/png" href="{{url($asset_prefix . 'logo', gen_setting()->site_logo)}}" />
     <!-- Bootstrap CSS-->
-    <link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
+    <link rel="stylesheet" href="<?php echo asset($asset_prefix . 'vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
     <!-- Font Awesome CSS-->
-    <link rel="preload" href="<?php echo asset('vendor/font-awesome/css/font-awesome.min.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link href="<?php echo asset('vendor/font-awesome/css/font-awesome.min.css') ?>" rel="stylesheet"></noscript>
+    <link rel="preload" href="<?php echo asset($asset_prefix . 'vendor/font-awesome/css/font-awesome.min.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link href="<?php echo asset($asset_prefix . 'vendor/font-awesome/css/font-awesome.min.css') ?>" rel="stylesheet"></noscript>
     <!-- login stylesheet-->
-    <link rel="stylesheet" href="<?php echo asset('css/auth.css') ?>" id="theme-stylesheet" type="text/css">
-    @else
-    <link rel="icon" type="image/png" href="{{url('../../logo', $general_setting->site_logo)}}" />
-    <!-- Bootstrap CSS-->
-    <link rel="stylesheet" href="<?php echo asset('../../vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
-    <!-- Font Awesome CSS-->
-    <link rel="preload" href="<?php echo asset('../../vendor/font-awesome/css/font-awesome.min.css') ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link href="<?php echo asset('../../vendor/font-awesome/css/font-awesome.min.css') ?>" rel="stylesheet"></noscript>
-    <!-- login stylesheet-->
-    <link rel="stylesheet" href="<?php echo asset('../../css/auth.css') ?>" id="theme-stylesheet" type="text/css">
-    @endif
+    <link rel="stylesheet" href="<?php echo asset($asset_prefix . 'css/auth.css') ?>" id="theme-stylesheet" type="text/css">
 
     <!-- Google fonts -->
-    @if($general_setting->font_css)
-      {!! $general_setting->font_css !!}
+    @if(gen_setting()->font_css)
+      {!! gen_setting()->font_css !!}
     @else
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,7 +31,7 @@
     @endif
 
     <!-- Custom CSS from general settings -->
-    {!! $general_setting->auth_css !!}
+    {!! gen_setting()->auth_css !!}
   </head>
   <body>
     <div class="page login-page">
@@ -46,10 +39,10 @@
         <div class="form-outer text-center d-flex align-items-center">
           <div class="form-inner">
             <div class="logo">
-                @if($general_setting->site_logo)
-                <img src="{{url('logo', $general_setting->site_logo)}}" width="110">
+                @if(gen_setting()->site_logo)
+                <img src="{{url('logo', gen_setting()->site_logo)}}" width="110">
                 @else
-                <span>{{$general_setting->site_title}}</span>
+                <span>{{gen_setting()->site_title}}</span>
                 @endif
             </div>
             
@@ -89,17 +82,14 @@
 
           </div>
           <div class="copyrights text-center">
-            <p>{{__('db.Developed By')}} <span class="external">{{$general_setting->developed_by}}</span></p>
+            <p>{{__('db.Developed By')}} <span class="external">{{gen_setting()->developed_by}}</span></p>
           </div>
         </div>
       </div>
     </div>
     
-@if(!config('database.connections.saleprosaas_landlord'))
-<script type="text/javascript" src="<?php echo asset('vendor/jquery/jquery.min.js') ?>"></script>
-@else
-<script type="text/javascript" src="<?php echo asset('../../vendor/jquery/jquery.min.js') ?>"></script>
-@endif
+
+<script type="text/javascript" src="<?php echo asset($asset_prefix . 'vendor/jquery/jquery.min.js') ?>"></script>
 <script>
     $("div.alert").delay(4000).slideUp(800);
 

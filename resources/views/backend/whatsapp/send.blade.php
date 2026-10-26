@@ -1,3 +1,6 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 @extends('backend.layout.main')
 @section('content')
     <x-success-message key="message" />
@@ -110,11 +113,7 @@
 
 
 @push('scripts')
-    @if (!config('database.connections.saleprosaas_landlord'))
-        <script type="text/javascript" src="<?php echo asset('vendor/emoji/vanillaEmojiPicker.js'); ?>"></script>
-    @else
-        <script type="text/javascript" src="<?php echo asset('../../vendor/emoji/vanillaEmojiPicker.js'); ?>"></script>
-    @endif
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/emoji/vanillaEmojiPicker.js') }}"></script>
 
     <script type="text/javascript">
 

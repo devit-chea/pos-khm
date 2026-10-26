@@ -1,4 +1,9 @@
+
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
 
 <style type="text/css">
@@ -14,19 +19,19 @@
 <section>
     <div class="container-fluid">
         @can('sales-add')
-            <a href="{{route('sales.create')}}" class="btn btn-info add-sale-btn btn-icon"><i class="dripicons-plus"></i> {{__('db.Add Sale')}}</a>&nbsp;
+            <a href="{{route('sales.create')}}" class="btn btn-info add-sale-btn btn-icon"><i class="ti ti-plus"></i> {{__('db.Add Sale')}}</a>&nbsp;
         @endcan
         @can('sales-import')
-            <a href="{{url('sales/sale_by_csv')}}" class="btn btn-primary add-sale-btn btn-icon"><i class="dripicons-copy"></i> {{__('db.Import Sale')}}</a>
+            <a href="{{url('sales/sale_by_csv')}}" class="btn btn-primary add-sale-btn btn-icon"><i class="ti ti-copy"></i> {{__('db.Import Sale')}}</a>
         @endcan
         @can('sales-delete')
             <a href="{{ url('sales/deleted_data') }}" class="btn btn-secondary add-sale-btn btn-icon">
-                <i class="dripicons-trash"></i>
+                <i class="ti ti-trash"></i>
                  {{ __('Deleted Sales') }}
             </a>
         @endcan
         <button type="button" class="btn btn-warning btn-icon" id="toggle-filter">
-            <i class="dripicons-experiment"></i> {{ __('db.Filter Sales') }}
+            <i class="ti ti-filter"></i> {{ __('db.Filter Sales') }}
         </button>
         <div class="card mt-3 mb-2">
             <div class="card-body" id="filter-card" style="display: none;">
@@ -52,6 +57,18 @@
                     </div>
                     <div class="col-md-3">
                         <div class="form-group top-fields">
+                            <label>{{ __('db.Sales Agent') }}</label>
+                            <select id="sales-agent-filter" class="selectpicker form-control" data-live-search="true" name="sales_agent_id">
+                                <option value="0">All Staff</option>
+                                @foreach($sales_agent_list as $agent)
+                                    <option value="{{ $agent->id }}">{{ $agent->name }}@if($agent->staff_id) ({{ $agent->staff_id }})@endif</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <div class="form-group top-fields">
                             <label>{{__('db.Sale Status')}}</label>
                             <select id="sale-status" class="form-control" name="sale_status">
                                 <option value="0">{{__('db.All')}}</option>
@@ -59,9 +76,9 @@
                                 <option value="2">{{__('db.Pending')}}</option>
                                 <option value="4">{{__('db.Returned')}}</option>
                                 <option value="5">{{__('db.Processing')}}</option>
-                                @if(in_array('restaurant',explode(',',$general_setting->modules)))
-                                <option value="6">{{__('db.Cooked')}}</option>
-                                @endif
+                                @module('restaurant')
+                                <option value="6">{{__('db.cooked')}}</option>
+                                @endmodule
                             </select>
                         </div>
                     </div>
@@ -110,16 +127,49 @@
                         </div>
                     </div>
 
-                    <div class="col-md-3 @if(!in_array('ecommerce',explode(',',$general_setting->modules))) d-none @endif">
+                    @php
+                        $moduleAccess = app(\App\Services\ModuleAccessService::class);
+                        $canAccessEcommerce = $moduleAccess->userCanAccess(auth()->user(), 'ecommerce');
+                        $canAccessTailoring = $moduleAccess->userCanAccess(auth()->user(), 'tailoring');
+                        $canAccessSocialCommerce = $moduleAccess->userCanAccess(auth()->user(), 'socialcommerce');
+                        $showSaleType = $canAccessEcommerce || $canAccessTailoring || $canAccessSocialCommerce;
+                    @endphp
+                    <div class="col-md-3 @if(!$showSaleType) d-none @endif">
                         <div class="form-group top-fields">
                             <label>{{__('db.Sale Type')}}</label>
                             <select id="sale-type" class="form-control" name="sale_type">
                                 <option value="0">{{__('db.All')}}</option>
                                 <option value="pos">{{__('db.POS')}}</option>
+                                @if($canAccessEcommerce)
                                 <option value="online">{{__('db.eCommerce')}}</option>
+                                @endif
+                                @if($canAccessTailoring)
+                                <option value="tailoring">{{__('db.tailoring')}}</option>
+                                @endif
+                                @if($canAccessSocialCommerce)
+                                <option value="social_commerce">{{ __('db.Social Commerce') }}</option>
+                                @endif
                             </select>
                         </div>
                     </div>
+                    @module('socialcommerce')
+                    @if(\Modules\SocialCommerce\Entities\SocialCommerceSetting::first()->is_active ?? false)
+                    <div class="col-md-3">
+                        <div class="form-group top-fields">
+                            <label>{{ __('db.Social Channel') }}</label>
+                            <select id="social-channel" class="form-control" name="social_channel">
+                                <option value="0">{{ __('db.All Channels') }}</option>
+                                <option value="whatsapp">{{ __('db.WhatsApp') }}</option>
+                                <option value="facebook">{{ __('db.Facebook') }}</option>
+                                <option value="instagram">{{ __('db.Instagram') }}</option>
+                                <option value="telegram">{{ __('db.Telegram') }}</option>
+                                <option value="qr">{{ __('db.QR Code') }}</option>
+                                <option value="direct">{{ __('db.Direct') }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    @endif
+                    @endmodule
                     <div id="filter-loading" class="col-12 text-center my-2" style="display:none;">
                         <span class="spinner-border text-primary spinner-border-sm" role="status"></span>
                         <span>Loading results...</span>
@@ -139,19 +189,21 @@
                     <th>{{__('db.Created By')}}</th>
                     <th>{{__('db.customer')}}</th>
                     <th>{{__('db.Warehouse')}}</th>
-                    @if ($general_setting->show_products_details_in_sales_table)
+                    @if (gen_setting()->show_products_details_in_sales_table)
                         <th>{{__('db.Products')}}</th>
                         <th>{{__('db.Quantity')}}</th>
                     @endif
                     <th>{{__('db.Sale Status')}}</th>
                     <th>{{__('db.Payment Status')}}</th>
-                    <th>{{__('db.Payment Method')}}</th>
+                    <th>{{__('db.Payment Method')}}({{ config('currency') }})</th>
                     <th>{{__('db.Currency')}}/{{__('db.Exchange Rate')}}</th>
                     <th>{{__('db.Delivery Status')}}</th>
-                    <th>{{__('db.grand total')}}</th>
-                    <th>{{__('db.Returned Amount')}}</th>
-                    <th>{{__('db.Paid')}}</th>
-                    <th>{{__('db.Due')}}</th>
+                    <th>{{__('db.Tax')}} ({{ config('currency') }})</th>
+                    <th>{{__('db.Order Tax')}} ({{ config('currency') }})</th>
+                    <th>{{__('db.grand total')}} ({{ config('currency') }})</th>
+                    <th>{{__('db.Returned Amount')}} ({{ config('currency') }})</th>
+                    <th>{{__('db.Paid')}} ({{ config('currency') }})</th>
+                    <th>{{__('db.Due')}} ({{ config('currency') }})</th>
                     @foreach($custom_fields as $fieldName)
                     <th>{{$fieldName}}</th>
                     @endforeach
@@ -167,10 +219,12 @@
                 <th></th>
                 <th></th>
                 <th></th>
-                @if ($general_setting->show_products_details_in_sales_table)
+                @if (gen_setting()->show_products_details_in_sales_table)
                     <th></th>
                     <th></th>
                 @endif
+                <th></th>
+                <th></th>
                 <th></th>
                 <th></th>
                 <th></th>
@@ -188,59 +242,44 @@
     </div>
 </section>
 
-<div id="sale-details" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" class="modal fade text-left">
-    <div role="document" class="modal-dialog">
+@can('sales-edit')
+<div id="sales-agent-modal" tabindex="-1" role="dialog" class="modal fade text-left">
+    <div role="document" class="modal-dialog modal-sm">
         <div class="modal-content">
-            <div class="container mt-3 pb-2 border-bottom">
-                <div class="row">
-                    <div class="col-md-6 d-print-none">
-                        <button id="print-btn" type="button" class="btn btn-default btn-sm"><i class="dripicons-print"></i> {{__('db.Print')}}</button>
-
-                        <form action="{{ route('sale.sendmail') }}" method="POST" class="sendmail-form">
-                            @csrf
-                            <input type="hidden" name="sale_id">
-                            <button class="btn btn-default btn-sm d-print-none"><i class="dripicons-mail"></i> {{__('db.Email')}}</button>
-                        </form>
-                    </div>
-                    <div class="col-md-6 d-print-none">
-                        <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="col-md-4 text-left">
-                        <img src="{{url('logo', $general_setting->site_logo)}}" width="90px;">
-                    </div>
-                    <div class="col-md-4 text-center">
-                        <h3 id="exampleModalLabel" class="modal-title container-fluid">{{$general_setting->site_title}}</h3>
-                    </div>
-                    <div class="col-md-4 text-right">
-                        <i style="font-size: 15px;">{{__('db.Sale Details')}}</i>
+            <div class="modal-header">
+                <h5 class="modal-title">{{ __('db.Assign Sales Agent') }}</h5>
+                <button type="button" data-dismiss="modal" class="close"><span>&times;</span></button>
+            </div>
+            <form id="sales-agent-form">
+                @csrf
+                @method('PATCH')
+                <div class="modal-body">
+                    <input type="hidden" id="sales-agent-sale-id">
+                    <div class="form-group">
+                        <label>Staff</label>
+                        <select id="sales-agent-modal-select" class="selectpicker form-control" data-live-search="true">
+                            <option value="">Unassigned</option>
+                            @foreach($sales_agent_list as $agent)
+                                <option value="{{ $agent->id }}">{{ $agent->name }}@if($agent->staff_id) ({{ $agent->staff_id }})@endif</option>
+                            @endforeach
+                        </select>
                     </div>
                 </div>
-            </div>
-            <div id="sale-content" class="modal-body">
-            </div>
-            <br>
-            <div class="table-responsive">
-                <table class="table table-bordered product-sale-list">
-                    <thead>
-                        <th>#</th>
-                        <th>{{__('db.product')}}</th>
-                        <th>{{__('db.Batch No')}}</th>
-                        <th>{{__('db.qty')}}</th>
-                        <th>{{__('db.Returned')}}</th>
-                        <th>{{__('db.Unit Price')}}</th>
-                        <th>{{__('db.Tax')}}</th>
-                        <th>{{__('db.Discount')}}</th>
-                        <th>{{__('db.Subtotal')}}</th>
-                        <th>{{__('db.Delivered')}}</th>
-                    </thead>
-                    <tbody>
-                    </tbody>
-                </table>
-            </div>
-            <div id="sale-footer" class="modal-body"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+@endcan
+
+@include('backend.sale.sale_details_modal')
+
+{{-- Load JsBarcode + QRCode libraries --}}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 
 <!-- Packing Slip modal -->
 <div id="packing-slip-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" class="modal fade text-left">
@@ -288,7 +327,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{__('db.All')}} {{__('db.Payment')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
                 <table class="table table-hover payment-list">
@@ -317,7 +356,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{__('db.Update Payment')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
                 <form action="{{ route('sale.update-payment') }}" method="POST" class="payment-form">
@@ -333,10 +372,10 @@
                         </div>
                         <div class="col-md-4">
                             <label>{{__('db.Change')}} : </label>
-                            <p class="change ml-2">{{number_format(0, $general_setting->decimal, '.', '')}}</p>
+                            <p class="change ml-2">{{number_format(0, gen_setting()->decimal, '.', '')}}</p>
                         </div>
                         <?php
-                            $payment_methods = explode(',', $lims_pos_setting_data->payment_options);
+                            $payment_methods = $lims_pos_setting_data ? explode(',', $lims_pos_setting_data->payment_options) : [];
                         ?>
                         <div class="col-md-4">
                             <label>{{__('db.Paid By')}}</label>
@@ -430,7 +469,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Delivery')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
                 <form action="{{ route('delivery.store') }}" method="POST" enctype="multipart/form-data">
@@ -481,7 +520,7 @@
                         <textarea rows="3" name="address" class="form-control" required></textarea>
                     </div>
                     <div class="col-md-6 form-group">
-                        <label>{{__('db.Note')}}</label>
+                        <label>{{__('db.note')}}</label>
                         <textarea rows="3" name="note" class="form-control"></textarea>
                     </div>
                 </div>
@@ -498,8 +537,8 @@
     <div role="document" class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 id="exampleModalLabel" class="modal-title">{{__('db.SteadFast Delivery')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <h5 id="exampleModalLabel" class="modal-title">{{__('db.steadfast_delivery')}}</h5>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
                 <form method="POST" id="steadfastForm">
@@ -518,11 +557,11 @@
                         <input type="text" name="recipient_phone" class="form-control">
                     </div>
                     <div class="col-md-6 mt-2 form-group">
-                        <label>{{__('db.Alternative Phone')}}</label>
+                        <label>{{__('db.alternative_phone')}}</label>
                         <input type="text" name="alternative_phone" class="form-control">
                     </div>
                     <div class="col-md-6 form-group">
-                        <label>{{__('db.Email')}}</label>
+                        <label>{{__('db.email')}}</label>
                         <input type="email" name="recipient_email" class="form-control">
                     </div>
                     <div class="col-md-6 form-group">
@@ -538,7 +577,7 @@
                         <textarea rows="3" name="item_description" class="form-control"></textarea>
                     </div>
                     <div class="col-md-6 form-group">
-                        <label>{{__('db.Note')}}</label>
+                        <label>{{__('db.note')}}</label>
                         <textarea rows="3" name="note" class="form-control"></textarea>
                     </div>
                 </div>
@@ -555,8 +594,8 @@
     <div role="document" class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 id="exampleModalLabel" class="modal-title">{{__('db.SteadFast Delivery')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <h5 id="exampleModalLabel" class="modal-title">{{__('db.steadfast_delivery')}}</h5>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
                 <div class="row">
@@ -575,7 +614,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{__('db.Send SMS')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
                 <form action="{{ route('sale.sendsms') }}" method="post">
@@ -605,6 +644,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $('#toggle-filter').on('click', function() {
@@ -617,7 +657,7 @@
 
     @if(config('database.connections.saleprosaas_landlord'))
         if(localStorage.getItem("message")) {
-            alert(localStorage.getItem("message"));
+            SaleProToast.show(localStorage.getItem("message"));
             localStorage.removeItem("message");
         }
 
@@ -625,7 +665,7 @@
         $.ajax({
             type: 'GET',
             async: false,
-            url: '{{route("package.fetchData", $general_setting->package_id)}}',
+            url: '{{route("package.fetchData", gen_setting()->package_id)}}',
             success: function(data) {
                 if(data['number_of_invoice'] > 0 && data['number_of_product'] <= numberOfInvoice) {
                     $("a.add-sale-btn").addClass('d-none');
@@ -634,7 +674,7 @@
         });
     @endif
 
-    var show_products_details = <?php echo json_encode($general_setting->show_products_details_in_sales_table) ?>;
+    var show_products_details = <?php echo json_encode(gen_setting()->show_products_details_in_sales_table) ?>;
     let columns = [
         { "data": "key" },
         { "data": "options" },
@@ -660,6 +700,8 @@
         { "data": "payment_method" },
         { "data": "currency" },
         { "data": "delivery_status" },
+        { "data": "total_tax" },
+        { "data": "order_tax" },
         { "data": "grand_total" },
         { "data": "returned_amount" },
         { "data": "paid_amount" },
@@ -681,7 +723,7 @@
         var reward_point_setting = <?php echo json_encode($lims_reward_point_setting_data) ?>;
     @endif
     var sale_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified')) ?>;
     var starting_date = <?php echo json_encode($starting_date); ?>;
     var ending_date = <?php echo json_encode($ending_date); ?>;
     var warehouse_id = <?php echo json_encode($warehouse_id); ?>;
@@ -689,6 +731,7 @@
     var payment_status = <?php echo json_encode($payment_status); ?>;
     var sale_type = <?php echo json_encode($sale_type); ?>;
     var payment_method = <?php echo json_encode($payment_method); ?>;
+    var sales_agent_id = <?php echo json_encode($sales_agent_id); ?>;
     var balance = {};
     var expired_date = {};
     @foreach($lims_gift_card_list as $gift_card)
@@ -704,7 +747,7 @@
     var payment_note = [];
     var account = [];
     var deposit;
-    var without_stock = <?php echo json_encode($general_setting->without_stock) ?>;
+    var without_stock = <?php echo json_encode(gen_setting()->without_stock) ?>;
 
     $.ajaxSetup({
         headers: {
@@ -718,6 +761,7 @@
     $("#sale-type").val(sale_type);
     $("#payment-method").val(payment_method);
     $("#installment-filter").val(0);
+    $('#sales-agent-filter').val(String(sales_agent_id || 0)).selectpicker('refresh');
 
     $(function () {
         $('#payment_at').datepicker({
@@ -739,14 +783,36 @@
 
     $('.selectpicker').selectpicker('refresh');
 
-    $(document).on("click", "tr.sale-link td:not(:first-child, :nth-child(2))", function() {
-        var sale = $(this).parent().data('sale');
-        saleDetails(sale);
+    $(document).on("click", "tr.sale-link td:not(:first-child, :nth-child(2), :last-child)", function() {
+        var tr   = $(this).closest('tr');
+        var sale_id = tr.data('sale');          // DataTable row array — used only to get the ID
+
+        $.ajax({
+            url: '{{url("sales/get-sale")}}/' + sale_id,
+            type: 'GET',
+            success: function(sale) {
+                saleDetails(sale, tr);
+            },
+            error: function(xhr, status, error) {
+                SaleProToast.show('Error loading sale details: ' + error);
+            }
+        });
     });
 
     $(document).on("click", ".view", function(){
-        var sale = $(this).parent().parent().parent().parent().parent().data('sale');
-        saleDetails(sale);
+        var tr   = $(this).closest('tr');
+        var sale_id = tr.data('sale');          // DataTable row array — used only to get the ID
+
+        $.ajax({
+            url: '{{url("sales/get-sale")}}/' + sale_id,
+            type: 'GET',
+            success: function(sale) {
+                saleDetails(sale, tr);
+            },
+            error: function(xhr, status, error) {
+                SaleProToast.show('Error loading sale details: ' + error);
+            }
+        });
     });
 
     $(document).on("click", ".gen-invoice", function(e){
@@ -770,7 +836,7 @@
         $("#packing-slip-modal input[name=sale_id]").val(id);
         $.get('sales/get-sold-items/'+id, function (data) {
             if(data == 'All the items of this sale has already been packed') {
-                alert(data);
+                SaleProToast.show(data);
                 $("#packing-slip-modal").modal('hide');
             }
             else {
@@ -821,22 +887,29 @@
     });
 
     $(document).on("click", "#print-btn", function() {
+        if ($(this).attr('data-fiscal-required') === '1') {
+            var fiscalUrl = $(this).attr('data-fiscal-invoice-url');
+            if (fiscalUrl) window.location.assign(fiscalUrl);
+            else SaleProToast.error('The verified fiscal invoice is unavailable. Do not print this details preview.');
+            return;
+        }
         var divContents = document.getElementById("sale-details").innerHTML;
-        //console.log(divContents);
+        var styleContents = document.getElementById("invoice-style").innerHTML;
         var a = window.open('');
-        a.document.write('<html>');
-        a.document.write('<body>');
-        a.document.write('<style>body{line-height: 1.15;-webkit-text-size-adjust: 100%;}.d-print-none{display:none}.text-left{text-align:left}.text-center{text-align:center}.text-right{text-align:right}.row{width:100%;margin-right: -15px;margin-left: -15px;}.col-md-12{width:100%;display:block;padding: 5px 15px;}.col-md-6{width: 50%;float:left;padding: 5px 15px;}table{width:100%;margin-top:30px;}th{text-aligh:left}td{padding:10px}table,th,td{border: 1px solid black; border-collapse: collapse;}</style><style>@media print {.modal-dialog { max-width: 1000px;} }</style>');
+        a.document.write('<html><head>');
+        a.document.write('<style>' + styleContents + '</style>');
+        a.document.write('<style>body{font-family: sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact;} .d-print-none{display:none;} table{width:100%; border-collapse:collapse;} </style>');
+        a.document.write('</head><body style="padding: 20px;">');
         a.document.write(divContents);
         a.document.write('</body></html>');
         a.document.close();
-        a.print();
-        setTimeout(function(){a.close();},10);
-        //setTimeout(function(){a.print();},20);
-        //a.print();
+        setTimeout(function(){
+            a.print();
+            setTimeout(function(){a.close();}, 100);
+        }, 200);
     });
 
-    $(document).on("click", "table.sale-list tbody .add-payment", function() {
+    $(document).on("click", "table.sale-list tbody .add-payment, #inv-action-bar .add-payment", function() {
         $("#cheque").hide();
         $(".gift-card").hide();
         $(".card-element").hide();
@@ -849,26 +922,26 @@
         const currency_name = $(this).data('currency_name');
         const exchange_rate = parseFloat($(this).data('exchange_rate')) || 1;
 
-        // rowindex = $(this).closest('tr').index();
-        // deposit = $('table.sale-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.deposit').val();
-        // var sale_id = $(this).data('id').toString();
+        var tr = $(this).closest('tr');
+        if(tr.length) {
+            rowindex = tr.index();
+            deposit = tr.find('.deposit').val();
+        } else {
+            deposit = $(this).attr('data-deposit');
+        }
 
-        // let currency_id = $(this).data('currency_id');
-        // let currency_name = $(this).data('currency_name');
-        // let exchange_rate = parseFloat($(this).data('exchange_rate')) || 1;
-
-        // // if(show_products_details == 1){
-        // //     var balance = $('table.sale-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(16)').text();
-        // // }else{
-        // //     var balance = $('table.sale-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('td:nth-child(12)').text();
-        // // }
-        // var sale = $('table.sale-list tbody tr:nth-child(' + (rowindex + 1) + ')').data('sale');
-        // balance = sale[21] - sale[22];
 
         $('input[name="paying_amount"]').val(balance);
         $('#add-payment input[name="balance"]').val(balance);
         $('input[name="amount"]').val(balance);
         $('input[name="sale_id"]').val(sale_id);
+
+        // Generate idempotency key for field collection approval if missing
+        if (!$('#add-payment form input[name="idempotency_key"]').length) {
+            $('#add-payment form').append('<input type="hidden" name="idempotency_key">');
+        }
+        $('#add-payment form input[name="idempotency_key"]').val(crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36));
+
         // Fill readonly currency info
         $('#currency_display').text(currency_name);
         $('#exchange_rate_display').text(exchange_rate.toFixed(2));
@@ -878,9 +951,14 @@
         $('#exchange_rate').val(exchange_rate);
     });
 
-    $(document).on("click", "table.sale-list tbody .get-payment", function(event) {
-        rowindex = $(this).closest('tr').index();
-        deposit = $('table.sale-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.deposit').val();
+    $(document).on("click", "table.sale-list tbody .get-payment, #inv-action-bar .get-payment", function(event) {
+        var tr = $(this).closest('tr');
+        if(tr.length) {
+            rowindex = tr.index();
+            deposit = tr.find('.deposit').val();
+        } else {
+            deposit = $(this).attr('data-deposit');
+        }
         var id = $(this).data('id').toString();
         $.get('sales/getpayment/' + id, function(data) {
             $(".payment-list tbody").remove();
@@ -915,15 +993,15 @@
                 cols += '<td>' + paying_method[index] + '</td>';
                 cols += '<td>' + payment_at[index] + '</td>';
                 cols += '<td><div class="btn-group"><button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">{{__("db.action")}}<span class="caret"></span><span class="sr-only">Toggle Dropdown</span></button><ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">';
-                cols += '<li><a href="{{ url("sales/payment-receipt")}}/' + payment_id[index] + '" target="_blank"><button type="button" class="btn btn-link"><i class="dripicons-document-new"></i> {{__("db.payment_receipt")}}</button></a></li> ';
+                cols += '<li><a href="{{ url("sales/payment-receipt")}}/' + payment_id[index] + '" target="_blank"><button type="button" class="btn btn-link"><i class="ti ti-file-type-xls"></i> {{__("db.payment_receipt")}}</button></a></li> ';
                 if(paying_method[index] == 'QR Code' && all_permission.indexOf("sale-payment-edit") != -1)
-                    cols += '<li><a href="{{url("frontend/images/payment-proof")}}/'+payment_proof+'" target="_blank"><button type="button" class="btn btn-link"><i class="fa fa-eye"></i> {{__("db.Payment Proof")}}</button></a></li> ';
+                    cols += '<li><a href="{{url("frontend/images/payment-proof")}}/'+payment_proof+'" target="_blank"><button type="button" class="btn btn-link"><i class="ti ti-eye"></i> {{__("db.payment_proof")}}</button></a></li> ';
                 if(payment_document[index])
-                    cols += '<li><a href="{{url("documents/add-payment")}}/'+payment_document[index]+'" target="_blank"><button type="button" class="btn btn-link"><i class="fa fa-file"></i> {{__("db.View Document")}}</button></a></li> ';
+                    cols += '<li><a href="{{url("documents/add-payment")}}/'+payment_document[index]+'" target="_blank"><button type="button" class="btn btn-link"><i class="ti ti-file"></i> {{__("db.View Document")}}</button></a></li> ';
                 if(paying_method[index] != 'Paypal' && all_permission.indexOf("sale-payment-edit") != -1)
-                    cols += '<li><button type="button" class="btn btn-link edit-btn" data-id="' + payment_id[index] +'" data-installment_id="' + installment_id[index] + '" data-clicked=false data-toggle="modal" data-target="#edit-payment"><i class="dripicons-document-edit"></i> {{__("db.edit")}}</button></li> ';
+                    cols += '<li><button type="button" class="btn btn-link edit-btn" data-id="' + payment_id[index] +'" data-installment_id="' + installment_id[index] + '" data-clicked=false data-toggle="modal" data-target="#edit-payment"><i class="ti ti-edit"></i> {{__("db.edit")}}</button></li> ';
                 if(all_permission.indexOf("sale-payment-delete") != -1)
-                    cols += '<form action="{{ route("sale.delete-payment") }}" method="POST">'+'@csrf'+'<li><input type="hidden" name="id" value="' + payment_id[index] + '" /> <input type="hidden" name="installment_id" value="' + installment_id[index] + '" /> <button type="submit" class="btn btn-link" onclick="return confirmPaymentDelete()"><i class="dripicons-trash"></i> {{__("db.delete")}}</button></li></form>';
+                    cols += '<form action="{{ route("sale.delete-payment") }}" method="POST">'+'@csrf'+'<li><input type="hidden" name="id" value="' + payment_id[index] + '" /> <input type="hidden" name="installment_id" value="' + installment_id[index] + '" /> <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> {{__("db.delete")}}</button></li></form>';
                 cols += '</ul></div></td>';
                 newRow.append(cols);
                 newBody.append(newRow);
@@ -1025,7 +1103,7 @@
             if(id == 6){
                 // console.log('paid_by_id', deposit, $('#add-payment input[name="amount"]').val());
                 if($('#add-payment input[name="amount"]').val() > parseFloat(deposit))
-                    alert('Amount exceeds customer deposit! Customer deposit : ' + deposit);
+                    SaleProToast.show('Amount exceeds customer deposit! Customer deposit : ' + deposit);
             }
             else if(id==7) {
                 pointCalculation($('#add-payment input[name="amount"]').val());
@@ -1036,36 +1114,40 @@
     $('#add-payment select[name="gift_card_id"]').on("change", function() {
         var id = $(this).val();
         if(expired_date[id] < current_date)
-            alert('This card is expired!');
+            SaleProToast.show('This card is expired!');
         else if($('#add-payment input[name="amount"]').val() > balance[id]){
-            alert('Amount exceeds card balance! Gift Card balance: '+ balance[id]);
+            SaleProToast.show('Amount exceeds card balance! Gift Card balance: '+ balance[id]);
         }
     });
 
-    $('input[name="paying_amount"]').on("input", function() {
-        $(".change").text(parseFloat( $(this).val() - $('input[name="amount"]').val() ).toFixed({{$general_setting->decimal}}));
+    $('input[name="paying_amount"]').on("focusout", function() {
+        if( $(this).val() < parseFloat($('input[name="amount"]').val()) ) {
+            $('input[name="amount"]').val($(this).val());
+        } else{
+            $(".change").text(parseFloat( $(this).val() - $('input[name="amount"]').val() ).toFixed({{gen_setting()->decimal}}));
+        }
     });
 
     $('input[name="amount"]').on("input", function() {
         if( $(this).val() > parseFloat($('input[name="paying_amount"]').val()) ) {
-            alert('Paying amount cannot be bigger than recieved amount');
+            SaleProToast.show('Paying amount cannot be bigger than recieved amount');
             $(this).val('');
         }
         else if( $(this).val() > parseFloat($('input[name="balance"]').val()) ) {
-            alert('Paying amount cannot be bigger than due amount');
+            SaleProToast.show('Paying amount cannot be bigger than due amount');
             $(this).val('');
         }
-        $(".change").text(parseFloat($('input[name="paying_amount"]').val() - $(this).val()).toFixed({{$general_setting->decimal}}));
+        $(".change").text(parseFloat($('input[name="paying_amount"]').val() - $(this).val()).toFixed({{gen_setting()->decimal}}));
         var id = $('#add-payment select[name="paid_by_id"]').val();
         var amount = $(this).val();
         if(id == 2){
             id = $('#add-payment select[name="gift_card_id"]').val();
             if(amount > balance[id])
-                alert('Amount exceeds card balance! Gift Card balance: '+ balance[id]);
+                SaleProToast.show('Amount exceeds card balance! Gift Card balance: '+ balance[id]);
         }
         else if(id == 6){
             if(amount > parseFloat(deposit))
-                alert('Amount exceeds customer deposit! Customer deposit : ' + deposit);
+                SaleProToast.show('Amount exceeds customer deposit! Customer deposit : ' + deposit);
         }
         else if(id==7) {
             pointCalculation(amount);
@@ -1102,7 +1184,7 @@
             $('.gift-card').hide();
             if(id == 6) {
                 if($('input[name="edit_amount"]').val() > parseFloat(deposit))
-                    alert('Amount exceeds customer deposit! Customer deposit : ' + deposit);
+                    SaleProToast.show('Amount exceeds customer deposit! Customer deposit : ' + deposit);
             }
             else if(id==7) {
                 pointCalculation($('input[name="edit_amount"]').val());
@@ -1113,37 +1195,37 @@
     $('#edit-payment select[name="gift_card_id"]').on("change", function() {
         var id = $(this).val();
         if(expired_date[id] < current_date)
-            alert('This card is expired!');
+            SaleProToast.show('This card is expired!');
         else if($('#edit-payment input[name="edit_amount"]').val() > balance[id])
-            alert('Amount exceeds card balance! Gift Card balance: '+ balance[id]);
+            SaleProToast.show('Amount exceeds card balance! Gift Card balance: '+ balance[id]);
     });
 
     $('input[name="edit_paying_amount"]').on("input", function() {
-        $(".change").text(parseFloat( $(this).val() - $('input[name="edit_amount"]').val() ).toFixed({{$general_setting->decimal}}));
+        $(".change").text(parseFloat( $(this).val() - $('input[name="edit_amount"]').val() ).toFixed({{gen_setting()->decimal}}));
     });
 
     $('input[name="edit_amount"]').on("input", function() {
         if( $(this).val() > parseFloat($('input[name="edit_paying_amount"]').val()) ) {
-            alert('Paying amount cannot be bigger than recieved amount');
+            SaleProToast.show('Paying amount cannot be bigger than recieved amount');
             $(this).val('');
         }
-        $(".change").text(parseFloat($('input[name="edit_paying_amount"]').val() - $(this).val()).toFixed({{$general_setting->decimal}}));
+        $(".change").text(parseFloat($('input[name="edit_paying_amount"]').val() - $(this).val()).toFixed({{gen_setting()->decimal}}));
         var amount = $(this).val();
         var id = $('#edit-payment select[name="gift_card_id"]').val();
         if(amount > balance[id]){
-            alert('Amount exceeds card balance! Gift Card balance: '+ balance[id]);
+            SaleProToast.show('Amount exceeds card balance! Gift Card balance: '+ balance[id]);
         }
         var id = $('#edit-payment select[name="edit_paid_by_id"]').val();
         if(id == 6){
             if(amount > parseFloat(deposit))
-                alert('Amount exceeds customer deposit! Customer deposit : ' + deposit);
+                SaleProToast.show('Amount exceeds customer deposit! Customer deposit : ' + deposit);
         }
         else if(id==7) {
             pointCalculation(amount);
         }
     });
 
-    $(document).on("click", "table.sale-list tbody .add-delivery", function(event) {
+    $(document).on("click", "table.sale-list tbody .add-delivery, #inv-action-bar .add-delivery", function(event) {
         var id = $(this).data('id').toString();
         $.get('delivery/create/'+id, function(data) {
             $('#dr').text(data[0]);
@@ -1212,19 +1294,19 @@
                     $('#sale-table').DataTable().ajax.reload();
                     $('#steadfast-delivery').modal('hide');
                 } else {
-                    alert(response.message || "Failed to place order.");
+                    SaleProToast.show(response.message || "Failed to place order.");
                 }
             },
             error: function(xhr) {
                 if (xhr.status === 422) {
                     let errors = xhr.responseJSON.errors;
                     for (let field in errors) {
-                        alert(errors[field][0]);
+                        SaleProToast.show(errors[field][0]);
                     }
                 } else if (xhr.status === 401) {
-                    alert("Unauthorized Access!");
+                    SaleProToast.show("Unauthorized Access!");
                 } else {
-                    alert("Something went wrong!");
+                    SaleProToast.show("Something went wrong!");
                 }
             }
         });
@@ -1280,7 +1362,7 @@
         availablePoints = $('table.sale-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.points').val();
         required_point = Math.ceil(amount / reward_point_setting['per_point_amount']);
         if(required_point > availablePoints) {
-          alert('Customer does not have sufficient points. Available points: '+availablePoints+'. Required points: '+required_point);
+          SaleProToast.show('Customer does not have sufficient points. Available points: '+availablePoints+'. Required points: '+required_point);
         }
     }
 
@@ -1289,7 +1371,7 @@
         buttons.push([
             {
                 extend: "pdf",
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ":visible:Not(.not-exported)",
                     rows: ":visible",
@@ -1309,7 +1391,7 @@
             },
             {
                 extend: "excel",
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ":visible:Not(.not-exported)",
                     rows: ":visible",
@@ -1329,7 +1411,7 @@
             },
             {
                 extend: "csv",
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ":visible:Not(.not-exported)",
                     rows: ":visible",
@@ -1349,7 +1431,7 @@
             },
             {
                 extend: "print",
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ":visible:Not(.not-exported)",
                     rows: ":visible",
@@ -1372,7 +1454,7 @@
 
     buttons.push([
         {
-            text: '<i title="delete" class="dripicons-cross"></i>',
+            text: '<i title="delete" class="ti ti-x"></i>',
             className: 'buttons-delete',
             action: function ( e, dt, node, config ) {
                 if(user_verified == '1') {
@@ -1381,33 +1463,38 @@
                         if(i){
                             var sale = $(this).closest('tr').data('sale');
                             if(sale)
-                                sale_id[i-1] = sale[13];
+                                sale_id[i-1] = sale;
                         }
                     });
-                    if(sale_id.length && confirm("Are you sure want to delete?")) {
-                        $.ajax({
-                            type:'POST',
-                            url:'sales/deletebyselection',
-                            data:{
-                                saleIdArray: sale_id
-                            },
-                            success:function(data){
-                                alert(data);
-                                //dt.rows({ page: 'current', selected: true }).deselect();
-                                dt.rows({ page: 'current', selected: true }).remove().draw(false);
+                    if (sale_id.length) {
+                        SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) {
+                            if (!confirmed) {
+                                return;
                             }
+                            $.ajax({
+                                type:'POST',
+                                url:'sales/deletebyselection',
+                                data:{
+                                    saleIdArray: sale_id
+                                },
+                                success:function(data){
+                                    SaleProToast.show(data);
+                                    //dt.rows({ page: 'current', selected: true }).deselect();
+                                    dt.rows({ page: 'current', selected: true }).remove().draw(false);
+                                }
+                            });
                         });
                     }
                     else if(!sale_id.length)
-                        alert('Nothing is selected!');
+                        SaleProToast.show('Nothing is selected!');
                 }
                 else
-                    alert('This feature is disable for demo!');
+                    SaleProToast.show('This feature is disable for demo!');
             }
         },
         {
             extend: 'colvis',
-            text: '<i title="column visibility" class="fa fa-eye"></i>',
+            text: '<i title="column visibility" class="ti ti-eye"></i>',
             columns: ':gt(0)'
         },
     ]);
@@ -1426,7 +1513,11 @@
                 d.sale_type        = $('#sale-type').val();
                 d.payment_status   = $('#payment-status').val();
                 d.payment_method   = $('#payment-method').val();
+                d.sales_agent_id    = $('#sales-agent-filter').val();
                 d.installment      = $('#installment-filter').val();
+                if ($('#social-channel').length) {
+                    d.social_channel = $('#social-channel').val();
+                }
             },
             dataType: "json",
             type:"post"
@@ -1448,8 +1539,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         order:[['2', 'desc']],
@@ -1490,8 +1581,8 @@
             {
                 "orderable": false,
                 'targets': show_products_details == 1
-                    ? [0, 1, 4, 11, 12, 14, 15]
-                    : [0, 1, 4, 9, 10, 12, 13]
+                    ? [0, 1, 4, 11, 12, 16, 17]
+                    : [0, 1, 4, 9, 10, 14, 15]
             },
             {
                 'render': function(data, type, row, meta){
@@ -1519,8 +1610,39 @@
         }
     });
 
-    $('#warehouse_id, #sale-status, #sale-type, #payment-status, #payment-method, #installment-filter').on('change', function () {
+    $('#warehouse_id, #sale-status, #sale-type, #payment-status, #payment-method, #installment-filter, #sales-agent-filter').on('change', function () {
         saleTable.ajax.reload();
+    });
+
+    $(document).on('click', '.assign-sales-agent', function () {
+        $('#sales-agent-sale-id').val($(this).data('sale-id'));
+        $('#sales-agent-modal-select').val(String($(this).data('agent-id') || '')).selectpicker('refresh');
+        $('#sales-agent-modal').modal('show');
+    });
+
+    $('#sales-agent-form').on('submit', function (event) {
+        event.preventDefault();
+        var saleId = $('#sales-agent-sale-id').val();
+        $.ajax({
+            url: '{{ url('sales') }}/' + saleId + '/sales-agent',
+            type: 'POST',
+            data: {
+                _token: $('meta[name="csrf-token"]').attr('content'),
+                _method: 'PATCH',
+                sales_agent_id: $('#sales-agent-modal-select').val()
+            },
+            success: function (response) {
+                $('#sales-agent-modal').modal('hide');
+                SaleProToast.show(response.message || 'Sales / service staff updated.');
+                saleTable.ajax.reload(null, false);
+            },
+            error: function (xhr) {
+                var message = xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error)
+                    ? (xhr.responseJSON.message || xhr.responseJSON.error)
+                    : 'Unable to update sales / service staff.';
+                SaleProToast.show(message);
+            }
+        });
     });
 
     // Show loader on request
@@ -1544,45 +1666,65 @@
         }
 
         if (show_products_details == 1) {
+            // Total Tax
+            $(dt_selector.column(14).footer()).html(
+                formatCurrency(dt_selector.cells(rows, 14).data().sum())
+            );
+
+            // Order Tax
+            $(dt_selector.column(15).footer()).html(
+                formatCurrency(dt_selector.cells(rows, 15).data().sum())
+            );
+
+            // Grand Total
+            $(dt_selector.column(16).footer()).html(
+                formatCurrency(dt_selector.cells(rows, 16).data().sum())
+            );
+
+            // Returned
+            $(dt_selector.column(17).footer()).html(
+                formatCurrency(dt_selector.cells(rows, 17).data().sum())
+            );
+
+            // Paid
+            $(dt_selector.column(18).footer()).html(
+                formatCurrency(dt_selector.cells(rows, 18).data().sum())
+            );
+
+            // ✅ Due
+            $(dt_selector.column(19).footer()).html(
+                formatCurrency(dt_selector.cells(rows, 19).data().sum())
+            );
+
+        } else {
+            // Total Tax
+            $(dt_selector.column(12).footer()).html(
+                formatCurrency(dt_selector.cells(rows, 12).data().sum())
+            );
+
+            // Order Tax
+            $(dt_selector.column(13).footer()).html(
+                formatCurrency(dt_selector.cells(rows, 13).data().sum())
+            );
+
             // Grand Total
             $(dt_selector.column(14).footer()).html(
-                dt_selector.cells(rows, 14).data().sum().toFixed({{$general_setting->decimal}})
+                formatCurrency(dt_selector.cells(rows, 14).data().sum())
             );
 
             // Returned
             $(dt_selector.column(15).footer()).html(
-                dt_selector.cells(rows, 15).data().sum().toFixed({{$general_setting->decimal}})
+                formatCurrency(dt_selector.cells(rows, 15).data().sum())
             );
 
             // Paid
             $(dt_selector.column(16).footer()).html(
-                dt_selector.cells(rows, 16).data().sum().toFixed({{$general_setting->decimal}})
+                formatCurrency(dt_selector.cells(rows, 16).data().sum())
             );
 
             // ✅ Due
             $(dt_selector.column(17).footer()).html(
-                dt_selector.cells(rows, 17).data().sum().toFixed({{$general_setting->decimal}})
-            );
-
-        } else {
-            // Grand Total
-            $(dt_selector.column(12).footer()).html(
-                dt_selector.cells(rows, 12).data().sum().toFixed({{$general_setting->decimal}})
-            );
-
-            // Returned
-            $(dt_selector.column(13).footer()).html(
-                dt_selector.cells(rows, 13).data().sum().toFixed({{$general_setting->decimal}})
-            );
-
-            // Paid
-            $(dt_selector.column(14).footer()).html(
-                dt_selector.cells(rows, 14).data().sum().toFixed({{$general_setting->decimal}})
-            );
-
-            // ✅ Due
-            $(dt_selector.column(15).footer()).html(
-                dt_selector.cells(rows, 15).data().sum().toFixed({{$general_setting->decimal}})
+                formatCurrency(dt_selector.cells(rows, 17).data().sum())
             );
         }
     }
@@ -1593,209 +1735,19 @@
         saleTable.ajax.reload();
     });
 
-    function saleDetails(sale){
-        $("#sale-details input[name='sale_id']").val(sale[13]);
-
-        var htmltext = '{{__("db.date")}}: '+sale[0]+
-            '<br>{{__("db.reference")}}: '+sale[1]+
-            '<br>{{__("db.Warehouse")}}: '+sale[27]+
-            '<br>{{__("db.Sale Status")}}: '+sale[2]+
-            '<br>{{__("db.Currency")}}: '+sale[31];
-
-        if(sale[32])
-            htmltext += '<br>{{__("db.Exchange Rate")}}: '+sale[32]+'<br>';
-        else
-            htmltext += '<br>{{__("db.Exchange Rate")}}: N/A<br>';
-        if(sale[33])
-            htmltext += '{{__("db.Table")}}: '+sale[33]+'<br>';
-        if(sale[30])
-            htmltext += '{{__("db.Attach Document")}}: <a href="documents/sale/'+sale[30]+'">Download</a><br>';
-
-        htmltext += '<br><div class="row"><div class="col-md-6">{{__("db.From")}}:<br>'+sale[3]+'<br>'+sale[4]+'<br>'+sale[5]+'<br>'+sale[6]+'<br>'+sale[7]+'<br>'+sale[8]+
-        '</div><div class="col-md-6"><div class="float-right">{{__("db.To")}}:<br>'+sale[9]+'<br>'+sale[10]+'<br>'+sale[11]+'<br>'+sale[12]+'</div></div></div>';
-
-        if(sale[34]) {
-            htmltext += '<br><strong>Payment Term:</strong> ' + sale[34] + ' ' + sale[35];
-        }
-
-        if(sale[36]) {
-            htmltext += '<br><strong>Due Date:</strong> ' + sale[36];
-
-            if(sale[37]) {
-                htmltext += ' <span class="badge badge-warning">[' + sale[37] + ']</span>';
-            }
-        }
-        $.get('sales/product_sale/' + sale[13], function(data){
-            // console.log(data);
-            $(".product-sale-list tbody").remove();
-            var name_code = data[0];
-            var qty = data[1];
-            var unit_code = data[2];
-            var tax = data[3];
-            var tax_rate = data[4];
-            var discount = data[5];
-            var subtotal = data[6];
-            var batch_no = data[7];
-            var return_qty = data[8];
-            var is_delivered = data[9];
-            // Check if data[10] exists
-            var toppings = data[10] ? data[10] : [];
-            var total_qty = 0;
-            var newBody = $("<tbody>");
-
-            $.each(name_code, function(index) {
-                var newRow = $("<tr>");
-                var cols = '';
-                cols += '<td>' + (index + 1) + '</td>';
-                cols += '<td>' + name_code[index];
-
-                // Append topping names if toppings[index] exists
-                if (toppings[index]) {
-                    try {
-                        // Parse and extract topping names
-                        var toppingData = JSON.parse(toppings[index]);
-                        var toppingNames = toppingData.map(topping => topping.name).join(', ');
-                        cols += ' (' + toppingNames + ')';
-                    } catch (error) {
-                        console.error('Error parsing toppings for index', index, toppings[index], error);
-                    }
-                }
-
-                cols += '</td>';
-                cols += '<td>' + batch_no[index] + '</td>';
-                cols += '<td>' + qty[index] + ' ' + unit_code[index] + '</td>';
-                cols += '<td>' + return_qty[index] + '</td>';
-
-                // Calculate unit price
-                var unitPrice = parseFloat(subtotal[index] / qty[index]).toFixed({{$general_setting->decimal}});
-
-                // Calculate topping prices if toppings[index] exists
-                var toppingPrices = '';
-                if (toppings[index]) {
-                    try {
-                        var toppingData = JSON.parse(toppings[index]); // Parse topping data
-                        toppingPrices = toppingData
-                            .map(topping => parseFloat(topping.price).toFixed({{$general_setting->decimal}})) // Extract and format each topping price
-                            .join(' + '); // Join prices with '+'
-                    } catch (error) {
-                        console.error('Error calculating topping prices for index', index, toppings[index], error);
-                    }
-                }
-
-                cols += '<td>' + unitPrice + ' (' + toppingPrices + ')</td>';
-
-                cols += '<td>' + tax[index] + '(' + tax_rate[index] + '%)' + '</td>';
-                cols += '<td>' + discount[index] + '</td>';
-
-                // Update subtotal to include topping prices
-                var toppingPricesRowTotal = 0;
-                if (toppings[index]) {
-                    try {
-                        var toppingData = JSON.parse(toppings[index]);
-                        toppingPricesRowTotal = toppingData.reduce((sum, topping) => sum + parseFloat(topping.price), 0);
-                    } catch (error) {
-                        console.error('Error calculating topping prices for index', index, toppings[index], error);
-                    }
-                }
-                subtotal[index] = parseFloat(subtotal[index]) + toppingPricesRowTotal;
-
-                cols += '<td>' + subtotal[index].toFixed({{$general_setting->decimal}}) + '</td>';
-                cols += '<td>' + is_delivered[index] + '</td>';
-
-                total_qty += parseFloat(qty[index]);
-                newRow.append(cols);
-                newBody.append(newRow);
-            });
-
-            var newRow = $("<tr>");
-            cols = '';
-            cols += '<td colspan=3>{{__("db.Total")}}:</td>';
-            cols += '<td>' + total_qty + '</td>';
-            cols += '<td colspan=2></td>';
-            cols += '<td>' + sale[14] + '</td>';
-            cols += '<td>' + sale[15] + '</td>';
-            cols += '<td>' + sale[16] + '</td>';
-            cols += '<td></td>';
-            newRow.append(cols);
-            newBody.append(newRow);
-
-            var newRow = $("<tr>");
-            cols = '';
-            cols += '<td colspan=9>{{__("db.Order Tax")}}:</td>';
-            cols += '<td>' + sale[17] + '(' + sale[18] + '%)' + '</td>';
-            newRow.append(cols);
-            newBody.append(newRow);
-
-            var newRow = $("<tr>");
-            cols = '';
-            cols += '<td colspan=9>{{__("db.Order Discount")}}:</td>';
-            cols += '<td>' + sale[19] + '</td>';
-            newRow.append(cols);
-            newBody.append(newRow);
-            if(sale[28]) {
-                var newRow = $("<tr>");
-                cols = '';
-                cols += '<td colspan=9>{{__("db.Coupon Discount")}} ['+sale[28]+']:</td>';
-                cols += '<td>' + sale[29] + '</td>';
-                newRow.append(cols);
-                newBody.append(newRow);
-            }
-
-            var newRow = $("<tr>");
-            cols = '';
-            cols += '<td colspan=9>{{__("db.Shipping Cost")}}:</td>';
-            cols += '<td>' + sale[20] + '</td>';
-            newRow.append(cols);
-            newBody.append(newRow);
-
-            var newRow = $("<tr>");
-            cols = '';
-            cols += '<td colspan=9>{{__("db.grand total")}}:</td>';
-            cols += '<td>' + sale[21] + '</td>';
-            newRow.append(cols);
-            newBody.append(newRow);
-
-            // Grand total in the other POS currencies, as stored with the sale
-            if(sale[38]) {
-                var newRow = $("<tr>");
-                cols = '<td colspan=9>{{__("db.grand total")}}:</td><td>' + sale[38] + '</td>';
-                newRow.append(cols);
-                newBody.append(newRow);
-            }
-
-            var newRow = $("<tr>");
-            cols = '';
-            cols += '<td colspan=9>{{__("db.Paid Amount")}}:</td>';
-            cols += '<td>' + sale[22] + '</td>';
-            newRow.append(cols);
-            newBody.append(newRow);
-
-            var newRow = $("<tr>");
-            cols = '';
-            cols += '<td colspan=9>{{__("db.Due")}}:</td>';
-            cols += '<td>' + parseFloat(sale[21] - sale[22]).toFixed({{$general_setting->decimal}}) + '</td>';
-            newRow.append(cols);
-            newBody.append(newRow);
-
-            $("table.product-sale-list").append(newBody);
-        });
-        var htmlfooter = '<p>{{__("db.Sale Note")}}: '+sale[23]+'</p><p>{{__("db.Staff Note")}}: '+sale[24]+'</p>{{__("db.Created By")}}:<br>'+sale[25]+'<br>'+sale[26];
-        $('#sale-content').html(htmltext);
-        $('#sale-footer').html(htmlfooter);
-        $('#sale-details').modal('show');
-    }
+    @include('backend.sale.sale_details_function');
 
     $(document).on('submit', '.payment-form', function(e) {
         if( $('input[name="paying_amount"]').val() < parseFloat($('#amount').val()) ) {
-            alert('Paying amount cannot be bigger than recieved amount');
+            SaleProToast.show('Paying amount cannot be bigger than recieved amount');
             $('input[name="amount"]').val('');
-            $(".change").text(parseFloat( $('input[name="paying_amount"]').val() - $('#amount').val() ).toFixed({{$general_setting->decimal}}));
+            $(".change").text(parseFloat( $('input[name="paying_amount"]').val() - $('#amount').val() ).toFixed({{gen_setting()->decimal}}));
             e.preventDefault();
         }
         else if( $('input[name="edit_paying_amount"]').val() < parseFloat($('input[name="edit_amount"]').val()) ) {
-            alert('Paying amount cannot be bigger than recieved amount');
+            SaleProToast.show('Paying amount cannot be bigger than recieved amount');
             $('input[name="edit_amount"]').val('');
-            $(".change").text(parseFloat( $('input[name="edit_paying_amount"]').val() - $('input[name="edit_amount"]').val() ).toFixed({{$general_setting->decimal}}));
+            $(".change").text(parseFloat( $('input[name="edit_paying_amount"]').val() - $('input[name="edit_amount"]').val() ).toFixed({{gen_setting()->decimal}}));
             e.preventDefault();
         }
 
@@ -1805,21 +1757,36 @@
     if(all_permission.indexOf("sales-delete") == -1)
         $('.buttons-delete').addClass('d-none');
 
-        function confirmDelete() {
-            if (confirm("Are you sure want to delete?")) {
-                return true;
-            }
-            return false;
-        }
-
-    function confirmPaymentDelete() {
-        if (confirm("Are you sure want to delete? If you delete this money will be refunded.")) {
-            return true;
-        }
-        return false;
-    }
+        function confirmDelete() { return true; }
 
     $(document).ready(function() {
+        $(document).on('submit', '.sale-void-form', function(e) {
+            var form = this;
+            if ($(form).data('void-confirmed')) {
+                $(form).removeData('void-confirmed');
+                return true;
+            }
+
+            e.preventDefault();
+            var reason = window.prompt('Reason for voiding this sale (required):');
+            if (!reason || reason.trim().length < 3) {
+                SaleProToast.show('A reason of at least 3 characters is required.');
+                return false;
+            }
+            SaleProConfirm.open({
+                type: 'warning',
+                title: 'Void Sale',
+                message: 'Void this sale and reverse its supported stock and financial effects? The audit history will be preserved.',
+                confirmText: 'Void Sale'
+            }).then(function(confirmed) {
+                if (!confirmed) return;
+                $(form).find('input[name="reason"]').val(reason.trim());
+                $(form).data('void-confirmed', true);
+                if (typeof form.requestSubmit === 'function') form.requestSubmit();
+                else form.submit();
+            });
+            return false;
+        });
         $(document).on('click', '.send-sms', function(){
             $("#send-sms input[name='customer_id']").val($(this).data('customer_id'));
             $("#send-sms input[name='reference_no']").val($(this).data('reference_no'));

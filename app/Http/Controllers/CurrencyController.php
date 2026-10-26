@@ -27,7 +27,8 @@ class CurrencyController extends Controller
     {
         $data = $this->posFields($request, $request->all());
         Currency::create($data);
-        $this->forgetCurrencyCache();
+        cache()->forget('currency');
+        cache()->forget('currency_list');
         return redirect()->back()->with('message', __('db.Currency created successfully'));
     }
 
@@ -38,16 +39,18 @@ class CurrencyController extends Controller
             GeneralSetting::latest()->first()->update(['currency' => $data['currency_id']]);
         }
         Currency::find($data['currency_id'])->update($this->posFields($request, $data));
-        $this->forgetCurrencyCache();
+        cache()->forget('currency');
+        cache()->forget('currency_list');
         return redirect()->back()->with('message', __('db.Currency updated successfully'));
     }
 
     public function destroy($id)
     {
-        if(!env('USER_VERIFIED'))
+        if(!config('app.user_verified'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
         Currency::find($id)->update(['is_active' => false]);
-        $this->forgetCurrencyCache();
+        cache()->forget('currency');
+        cache()->forget('currency_list');
         return redirect()->back()->with('message', __('db.Currency deleted successfully'));
     }
 
@@ -57,12 +60,5 @@ class CurrencyController extends Controller
         $data['show_in_pos'] = $request->boolean('show_in_pos');
         $data['rounding'] = $request->filled('rounding') ? $request->input('rounding') : null;
         return $data;
-    }
-
-    // POS reads the active currency list from cache (Common middleware)
-    private function forgetCurrencyCache(): void
-    {
-        cache()->forget('currency');
-        cache()->forget('currency_list');
     }
 }

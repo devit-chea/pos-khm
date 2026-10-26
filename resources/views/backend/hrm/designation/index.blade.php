@@ -1,4 +1,8 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
 
 <x-error-message key="name" />
@@ -7,7 +11,8 @@
 
 <section>
     <div class="container-fluid">
-        <button type="button" class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="dripicons-plus"></i> {{__('db.Add Designation')}}</button>
+        @include('backend.hrm.partials.warehouse_filter')
+        <button type="button" class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="ti ti-plus"></i> {{__('db.Add Designation')}}</button>
     </div>
     <div class="table-responsive">
         <table id="designation-table" class="table">
@@ -15,6 +20,7 @@
                 <tr>
                     <th class="not-exported"></th>
                     <th>{{__('db.Designation')}}</th>
+                    <th>{{__('db.Warehouse')}}</th>
                     <th class="not-exported">{{__('db.action')}}</th>
                 </tr>
             </thead>
@@ -23,6 +29,7 @@
                 <tr data-id="{{$designation->id}}">
                     <td>{{$key}}</td>
                     <td>{{ $designation->name }}</td>
+                    <td>{{ $designation->warehouse?->name }}</td>
                     <td>
                         <div class="btn-group">
                             <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">{{__('db.action')}}
@@ -31,14 +38,14 @@
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                                 <li>
-                                    <button type="button" data-id="{{$designation->id}}" data-name="{{$designation->name}}" class="edit-btn btn btn-link" data-toggle="modal" data-target="#editModal" ><i class="dripicons-document-edit"></i>  {{__('db.edit')}}</button>
+                                    <button type="button" data-id="{{$designation->id}}" data-name="{{$designation->name}}" data-warehouse-id="{{$designation->warehouse_id}}" class="edit-btn btn btn-link" data-toggle="modal" data-target="#editModal" ><i class="ti ti-edit"></i>  {{__('db.edit')}}</button>
                                 </li>
                                 <li class="divider"></li>
                                 <form action="{{ route('designations.destroy', $designation->id) }}" method="POST">
                                     @csrf
                                     @method('DELETE')
                                     <li>
-                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> {{__('db.delete')}}</button>
+                                        <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> {{__('db.delete')}}</button>
                                     </li>
                                 </form>
                             </ul>
@@ -59,7 +66,7 @@
             @csrf
         <div class="modal-header">
           <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Designation')}}</h5>
-          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
         </div>
         <div class="modal-body">
           <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -67,6 +74,14 @@
             <div class="form-group">
                 <label>{{__('db.name')}} *</label>
                 <input type="text" name="name" required="required" class="form-control" placeholder="{{ __('db.Type designation name') }}">
+            </div>
+            <div class="form-group">
+                <label>{{__('db.Warehouse')}} *</label>
+                <select name="warehouse_id" required class="form-control selectpicker" data-live-search="true">
+                    @foreach($lims_warehouse_list as $warehouse)
+                        <option value="{{$warehouse->id}}">{{$warehouse->name}}</option>
+                    @endforeach
+                </select>
             </div>
             <div class="form-group">
               <input type="submit" value="{{__('db.submit')}}" class="btn btn-primary">
@@ -85,14 +100,22 @@
             @csrf
             @method('PUT')
       <div class="modal-header">
-        <h5 id="exampleModalLabel" class="modal-title">{{__('db.Update Designation')}}</h5>
-        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+        <h5 id="exampleModalLabel" class="modal-title">{{__('db.update_designation')}}</h5>
+        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
       </div>
       <div class="modal-body">
         <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
             <div class="form-group">
                 <label>{{__('db.name')}} *</label>
                 <input type="text" name="name" required="required" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>{{__('db.Warehouse')}} *</label>
+                <select name="warehouse_id" required class="form-control selectpicker" data-live-search="true">
+                    @foreach($lims_warehouse_list as $warehouse)
+                        <option value="{{$warehouse->id}}">{{$warehouse->name}}</option>
+                    @endforeach
+                </select>
             </div>
             <input type="hidden" name="designation_id">
             <div class="form-group">
@@ -108,13 +131,14 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
     $("ul#hrm").siblings('a').attr('aria-expanded','true');
     $("ul#hrm").addClass("show");
     $("ul#hrm #designations-menu").addClass("active");
 
     var designation_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
     $.ajaxSetup({
         headers: {
@@ -122,16 +146,12 @@
         }
     });
 
-    function confirmDelete() {
-      if (confirm("Are you sure want to delete?")) {
-          return true;
-      }
-      return false;
-    }
+    function confirmDelete() { return true; }
 $(document).ready(function() {
     $('.edit-btn').on('click', function(){
         $("#editModal input[name='designation_id']").val($(this).data('id'));
         $("#editModal input[name='name']").val($(this).data('name'));
+        $("#editModal select[name='warehouse_id']").val($(this).data('warehouse-id')).selectpicker('refresh');
     });
 });
 
@@ -142,14 +162,14 @@ $(document).ready(function() {
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
             {
                 "orderable": false,
-                'targets': [0, 2]
+                'targets': [0, 3]
             },
             {
                 'render': function(data, type, row, meta){
@@ -172,7 +192,7 @@ $(document).ready(function() {
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -181,7 +201,7 @@ $(document).ready(function() {
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -190,7 +210,7 @@ $(document).ready(function() {
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -199,7 +219,7 @@ $(document).ready(function() {
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -207,7 +227,7 @@ $(document).ready(function() {
                 footer:true
             },
             {
-                text: '<i title="delete" class="dripicons-cross"></i>',
+                text: '<i title="delete" class="ti ti-x"></i>',
                 className: 'buttons-delete',
                 action: function ( e, dt, node, config ) {
                     if(user_verified == '1') {
@@ -217,7 +237,7 @@ $(document).ready(function() {
                                 designation_id[i-1] = $(this).closest('tr').data('id');
                             }
                         });
-                        if(designation_id.length && confirm("Are you sure want to delete?")) {
+                        if (designation_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                             $.ajax({
                                 type:'POST',
                                 url:'designations/deletebyselection',
@@ -225,21 +245,23 @@ $(document).ready(function() {
                                     designationIdArray: designation_id
                                 },
                                 success:function(data){
-                                    alert(data);
+                                    SaleProToast.show(data);
                                 }
                             });
                             dt.rows({ page: 'current', selected: true }).remove().draw(false);
                         }
+                        });
+                        }
                         else if(!designation_id.length)
-                            alert('No designation is selected!');
+                            SaleProToast.show('No designation is selected!');
                     }
                     else
-                        alert('This feature is disable for demo!');
+                        SaleProToast.show('This feature is disable for demo!');
                 }
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],

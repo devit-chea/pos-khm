@@ -17,7 +17,7 @@ class Translation extends Model
     // Get Default Language (Cached)
     public static function getTrnaslactionsByLocale(string $locale)
     {
-        return Cache::rememberForever('translations_by_locale', function () use($locale) {
+        return Cache::rememberForever("translations_{$locale}", function () use ($locale) {
             return self::where('locale', $locale)
                 ->get()
                 ->mapWithKeys(function ($item) {
@@ -31,6 +31,19 @@ class Translation extends Model
     {
         Cache::forget('translations_by_locale');
         Cache::forget('languages_list');
+        Cache::forget('translations_en');
+        if (\Illuminate\Support\Facades\Schema::hasTable('translations')) {
+            $locales = self::query()->distinct()->pluck('locale')->all();
+            foreach ($locales as $loc) {
+                Cache::forget("translations_{$loc}");
+            }
+        }
+        if (\Illuminate\Support\Facades\Schema::hasTable('languages')) {
+            $locales = Language::pluck('language')->all();
+            foreach ($locales as $loc) {
+                Cache::forget("translations_{$loc}");
+            }
+        }
     }
 
     public function language(): BelongsTo

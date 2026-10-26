@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use DB;
 use Auth;
-use Carbon\Carbon;
 use App\Models\Tax;
 use App\Models\Unit;
 use App\Models\Product;
@@ -20,14 +19,19 @@ use App\Models\ProductTransfer;
 use App\Models\Product_Warehouse;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Mail;
-use Spatie\Permission\Models\Permission;
 use Illuminate\Support\Facades\Validator;
-
-use App\Helpers\DateHelper;
+use App\Services\InvoiceService;
 
 class TransferController extends Controller
 {
     use \App\Traits\MailInfo;
+
+    public function __construct(
+        private InvoiceService $invoiceService,
+        private \App\Services\Domain\TransferDomainService $transferDomainService
+    ) {
+    }
+
 
     public function index(Request $request)
     {
@@ -58,7 +62,7 @@ class TransferController extends Controller
                 $ending_date = date("Y-m-d");
             }
 
-            $lims_warehouse_list = Warehouse::select('name', 'id')->where('is_active', true)->get();
+            $lims_warehouse_list = Warehouse::withoutGlobalScope('authorized_warehouse')->select('name', 'id')->where('is_active', true)->get();
             return view('backend.transfer.index',compact('starting_date', 'ending_date', 'from_warehouse_id', 'to_warehouse_id', 'all_permission', 'lims_warehouse_list'));
         }
         else
@@ -237,12 +241,12 @@ class TransferController extends Controller
                     </button>
                     <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                         <li>
-                            <button type="button" class="btn btn-link view"><i class="fa fa-eye"></i> ' . __('db.View') . '</button>
+                            <button type="button" class="btn btn-link view"><i class="ti ti-eye"></i> ' . __('db.View') . '</button>
                         </li>';
 
                 if(in_array("transfers-edit", $request['all_permission'])) {
                     $nestedData['options'] .= '<li>
-                        <a href="'.route('transfers.edit', $transfer->id).'" class="btn btn-link"><i class="dripicons-document-edit"></i> ' . __('db.edit') . '</a>
+                        <a href="'.route('transfers.edit', $transfer->id).'" class="btn btn-link"><i class="ti ti-edit"></i> ' . __('db.edit') . '</a>
                     </li>';
                 }
 
@@ -252,8 +256,8 @@ class TransferController extends Controller
                             <select name="status" type="hidden" class="form-control selectpicker d-none">
                                 <option value="1" selected>' . __('db.Completed') . '</option>
                             </select>
-                            <button type="submit" class="btn btn-link" onclick="return confirmApprove()">
-                                <i class="dripicons-checkmark"></i> ' . __("Approved") . '
+                            <button type="submit" class="btn btn-link" data-confirm-message="' . __('db.Are you sure you want to proceed?') . '">
+                                <i class="ti ti-checkmark"></i> ' . __("Approved") . '
                             </button>
                         </form>
                     </li>';
@@ -262,8 +266,8 @@ class TransferController extends Controller
                 if(in_array("transfers-delete", $request['all_permission'])) {
                     $nestedData['options'] .= '<li>
                         <form action="' . route("transfers.destroy", $transfer->id) . '" method="POST">'.csrf_field().'' . method_field("DELETE") . '
-                            <button type="submit" class="btn btn-link" onclick="return confirmDelete()">
-                                <i class="dripicons-trash"></i> ' . __("db.delete") . '
+                            <button type="submit" class="btn btn-link" data-confirm-message="' . __('db.Are you sure want to delete?') . '">
+                                <i class="ti ti-trash"></i> ' . __("db.delete") . '
                             </button>
                         </form>
                     </li>';
@@ -290,7 +294,7 @@ class TransferController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         if($role->hasPermissionTo('transfers-add')){
-            $lims_warehouse_list = Warehouse::where('is_active', true)->get();
+            $lims_warehouse_list = Warehouse::withoutGlobalScope('authorized_warehouse')->where('is_active', true)->get();
             return view('backend.transfer.create', compact('lims_warehouse_list'));
         }
         else
@@ -300,152 +304,43 @@ class TransferController extends Controller
     public function store(Request $request)
     {
         $data = $request->except('document');
-
-        $data['user_id'] = Auth::id();
-        $data['reference_no'] = 'tr-' . date("Ymd") . '-'. date("his");
-      
-        if (isset($data['created_at'])) {
-            $data['created_at'] = normalize_to_sql_datetime($data['created_at']);
-        } else {
-            $data['created_at'] = date('Y-m-d H:i:s');
-        }  
-
         $document = $request->document;
-        if ($document) {
-            $v = Validator::make(
-                [
-                    'extension' => strtolower($request->document->getClientOriginalExtension()),
-                ],
-                [
-                    'extension' => 'in:jpg,jpeg,png,gif,pdf,csv,docx,xlsx,txt',
-                ]
-            );
-            if ($v->fails())
-                return redirect()->back()->withErrors($v->errors());
 
-            $documentName = $document->getClientOriginalName();
-            $document->move(public_path('documents/transfer'), $documentName);
-            $data['document'] = $documentName;
-        }
-        $lims_transfer_data = Transfer::create($data);
+        try {
+            if ($document) {
+                $v = Validator::make(
+                    [
+                        'extension' => strtolower($request->document->getClientOriginalExtension()),
+                    ],
+                    [
+                        'extension' => 'in:jpg,jpeg,png,gif,pdf,csv,docx,xlsx,txt',
+                    ]
+                );
+                if ($v->fails())
+                    return redirect()->back()->withErrors($v->errors());
 
-        $product_id = $data['product_id'];
-        $imei_number = $data['imei_number'] ?? NULL;
-        $product_batch_id = $data['product_batch_id'] ?? NULL;
-        $product_code = $data['product_code'];
-        $qty = $data['qty'];
-        $purchase_unit = $data['purchase_unit'];
-        $net_unit_cost = $data['net_unit_cost'];
-        $tax_rate = $data['tax_rate'];
-        $tax = $data['tax'];
-        $total = $data['subtotal'];
-        $product_transfer = [];
-
-        foreach ($product_id as $i => $id) {
-            $lims_purchase_unit_data  = Unit::where('unit_name', $purchase_unit[$i])->first();
-            $product_transfer['variant_id'] = null;
-            $product_transfer['product_batch_id'] = null;
-
-            //get product data
-            $lims_product_data = Product::select('is_variant')->find($id);
-            if($lims_product_data->is_variant) {
-                $lims_product_variant_data = ProductVariant::select('variant_id')->FindExactProductWithCode($id, $product_code[$i])->first();
-                $lims_product_warehouse_data = Product_Warehouse::FindProductWithVariant($id, $lims_product_variant_data->variant_id, $data['from_warehouse_id'])->first();
-                $product_transfer['variant_id'] = $lims_product_variant_data->variant_id;
-            }
-            elseif(isset($data['product_batch_id']) && $product_batch_id[$i]) {
-                $lims_product_warehouse_data = Product_Warehouse::where([
-                    ['product_batch_id', $product_batch_id[$i] ],
-                    ['warehouse_id', $data['from_warehouse_id'] ]
-                ])->first();
-                $product_transfer['product_batch_id'] = $product_batch_id[$i];
-            }
-            else {
-                $lims_product_warehouse_data = Product_Warehouse::where([
-                    ['product_id', $id],
-                    ['warehouse_id', $data['from_warehouse_id'] ],
-                    ])->first();
+                $documentName = $document->getClientOriginalName();
+                $document->move(public_path('documents/transfer'), $documentName);
+                $data['document'] = $documentName;
             }
 
-            if($data['status'] != 2) {
-                if ($lims_purchase_unit_data->operator == '*')
-                    $quantity = $qty[$i] * $lims_purchase_unit_data->operation_value;
-                else
-                    $quantity = $qty[$i] / $lims_purchase_unit_data->operation_value;
-                //deduct imei number if available
-                if($imei_number[$i]) {
-                    $imei_numbers = explode(",", $imei_number[$i]);
-                    $all_imei_numbers = explode(",", $lims_product_warehouse_data->imei_number);
-                    foreach ($imei_numbers as $number) {
-                        if (($j = array_search($number, $all_imei_numbers)) !== false) {
-                            unset($all_imei_numbers[$j]);
-                        }
-                    }
-                    $lims_product_warehouse_data->imei_number = implode(",", $all_imei_numbers);
-                }
-            }
-            else
-                $quantity = 0;
-            //deduct quantity from sending warehouse
-            $lims_product_warehouse_data->qty -= $quantity;
-            $lims_product_warehouse_data->save();
+            $lims_transfer_data = $this->transferDomainService->createTransfer($data, Auth::user());
 
-            if($data['status'] == 1) {
-                if($lims_product_data->is_variant) {
-                    $lims_product_warehouse_data = Product_Warehouse::FindProductWithVariant($id, $lims_product_variant_data->variant_id, $data['to_warehouse_id'])->first();
-                }
-                elseif(isset($data['product_batch_id']) && $product_batch_id[$i]) {
-                    $lims_product_warehouse_data = Product_Warehouse::where([
-                        ['product_batch_id', $product_batch_id[$i] ],
-                        ['warehouse_id', $data['to_warehouse_id'] ]
-                    ])->first();
-                }
-                else {
-                    $lims_product_warehouse_data = Product_Warehouse::where([
-                        ['product_id', $id],
-                        ['warehouse_id', $data['to_warehouse_id'] ],
-                    ])->first();
-                }
-                //add quantity to destination warehouse
-                if ($lims_product_warehouse_data)
-                    $lims_product_warehouse_data->qty += $quantity;
-                else {
-                    $lims_product_warehouse_data = new Product_Warehouse();
-                    $lims_product_warehouse_data->product_id = $id;
-                    $lims_product_warehouse_data->product_batch_id = $product_transfer['product_batch_id'];
-                    $lims_product_warehouse_data->variant_id = $product_transfer['variant_id'];
-                    $lims_product_warehouse_data->warehouse_id = $data['to_warehouse_id'];
-                    $lims_product_warehouse_data->qty = $quantity;
-                }
-                //add imei number if available
-                if($imei_number[$i]) {
-                    if($lims_product_warehouse_data->imei_number)
-                        $lims_product_warehouse_data->imei_number .= ',' . $imei_number[$i];
-                    else
-                        $lims_product_warehouse_data->imei_number = $imei_number[$i];
-                }
+            // DISPATCH STOCK TRANSFER CREATED NOTIFICATION
+            $this->dispatchTransferNotifications($lims_transfer_data, $data['product_id'], $data['qty']);
 
-                $lims_product_warehouse_data->save();
-            }
-
-            $product_transfer['transfer_id'] = $lims_transfer_data->id ;
-            $product_transfer['product_id'] = $id;
-            $product_transfer['imei_number'] = $imei_number[$i];
-            $product_transfer['qty'] = $qty[$i];
-            $product_transfer['purchase_unit_id'] = $lims_purchase_unit_data->id;
-            $product_transfer['net_unit_cost'] = $net_unit_cost[$i];
-            $product_transfer['tax_rate'] = $tax_rate[$i];
-            $product_transfer['tax'] = $tax[$i];
-            $product_transfer['total'] = $total[$i];
-            ProductTransfer::create($product_transfer);
+        } catch (\Exception $e) {
+            \Log::error('Transfer creation failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Transfer creation failed: ' . $e->getMessage());
         }
 
         $message = 'Transfer created successfully';
 
+
         // Mail Send Start
         $mail_setting = MailSetting::latest()->first();
-        $fromWareHouse = Warehouse::find($data['from_warehouse_id']);
-        $toWareHouse = Warehouse::find($data['to_warehouse_id']);
+        $fromWareHouse = Warehouse::withoutGlobalScope('authorized_warehouse')->find($data['from_warehouse_id']);
+        $toWareHouse = Warehouse::withoutGlobalScope('authorized_warehouse')->find($data['to_warehouse_id']);
         $mailData = [];
 
         //Data
@@ -752,18 +647,16 @@ class TransferController extends Controller
                         ->select('discounts.*')
                         ->get();
         // return $product_data[0];
-        $lims_product_data = Product::where([
-            ['code', $product_data[0]],
-            ['is_active', true]
-        ])->first();
+        $lims_product_data = Product::where('code', $product_data[0])
+            ->whereIn('is_active', [1, 3])
+            ->first();
 
         if(!$lims_product_data) {
             $lims_product_data = Product::join('product_variants', 'products.id', 'product_variants.product_id')
                 ->select('products.*', 'product_variants.id as product_variant_id', 'product_variants.item_code', 'product_variants.additional_cost')
-                ->where([
-                    ['product_variants.item_code', $product_data[0]],
-                    ['products.is_active', true]
-                ])->first();
+                ->where('product_variants.item_code', $product_data[0])
+                ->whereIn('products.is_active', [1, 3])
+                ->first();
 
             // return $lims_product_data;
             $product_variant_id = $lims_product_data->product_variant_id;
@@ -853,16 +746,18 @@ class TransferController extends Controller
         $product[] = $lims_product_data->is_batch; //12
         $product[] = $lims_product_data->is_imei;
         $product[] = $lims_product_data->is_variant;
-        $product[] = $product_data[4];
+        $product[] = $product_data[4] ?? '';
         $product[] = $lims_product_data->wholesale_price;
         $product[] = $lims_product_data->cost;
-        $product[] = $product_data[2];
+        $product[] = $product_data[2] ?? '';
         return $product;
 
     }
 
     public function productTransferData($id)
     {
+        Transfer::findOrFail($id);
+
         $lims_product_transfer_data = ProductTransfer::where('transfer_id', $id)->get();
 
         foreach ($lims_product_transfer_data as $key => $product_transfer_data) {
@@ -929,11 +824,12 @@ class TransferController extends Controller
         }
         return $product_transfer;
     }
+
     public function transferByCsv()
     {
         $role = Role::find(Auth::user()->role_id);
         if($role->hasPermissionTo('transfers-add')){
-            $lims_warehouse_list = Warehouse::where('is_active', true)->get();
+            $lims_warehouse_list = Warehouse::withoutGlobalScope('authorized_warehouse')->where('is_active', true)->get();
             return view('backend.transfer.import', compact('lims_warehouse_list'));
         }
         else
@@ -977,7 +873,8 @@ class TransferController extends Controller
         }
 
         $data = $request->except('file');
-        $data['reference_no'] = 'tr-' . date("Ymd") . '-'. date("his");
+        $importedProductIds = [];
+        $data['reference_no'] = $this->invoiceService->generateInvoiceName('tr-'); // 'tr-' . date("Ymd") . '-'. date("his");
         $document = $request->document;
         if ($document) {
             $v = Validator::make(
@@ -1003,6 +900,7 @@ class TransferController extends Controller
         $lims_transfer_data = Transfer::latest()->first();
 
         foreach ($product_data as $key => $product) {
+            $importedProductIds[] = (int) $product->id;
             if($product['tax_method'] == 1){
                 $net_unit_cost = $cost[$key];
                 $product_tax = $net_unit_cost * ($tax[$key]['rate'] / 100) * $qty[$key];
@@ -1070,6 +968,12 @@ class TransferController extends Controller
         $lims_transfer_data->item = $key + 1;
         $lims_transfer_data->grand_total = $lims_transfer_data->total_cost + $lims_transfer_data->shipping_cost;
         $lims_transfer_data->save();
+
+        //  DISPATCH STOCK TRANSFER NOTIFICATION FROM BULK CSV DATA 
+        if (!empty($importedProductIds)) {
+            $this->dispatchTransferNotifications($lims_transfer_data, $importedProductIds, $qty);
+        }
+
         return redirect('transfers')->with('message', __('db.Transfer imported successfully'));
     }
 
@@ -1077,7 +981,7 @@ class TransferController extends Controller
     {
         $role = Role::find(Auth::user()->role_id);
         if($role->hasPermissionTo('transfers-edit')){
-            $lims_warehouse_list = Warehouse::where('is_active',true)->get();
+            $lims_warehouse_list = Warehouse::withoutGlobalScope('authorized_warehouse')->where('is_active',true)->get();
             $lims_transfer_data = Transfer::find($id);
             $lims_product_transfer_data = ProductTransfer::where('transfer_id', $id)->get();
             return view('backend.transfer.edit', compact('lims_warehouse_list', 'lims_transfer_data', 'lims_product_transfer_data'));
@@ -1097,7 +1001,13 @@ class TransferController extends Controller
             $data['created_at'] = date('Y-m-d H:i:s');
         }
 
+        try {
+        DB::beginTransaction();
+
         $lims_transfer_data = Transfer::find($id);
+        if ((int) $lims_transfer_data->status === 1) {
+            app(\App\Services\ImportCostAllocationService::class)->validateAndReverseTransfer($lims_transfer_data);
+        }
 
         if ($document) {
             $v = Validator::make(
@@ -1351,23 +1261,39 @@ class TransferController extends Controller
         }
 
         $lims_transfer_data->update($data);
+        if ((int) $lims_transfer_data->status === 1) {
+            foreach (ProductTransfer::where('transfer_id', $id)->get() as $completedLine) {
+                app(\App\Services\ImportCostAllocationService::class)->allocateTransferCost($lims_transfer_data, $completedLine);
+            }
+        }
+
+        DB::commit();
+
         return redirect('transfers')->with('message', __('db.Transfer updated successfully'));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Transfer update failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Transfer update failed: ' . $e->getMessage());
+        }
     }
 
     public function changeStatus(Request $request)
     {
-        $id = $request->id;
-        $lims_transfer_data = Transfer::findOrFail($id);
+        $id = (int) ($request->route('id') ?? $request->id);
         $status = (int) $request->status;
-
-        if ($lims_transfer_data->status != 2) {
-            return redirect('transfers')->with('not_permitted', __('Only Pending transfers can be updated'));
-        }
 
         if ($status !== 1) {
             return redirect('transfers')->with('not_permitted', __('Invalid status change'));
         }
 
+        DB::beginTransaction();
+        try {
+        $lims_transfer_data = Transfer::whereKey($id)->lockForUpdate()->firstOrFail();
+        if ((int) $lims_transfer_data->status !== 2) {
+            DB::rollBack();
+            return redirect('transfers')->with('not_permitted', __('Only Pending transfers can be updated'));
+        }
         $lims_product_transfer_data = ProductTransfer::where('transfer_id', $id)->get();
 
         foreach ($lims_product_transfer_data as $product_transfer_data) {
@@ -1458,10 +1384,21 @@ class TransferController extends Controller
 
             $lims_product_to_warehouse_data->qty += $quantity;
             $lims_product_to_warehouse_data->save();
+            app(\App\Services\ImportCostAllocationService::class)->allocateTransferCost(
+                $lims_transfer_data,
+                $product_transfer_data
+            );
         }
 
         $lims_transfer_data->status = 1;
         $lims_transfer_data->save();
+
+        DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('Transfer completion failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Transfer completion failed: ' . $e->getMessage());
+        }
 
         return redirect('transfers')->with('message', __('db.Transfer updated successfully'));
     }
@@ -1469,21 +1406,29 @@ class TransferController extends Controller
     public function deleteBySelection(Request $request)
     {
         $transfer_id = $request['transferIdArray'];
+        DB::beginTransaction();
+        try {
         foreach ($transfer_id as $id) {
             $lims_transfer_data =Transfer::find($id);
+            if (!$lims_transfer_data) {
+                continue;
+            }
+            app(\App\Services\ImportCostAllocationService::class)->validateAndReverseTransfer($lims_transfer_data);
             $lims_product_transfer_data = ProductTransfer::where('transfer_id', $id)->get();
             foreach ($lims_product_transfer_data as $product_transfer_data) {
                 $lims_transfer_unit_data = Unit::find($product_transfer_data->purchase_unit_id);
                 if ($lims_transfer_unit_data->operator == '*') {
                     $quantity = $product_transfer_data->qty * $lims_transfer_unit_data->operation_value;
                 } else {
-                    $quantity = $product_transfer_data / $lims_transfer_unit_data->operation_value;
+                    $quantity = $product_transfer_data->qty / $lims_transfer_unit_data->operation_value;
                 }
 
                 if($lims_transfer_data->status == 1) {
                     //add quantity for from warehouse
                     if($product_transfer_data->variant_id)
                         $lims_product_warehouse_data = Product_Warehouse::FindProductWithVariant($product_transfer_data->product_id, $product_transfer_data->variant_id, $lims_transfer_data->from_warehouse_id)->first();
+                    elseif($product_transfer_data->product_batch_id)
+                        $lims_product_warehouse_data = Product_Warehouse::where('product_batch_id', $product_transfer_data->product_batch_id)->where('warehouse_id', $lims_transfer_data->from_warehouse_id)->first();
                     else
                         $lims_product_warehouse_data = Product_Warehouse::FindProductWithoutVariant($product_transfer_data->product_id, $lims_transfer_data->from_warehouse_id)->first();
                     $lims_product_warehouse_data->qty += $quantity;
@@ -1491,6 +1436,8 @@ class TransferController extends Controller
                     //deduct quantity for to warehouse
                     if($product_transfer_data->variant_id)
                         $lims_product_warehouse_data = Product_Warehouse::FindProductWithVariant($product_transfer_data->product_id, $product_transfer_data->variant_id, $lims_transfer_data->to_warehouse_id)->first();
+                    elseif($product_transfer_data->product_batch_id)
+                        $lims_product_warehouse_data = Product_Warehouse::where('product_batch_id', $product_transfer_data->product_batch_id)->where('warehouse_id', $lims_transfer_data->to_warehouse_id)->first();
                     else
                         $lims_product_warehouse_data = Product_Warehouse::FindProductWithoutVariant($product_transfer_data->product_id, $lims_transfer_data->to_warehouse_id)->first();
 
@@ -1501,6 +1448,8 @@ class TransferController extends Controller
                     //add quantity for from warehouse
                     if($product_transfer_data->variant_id)
                         $lims_product_warehouse_data = Product_Warehouse::FindProductWithVariant($product_transfer_data->product_id, $product_transfer_data->variant_id, $lims_transfer_data->from_warehouse_id)->first();
+                    elseif($product_transfer_data->product_batch_id)
+                        $lims_product_warehouse_data = Product_Warehouse::where('product_batch_id', $product_transfer_data->product_batch_id)->where('warehouse_id', $lims_transfer_data->from_warehouse_id)->first();
                     else
                         $lims_product_warehouse_data = Product_Warehouse::FindProductWithoutVariant($product_transfer_data->product_id, $lims_transfer_data->from_warehouse_id)->first();
 
@@ -1510,15 +1459,25 @@ class TransferController extends Controller
                 $product_transfer_data->delete();
             }
             $lims_transfer_data->delete();
-            $this->fileDelete(public_path('documents/transfer/'), $lims_transfer_data->document);
-
         }
+        DB::commit();
         return 'Transfer deleted successfully!';
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('Bulk transfer deletion failed: ' . $e->getMessage());
+            return response()->json(['message' => 'Transfer deletion failed.'], 422);
+        }
     }
 
     public function destroy($id)
     {
+        try {
+        DB::beginTransaction();
+
         $lims_transfer_data =Transfer::find($id);
+        if ($lims_transfer_data) {
+            app(\App\Services\ImportCostAllocationService::class)->validateAndReverseTransfer($lims_transfer_data);
+        }
         $lims_product_transfer_data = ProductTransfer::where('transfer_id', $id)->get();
         foreach ($lims_product_transfer_data as $product_transfer_data) {
             $lims_transfer_unit_data = Unit::find($product_transfer_data->purchase_unit_id);
@@ -1604,6 +1563,41 @@ class TransferController extends Controller
         $lims_transfer_data->delete();
         $this->fileDelete(public_path('documents/transfer/'), $lims_transfer_data->document);
 
+        DB::commit();
         return redirect('transfers')->with('not_permitted', __('db.Transfer deleted successfully'));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Transfer deletion failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Transfer deletion failed: ' . $e->getMessage());
+        }
+    }
+
+    protected function dispatchTransferNotifications($transfer, array $productIds, array $quantities)
+    {
+        \Illuminate\Support\Facades\DB::afterCommit(function () use ($transfer, $productIds, $quantities) {
+            try {
+                $products = \App\Models\Product::whereIn('id', array_values(array_unique($productIds)))
+                    ->get(['id', 'name'])
+                    ->keyBy('id');
+
+                $compiledProducts = [];
+                foreach ($productIds as $index => $id) {
+                    $product = $products->get($id);
+                    if ($product) {
+                        $compiledProducts[] = [
+                            'name' => $product->name,
+                            'qty'  => (float) ($quantities[$index] ?? 0),
+                        ];
+                    }
+                }
+
+                $totalQty = (float) array_sum($quantities);
+                $dto = \App\DTOs\NotificationEventData::forTransfer($transfer, $compiledProducts, $totalQty);
+                app(\App\Services\NotificationService::class)->dispatch($dto);
+            } catch (\Throwable $e) {
+                \Log::error('Notification Dispatcher failed in TransferController: ' . $e->getMessage());
+            }
+        });
     }
 }

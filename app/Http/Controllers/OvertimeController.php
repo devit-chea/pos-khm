@@ -7,16 +7,25 @@ use App\Models\Overtime;
 use App\Models\Employee;
 use Illuminate\Support\Facades\Auth;
 use Spatie\Permission\Models\Role;
+use App\Http\Controllers\Concerns\AuthorizesHrmWarehouse;
 
 class OvertimeController extends Controller
 {
-    public function index()
+    use AuthorizesHrmWarehouse;
+
+    public function index(Request $request)
     {
         $role = Role::find(Auth::user()->role_id);
             if ($role->hasPermissionTo('overtime')) {
-                $overtimes = Overtime::with('employee')->get();
+                $overtimeQuery = Overtime::with('employee.warehouse');
+                if ($request->filled('warehouse_id')) {
+                    $warehouseId = $this->authorizedWarehouseId($request);
+                    $overtimeQuery->whereHas('employee', fn ($query) => $query->where('warehouse_id', $warehouseId));
+                }
+                $overtimes = $overtimeQuery->get();
                 $employees = Employee::all();
-                return view('backend.hrm.overtime.index', compact('overtimes', 'employees'));
+                $lims_warehouse_list = $this->authorizedWarehouses();
+                return view('backend.hrm.overtime.index', compact('overtimes', 'employees', 'lims_warehouse_list'));
             } else {
                 return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
             }
@@ -30,6 +39,7 @@ class OvertimeController extends Controller
             'hours' => 'required|numeric|min:0',
             'rate' => 'required|numeric|min:0'
         ]);
+        $this->authorizedEmployee((int) $request->employee_id);
         $data = $request->all();
         $data['date'] =  date("Y-m-d", strtotime(str_replace("/", "-", $request->input('date'))));
         Overtime::create($data);
@@ -45,6 +55,7 @@ class OvertimeController extends Controller
             'rate' => 'required|numeric|min:0',
             'status' => 'required|in:pending,approved,rejected'
         ]);
+        $this->authorizedEmployee((int) $request->employee_id);
         $data = $request->all();
         $data['date'] =  date("Y-m-d", strtotime(str_replace("/", "-", $request->input('date'))));
         $overtime = Overtime::findOrFail($id);

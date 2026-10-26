@@ -2,6 +2,7 @@
 @section('content')
 
 @push('css')
+    @include('backend.layout.partials.datatable_css')
 <style>
 .dashboard-counts { color: #333; padding: 10px 0; }
 .count-title { border-radius: 10px; box-shadow: rgba(37, 83, 185, 0.1) 0px 2px 6px 0px; display: flex; padding: 20px 10px; overflow: hidden; }
@@ -12,7 +13,10 @@
 .dashboard-counts .count-number { display: inline-block; font-size: 1.3em; font-weight: 500; line-height: 0.9; }
 .count-title { margin-top: 15px; position: relative; }
 .dashboard-counts strong { font-size: 1rem; margin-top: 5px; }
-
+.top-fields{margin-top:10px;position: relative;}
+.top-fields label {font-size:11px;font-weight:600;margin-left:10px;padding:0 3px;position:absolute;top:-8px;z-index:9;}
+.top-fields input{font-size:13px;height:45px}
+.dt-buttons{width: 100%}
 </style>
 @endpush
 
@@ -27,36 +31,35 @@
 
                     {{-- Date Range --}}
                     <div class="col-md-4">
-                        <div class="form-group mb-0">
-                            <label><strong>{{__('db.Choose Your Date')}}</strong></label>
-                            <div class="input-group">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text bg-white">
-                                        <i class="dripicons-calendar text-primary"></i>
-                                    </span>
+                        <div class="form-group top-fields row daterangepicker-container">
+                            <label class="d-tc">{{__('db.Choose Your Date')}}</label>
+                            <div class="d-tc">
+                                <div class="input-group">
+                                    <input type="text" class="daterangepicker-field form-control border-left-0"
+                                        value="{{$start_date}} To {{$end_date}}" readonly />
+                                    <input type="hidden" id="start_date" name="start_date" value="{{$start_date}}" />
+                                    <input type="hidden" id="end_date" name="end_date" value="{{$end_date}}" />
                                 </div>
-                                <input type="text" class="daterangepicker-field form-control border-left-0"
-                                    value="{{$start_date}} To {{$end_date}}" readonly />
-                                <input type="hidden" id="start_date" name="start_date" value="{{$start_date}}" />
-                                <input type="hidden" id="end_date" name="end_date" value="{{$end_date}}" />
                             </div>
                         </div>
                     </div>
 
                     {{-- Customer Filter --}}
                     <div class="col-md-4">
-                        <div class="form-group mb-0">
-                            <label><strong>{{__('db.customer')}}</strong></label>
-                            <select id="customer_filter" class="selectpicker form-control"
-                                data-live-search="true">
-                                <option value="0">{{__('db.All')}} {{__('db.customer')}}</option>
-                                @foreach($lims_customer_list as $customer)
-                                    <option value="{{$customer->id}}"
-                                        {{ $customer_id == $customer->id ? 'selected' : '' }}>
-                                        {{$customer->name}} [{{$customer->phone_number}}]
-                                    </option>
-                                @endforeach
-                            </select>
+                        <div class="form-group top-fields row">
+                            <label class="d-tc">{{__('db.Choose Customer')}}</label>
+                            <div class="d-tc">
+                                <input type="hidden" name="customer_id_hidden" value="{{$customer_id}}" />
+                                <select id="customer_filter" name="customer_id" class="selectpicker form-control" data-live-search="true">
+                                    <option value="0" {{ (int) $customer_id === 0 ? 'selected' : '' }}>{{__('db.all_customers') === 'db.All Customers' ? 'All Customers' : __('db.all_customers')}}</option>
+                                    @foreach($lims_customer_list as $customer)
+                                        @if ($customer->type != 'walkin')
+                                            <option value="{{$customer->id}}"
+                                            {{ $customer_id == $customer->id ? 'selected' : '' }}>{{$customer->name}} ({{$customer->phone_number}})</option>
+                                        @endif
+                                    @endforeach
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -77,11 +80,11 @@
                             <div class="wrapper count-title">
                                 <x-info title="Total Grand Amount of Due Sales" type="info" />
                                 <div class="icon">
-                                    <i class="dripicons-graph-bar" style="color: #733686"></i>
+                                    <i class="ti ti-chart-bar" style="color: #733686"></i>
                                 </div>
                                 <div>
                                     <div class="count-number" id="summary-grand-total">
-                                        {{ number_format(0, $general_setting->decimal, '.', '') }}
+                                        {{ number_format(0, gen_setting()->decimal, '.', '') }}
                                     </div>
                                     <div class="name">
                                         <strong style="color: #733686">{{__('db.grand total')}}</strong>
@@ -95,11 +98,11 @@
                             <div class="wrapper count-title">
                                 <x-info title="Total Returned Amount" type="info" />
                                 <div class="icon">
-                                    <i class="dripicons-return" style="color: #ff8952"></i>
+                                    <i class="ti ti-arrow-back" style="color: #ff8952"></i>
                                 </div>
                                 <div>
                                     <div class="count-number" id="summary-returned">
-                                        {{ number_format(0, $general_setting->decimal, '.', '') }}
+                                        {{ number_format(0, gen_setting()->decimal, '.', '') }}
                                     </div>
                                     <div class="name">
                                         <strong style="color: #ff8952">{{__('db.Returned Amount')}}</strong>
@@ -113,11 +116,11 @@
                             <div class="wrapper count-title">
                                 <x-info title="Total Paid Amount" type="info" />
                                 <div class="icon">
-                                    <i class="dripicons-checkmark" style="color: #00c689"></i>
+                                    <i class="ti ti-checkmark" style="color: #00c689"></i>
                                 </div>
                                 <div>
                                     <div class="count-number" id="summary-paid">
-                                        {{ number_format(0, $general_setting->decimal, '.', '') }}
+                                        {{ number_format(0, gen_setting()->decimal, '.', '') }}
                                     </div>
                                     <div class="name">
                                         <strong style="color: #00c689">{{__('db.Paid')}}</strong>
@@ -131,11 +134,11 @@
                             <div class="wrapper count-title">
                                 <x-info title="Grand Total - Returned - Paid = Due" type="info" />
                                 <div class="icon">
-                                    <i class="dripicons-document" style="color: #0584a0"></i>
+                                    <i class="ti ti-document" style="color: #0584a0"></i>
                                 </div>
                                 <div>
                                     <div class="count-number" id="summary-due">
-                                        {{ number_format(0, $general_setting->decimal, '.', '') }}
+                                        {{ number_format(0, gen_setting()->decimal, '.', '') }}
                                     </div>
                                     <div class="name">
                                         <strong style="color: #0584a0">{{__('db.Due')}}</strong>
@@ -158,10 +161,10 @@
                     <th>{{__('db.date')}}</th>
                     <th>{{__('db.reference')}}</th>
                     <th>{{__('db.Customer Details')}}</th>
-                    <th>{{__('db.grand total')}}</th>
-                    <th>{{__('db.Returned Amount')}}</th>
-                    <th>{{__('db.Paid')}}</th>
-                    <th>{{__('db.Due')}}</th>
+                    <th>{{__('db.grand total')}} ({{ config('currency') }})</th>
+                    <th>{{__('db.Returned Amount')}} ({{ config('currency') }})</th>
+                    <th>{{__('db.Paid')}} ({{ config('currency') }})</th>
+                    <th>{{__('db.Due')}} ({{ config('currency') }})</th>
                 </tr>
             </thead>
             <tfoot class="tfoot active">
@@ -169,10 +172,10 @@
                 <th>{{__('db.Total')}}:</th>
                 <th></th>
                 <th></th>
-                <th>{{number_format(0, $general_setting->decimal, '.', '')}}</th>
-                <th>{{number_format(0, $general_setting->decimal, '.', '')}}</th>
-                <th>{{number_format(0, $general_setting->decimal, '.', '')}}</th>
-                <th>{{number_format(0, $general_setting->decimal, '.', '')}}</th>
+                <th>{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
+                <th>{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
+                <th>{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
+                <th>{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
             </tfoot>
         </table>
     </div>
@@ -181,6 +184,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $("ul#report").siblings('a').attr('aria-expanded','true');
@@ -225,8 +229,8 @@
             "info": '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search": '{{__("db.Search")}}',
             'paginate': {
-                'previous': '<i class="dripicons-chevron-left"></i>',
-                'next': '<i class="dripicons-chevron-right"></i>'
+                'previous': '<i class="ti ti-chevron-left"></i>',
+                'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         order: [['1', 'desc']],
@@ -256,7 +260,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                 action: function(e, dt, button, config) {
                     datatable_sum_due(dt, true);
@@ -267,7 +271,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                 action: function(e, dt, button, config) {
                     datatable_sum_due(dt, true);
@@ -278,7 +282,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                 action: function(e, dt, button, config) {
                     datatable_sum_due(dt, true);
@@ -289,7 +293,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                 action: function(e, dt, button, config) {
                     datatable_sum_due(dt, true);
@@ -300,7 +304,7 @@
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],
@@ -339,15 +343,15 @@
     function datatable_sum_due(dt_selector, is_calling_first) {
         if (dt_selector.rows('.selected').any() && is_calling_first) {
             var rows = dt_selector.rows('.selected').indexes();
-            $(dt_selector.column(4).footer()).html(cleanSum(dt_selector.cells(rows, 4, { page: 'current' }).data()).toFixed({{$general_setting->decimal}}));
-            $(dt_selector.column(5).footer()).html(cleanSum(dt_selector.cells(rows, 5, { page: 'current' }).data()).toFixed({{$general_setting->decimal}}));
-            $(dt_selector.column(6).footer()).html(cleanSum(dt_selector.cells(rows, 6, { page: 'current' }).data()).toFixed({{$general_setting->decimal}}));
-            $(dt_selector.column(7).footer()).html(cleanSum(dt_selector.cells(rows, 7, { page: 'current' }).data()).toFixed({{$general_setting->decimal}}));
+            $(dt_selector.column(4).footer()).html(cleanSum(dt_selector.cells(rows, 4, { page: 'current' }).data()).toFixed({{gen_setting()->decimal}}));
+            $(dt_selector.column(5).footer()).html(cleanSum(dt_selector.cells(rows, 5, { page: 'current' }).data()).toFixed({{gen_setting()->decimal}}));
+            $(dt_selector.column(6).footer()).html(cleanSum(dt_selector.cells(rows, 6, { page: 'current' }).data()).toFixed({{gen_setting()->decimal}}));
+            $(dt_selector.column(7).footer()).html(cleanSum(dt_selector.cells(rows, 7, { page: 'current' }).data()).toFixed({{gen_setting()->decimal}}));
         } else {
-            $(dt_selector.column(4).footer()).html(cleanSum(dt_selector.column(4, { page: 'current' }).data()).toFixed({{$general_setting->decimal}}));
-            $(dt_selector.column(5).footer()).html(cleanSum(dt_selector.column(5, { page: 'current' }).data()).toFixed({{$general_setting->decimal}}));
-            $(dt_selector.column(6).footer()).html(cleanSum(dt_selector.column(6, { page: 'current' }).data()).toFixed({{$general_setting->decimal}}));
-            $(dt_selector.column(7).footer()).html(cleanSum(dt_selector.column(7, { page: 'current' }).data()).toFixed({{$general_setting->decimal}}));
+            $(dt_selector.column(4).footer()).html(cleanSum(dt_selector.column(4, { page: 'current' }).data()).toFixed({{gen_setting()->decimal}}));
+            $(dt_selector.column(5).footer()).html(cleanSum(dt_selector.column(5, { page: 'current' }).data()).toFixed({{gen_setting()->decimal}}));
+            $(dt_selector.column(6).footer()).html(cleanSum(dt_selector.column(6, { page: 'current' }).data()).toFixed({{gen_setting()->decimal}}));
+            $(dt_selector.column(7).footer()).html(cleanSum(dt_selector.column(7, { page: 'current' }).data()).toFixed({{gen_setting()->decimal}}));
         }
     }
 

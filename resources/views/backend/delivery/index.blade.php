@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <x-success-message key="message" />
 <x-error-message key="not_permitted" />
@@ -14,7 +18,7 @@
                     <th>{{__('db.Packing Slip Reference')}}</th>
                     <th>{{__('db.customer')}}</th>
                     <th>{{__('db.Courier')}}</th>
-                    <th>{{__('db.Tracking Code')}}</th>
+                    <th>{{__('db.tracking_code')}}</th>
                     <th>{{__('db.Address')}}</th>
                     <th>{{__('db.Products')}}</th>
                     <th>{{__('db.grand total')}}</th>
@@ -34,20 +38,20 @@
         <div class="container mt-3 pb-2 border-bottom">
             <div class="row">
                 <div class="col-md-6 d-print-none">
-                    <button id="print-btn" type="button" class="btn btn-default btn-sm d-print-none"><i class="dripicons-print"></i> {{__('db.Print')}}</button>
+                    <button id="print-btn" type="button" class="btn btn-default btn-sm d-print-none"><i class="ti ti-printer"></i> {{__('db.print')}}</button>
 
                     <form action="{{ route('delivery.sendMail') }}" method="POST" class="sendmail-form">
                         @csrf
                         <input type="hidden" name="delivery_id">
-                        <button class="btn btn-default btn-sm d-print-none"><i class="dripicons-mail"></i> {{__('db.Email')}}</button>
+                        <button class="btn btn-default btn-sm d-print-none"><i class="ti ti-mail"></i> {{__('db.email')}}</button>
                     </form>
                 </div>
                 <div class="col-md-6">
-                    <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close d-print-none"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close d-print-none"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="col-md-12">
                     <h3 id="exampleModalLabel" class="modal-title text-center container-fluid">
-                        {{$general_setting->site_title}}
+                        {{gen_setting()->site_title}}
                     </h3>
                 </div>
                 <div class="col-md-12 text-center">
@@ -84,7 +88,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{__('db.Update Delivery')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
                 <form action="{{ route('delivery.update') }}" method="POST" enctype="multipart/form-data">
@@ -135,7 +139,7 @@
                         <textarea rows="3" name="address" class="form-control" required></textarea>
                     </div>
                     <div class="col-md-6 form-group">
-                        <label>{{__('db.Note')}}</label>
+                        <label>{{__('db.note')}}</label>
                         <textarea rows="3" name="note" class="form-control"></textarea>
                     </div>
                 </div>
@@ -154,10 +158,10 @@
         <div class="modal-content">
             <div class="modal-header" style="background: #2d6a4f;">
                 <h5 class="modal-title text-white">
-                    <i class="fa fa-map-marker"></i> Parcel Tracking
+                    <i class="ti ti-map-marker"></i> Parcel Tracking
                 </h5>
                 <button type="button" data-dismiss="modal" aria-label="Close" class="close text-white">
-                    <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                    <span aria-hidden="true"><i class="ti ti-x"></i></span>
                 </button>
             </div>
             <div class="modal-body" id="tracking-modal-body">
@@ -171,8 +175,8 @@
     <div role="document" class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 id="exampleModalLabel" class="modal-title">{{__('db.Send Delivery')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <h5 id="exampleModalLabel" class="modal-title">{{__('db.send_delivery')}}</h5>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
                 <form action="{{ route('steadfast.create-order') }}" method="POST" id="steadfastForm">
@@ -191,11 +195,11 @@
                         <input type="text" name="recipient_phone" class="form-control">
                     </div>
                     <div class="col-md-6 mt-2 form-group">
-                        <label>{{__('db.Alternative Phone')}}</label>
+                        <label>{{__('db.alternative_phone')}}</label>
                         <input type="text" name="alternative_phone" class="form-control">
                     </div>
                     <div class="col-md-6 form-group">
-                        <label>{{__('db.Email')}}</label>
+                        <label>{{__('db.email')}}</label>
                         <input type="email" name="recipient_email" class="form-control">
                     </div>
                     <div class="col-md-6 form-group">
@@ -211,7 +215,7 @@
                         <textarea rows="3" name="item_description" class="form-control"></textarea>
                     </div>
                     <div class="col-md-6 form-group">
-                        <label>{{__('db.Note')}}</label>
+                        <label>{{__('db.note')}}</label>
                         <textarea rows="3" name="note" class="form-control"></textarea>
                     </div>
                 </div>
@@ -228,6 +232,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $("ul#sale").siblings('a').attr('aria-expanded','true');
@@ -235,7 +240,7 @@
     $("ul#sale #delivery-menu").addClass("active");
 
     var delivery_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
     $.ajaxSetup({
         headers: {
@@ -255,12 +260,7 @@
         a.print();
     });
 
-    function confirmDelete() {
-      if (confirm("Are you sure want to delete?")) {
-          return true;
-      }
-      return false;
-    }
+    function confirmDelete() { return true; }
 
     // $("tr.delivery-link td:not(:first-child, :last-child)").on("click", function() {
     //     var delivery = $(this).parent().data('delivery');
@@ -307,6 +307,7 @@
 });
 
     function deliveryDetails(delivery, barcode) {
+        delivery = delivery.map(value => $('<div>').text(value ?? '').html());
         $('input[name="delivery_id"]').val(delivery[4]);
         $("#delivery-content tbody").remove();
         var newBody = $("<tbody>");
@@ -367,10 +368,10 @@
             row.customer.match(/<br>(.*)/)?.[1] ?? '',
             row.address,
             '',
-            '',
-            '',
-            '',
-            ''
+            row.note ?? '',
+            row.prepared_by ?? '',
+            row.delivered_by ?? '',
+            row.recieved_by ?? ''
         ];
 
         let barcode = row.barcode ?? '';
@@ -432,8 +433,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -462,7 +463,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -470,7 +471,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -478,7 +479,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -486,14 +487,14 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
                 },
             },
             {
-                text: '<i title="delete" class="dripicons-cross"></i>',
+                text: '<i title="delete" class="ti ti-x"></i>',
                 className: 'buttons-delete',
                 action: function ( e, dt, node, config ) {
                     if(user_verified == '1') {
@@ -503,7 +504,7 @@
                                 delivery_id[i-1] = $(this).closest('tr').data('id');
                             }
                         });
-                        if(delivery_id.length && confirm("Are you sure want to delete?")) {
+                        if (delivery_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                             $.ajax({
                                 type:'POST',
                                 url:'delivery/deletebyselection',
@@ -511,21 +512,23 @@
                                     deliveryIdArray: delivery_id
                                 },
                                 success:function(data){
-                                    alert(data);
+                                    SaleProToast.show(data);
                                 }
                             });
                             dt.rows({ page: 'current', selected: true }).remove().draw(false);
                         }
+                        });
+                        }
                         else if(!delivery_id.length)
-                            alert('Nothing is selected!');
+                            SaleProToast.show('Nothing is selected!');
                     }
                     else
-                        alert('This feature is disable for demo!');
+                        SaleProToast.show('This feature is disable for demo!');
                 }
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],
@@ -539,7 +542,7 @@ $(document).on('click', '.track-delivery-btn', function () {
 
     $('#tracking-modal-body').html(`
         <div class="text-center py-4">
-            <i class="fa fa-spinner fa-spin fa-2x text-info"></i>
+            <i class="ti ti-spinner fa-spin fa-2x text-info"></i>
             <p class="mt-2 text-muted">
                 Fetching tracking info for
                 <strong>${trackingCode}</strong>...
@@ -556,7 +559,7 @@ $(document).on('click', '.track-delivery-btn', function () {
             if (!res.success) {
                 $('#tracking-modal-body').html(`
                     <div class="alert alert-danger">
-                        <i class="fa fa-times-circle"></i> ${res.error}
+                        <i class="ti ti-times-circle"></i> ${res.error}
                     </div>
                 `);
                 return;
@@ -565,7 +568,7 @@ $(document).on('click', '.track-delivery-btn', function () {
             const trackingUrlBtn = res.tracking_url
                 ? `<div class="text-center mt-3">
                        <a href="${res.tracking_url}" target="_blank" class="btn btn-sm btn-outline-info">
-                           <i class="fa fa-external-link"></i> View on ${res.courier} Website
+                           <i class="ti ti-external-link"></i> View on ${res.courier} Website
                        </a>
                    </div>`
                 : '';
@@ -616,7 +619,7 @@ $(document).on('click', '.track-delivery-btn', function () {
         error: function () {
             $('#tracking-modal-body').html(`
                 <div class="alert alert-danger">
-                    <i class="fa fa-times-circle"></i> Server error. Please try again.
+                    <i class="ti ti-times-circle"></i> Server error. Please try again.
                 </div>
             `);
         }
@@ -628,27 +631,32 @@ $(document).on('click', '.pathao-delivery', function () {
     var deliveryId = $(this).data('delivery-id');
     var saleId     = $(this).data('id');
 
-    if (confirm('Are you sure you want to send this order to Pathao?')) {
+    SaleProConfirm.open({
+        message: 'Are you sure you want to send this order to Pathao?',
+        confirmText: "{{__('db.Yes')}}",
+        type: "info"
+    }).then(function(confirmed) { if (confirmed) {
         $.ajax({
             type: 'POST',
             url: '{{url("delivery")}}/' + deliveryId + '/send-to-pathao',
             data: { _token: '{{ csrf_token() }}' },
             beforeSend: function () {
-                alert('Sending order to Pathao...');
+                SaleProToast.show('Sending order to Pathao...');
             },
             success: function (response) {
                 if (response.success) {
-                    alert('Order sent to Pathao successfully! Tracking Code: ' + response.tracking_code);
+                    SaleProToast.show('Order sent to Pathao successfully! Tracking Code: ' + response.tracking_code);
                     location.reload();
                 } else {
-                    alert('Failed to send order to Pathao. Error: ' + response.error);
+                    SaleProToast.show('Failed to send order to Pathao. Error: ' + response.error);
                 }
             },
             error: function () {
-                alert('Something went wrong! Please try again.');
+                SaleProToast.show('Something went wrong! Please try again.');
             }
         });
     }
+    });
 });
 </script>
 @endpush

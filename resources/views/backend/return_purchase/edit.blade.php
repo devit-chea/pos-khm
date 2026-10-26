@@ -66,7 +66,7 @@
                                     <div class="col-md-12 mt-3">
                                         <label>{{__('db.Select Product')}}</label>
                                         <div class="search-box input-group">
-                                            <button type="button" class="btn btn-secondary btn-lg"><i class="fa fa-barcode"></i></button>
+                                            <button type="button" class="btn btn-secondary btn-lg"><i class="ti ti-barcode"></i></button>
                                             <input type="text" name="product_code_name" id="lims_productcodeSearch" placeholder="{{__('db.Please type product code and select')}}" class="form-control" />
                                         </div>
                                     </div>
@@ -86,7 +86,7 @@
                                                         <th>{{__('db.Discount')}}</th>
                                                         <th>{{__('db.Tax')}}</th>
                                                         <th>{{__('db.Subtotal')}}</th>
-                                                        <th><i class="dripicons-trash"></i></th>
+                                                        <th><i class="ti ti-trash"></i></th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -96,21 +96,42 @@
                                                     $temp_unit_operation_value = [];
                                                     ?>
                                                     @foreach($lims_product_return_data as $product_return)
-                                                    <tr>
                                                     <?php
                                                         $product_data = DB::table('products')->find($product_return->product_id);
+                                                        if (!$product_data) {
+                                                            continue;
+                                                        }
+                                                        $product_variant_id = null;
                                                         if($product_return->variant_id) {
                                                             $product_variant_data = \App\Models\ProductVariant::select('id', 'item_code')->FindExactProduct($product_return->product_id, $product_return->variant_id)->first();
-                                                            $product_data->code = $product_variant_data->item_code;
-                                                            $product_variant_id = $product_variant_data->id;
+                                                            if (!$product_variant_data) {
+                                                                $product_variant_data = \App\Models\ProductVariant::select('id', 'item_code')
+                                                                    ->where('product_id', $product_return->product_id)
+                                                                    ->where('id', $product_return->variant_id)
+                                                                    ->first();
+                                                            }
+                                                            if ($product_variant_data) {
+                                                                $product_data->code = $product_variant_data->item_code;
+                                                                $product_variant_id = $product_variant_data->id;
+                                                            } else {
+                                                                $product_variant_id = null;
+                                                                $product_data->code = $product_data->code ?? 'N/A';
+                                                            }
                                                         }
-                                                        else
+                                                        else {
                                                             $product_variant_id = null;
+                                                        }
+
+                                                        $lineQty = (float) $product_return->qty;
+                                                        $hasValidQty = $lineQty > 0;
                                                         if($product_data->tax_method == 1){
-                                                            $product_cost = $product_return->net_unit_cost + ($product_return->discount / $product_return->qty);
+                                                            $product_cost = $product_return->net_unit_cost + ($hasValidQty ? ($product_return->discount / $lineQty) : 0);
                                                         }
                                                         elseif ($product_data->tax_method == 2) {
-                                                            $product_cost =($product_return->total / $product_return->qty) + ($product_return->discount / $product_return->qty);
+                                                            $product_cost = ($hasValidQty ? ($product_return->total / $lineQty) : $product_return->net_unit_cost) + ($hasValidQty ? ($product_return->discount / $lineQty) : 0);
+                                                        }
+                                                        else {
+                                                            $product_cost = $product_return->net_unit_cost;
                                                         }
 
                                                         $tax = DB::table('taxes')->where('rate',$product_return->tax_rate)->first();
@@ -150,7 +171,8 @@
                                                         $temp_unit_operation_value = $unit_operation_value =  implode(",",$unit_operation_value) . ',';
                                                         $product_batch_data = \App\Models\ProductBatch::select('batch_no')->find($product_return->product_batch_id);
                                                     ?>
-                                                        <td>{{$product_data->name}} <button type="button" class="edit-product btn btn-link" data-toggle="modal" data-target="#editModal"> <i class="dripicons-document-edit"></i></button> </td>
+                                                    <tr>
+                                                        <td>{{$product_data->name}} <button type="button" class="edit-product btn btn-link" data-toggle="modal" data-target="#editModal"> <i class="ti ti-edit"></i></button> </td>
                                                         <td>{{$product_data->code}}</td>
                                                         @if($product_batch_data)
                                                         <td>
@@ -163,11 +185,11 @@
                                                             <input type="text" class="form-control batch-no" name="batch_no[]" value="" disabled />
                                                         </td>
                                                         @endif
-                                                        <td><input type="number" class="form-control qty" name="qty[]" value="{{$product_return->qty}}" required step="any" /></td>
-                                                        <td class="net_unit_cost">{{ number_format((float)$product_return->net_unit_cost, $general_setting->decimal, '.', '')}} </td>
-                                                        <td class="discount">{{ number_format((float)$product_return->discount, $general_setting->decimal, '.', '')}}</td>
-                                                        <td class="tax">{{ number_format((float)$product_return->tax, $general_setting->decimal, '.', '')}}</td>
-                                                        <td class="sub-total">{{ number_format((float)$product_return->total, $general_setting->decimal, '.', '')}}</td>
+                                                        <td><input type="number" class="form-control qty" name="qty[]" value="{{$product_return->qty}}" required step="any" min="0.000001" /></td>
+                                                        <td class="net_unit_cost">{{ number_format((float)$product_return->net_unit_cost, gen_setting()->decimal, '.', '')}} </td>
+                                                        <td class="discount">{{ number_format((float)$product_return->discount, gen_setting()->decimal, '.', '')}}</td>
+                                                        <td class="tax">{{ number_format((float)$product_return->tax, gen_setting()->decimal, '.', '')}}</td>
+                                                        <td class="sub-total">{{ number_format((float)$product_return->total, gen_setting()->decimal, '.', '')}}</td>
                                                         <td><button type="button" class="ibtnDel btn btn-md btn-danger">{{__("db.delete")}}</button></td>
                                                         <input type="hidden" class="product-code" name="product_code[]" value="{{$product_data->code}}"/>
                                                         <input type="hidden" name="product_id[]" class="product-id" value="{{$product_data->id}}"/>
@@ -196,10 +218,10 @@
                                                     <th></th>
                                                     <th id="total-qty">{{$lims_return_data->total_qty}}</th>
                                                     <th></th>
-                                                    <th id="total-discount">{{ number_format((float)$lims_return_data->total_discount, $general_setting->decimal, '.', '')}}</th>
-                                                    <th id="total-tax">{{ number_format((float)$lims_return_data->total_tax, $general_setting->decimal, '.', '')}}</th>
-                                                    <th id="total">{{ number_format((float)$lims_return_data->total_cost, $general_setting->decimal, '.', '')}}</th>
-                                                    <th><i class="dripicons-trash"></i></th>
+                                                    <th id="total-discount">{{ number_format((float)$lims_return_data->total_discount, gen_setting()->decimal, '.', '')}}</th>
+                                                    <th id="total-tax">{{ number_format((float)$lims_return_data->total_tax, gen_setting()->decimal, '.', '')}}</th>
+                                                    <th id="total">{{ number_format((float)$lims_return_data->total_cost, gen_setting()->decimal, '.', '')}}</th>
+                                                    <th><i class="ti ti-trash"></i></th>
                                                 </tfoot>
                                             </table>
                                         </div>
@@ -254,7 +276,7 @@
                                 	<div class="col-md-4">
                                         <div class="form-group">
                                             <label>{{__('db.Attach Document')}}</label>
-                                            <i class="dripicons-question" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
+                                            <i class="ti ti-info-circle" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
                                             <input type="file" name="document" class="form-control" />
                                             @if($errors->has('extension'))
                                                 <span>
@@ -292,16 +314,16 @@
     <div class="container-fluid">
         <table class="table table-bordered table-condensed totals">
             <td><strong>{{__('db.Items')}}</strong>
-                <span class="pull-right" id="item">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="item">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
             <td><strong>{{__('db.Total')}}</strong>
-                <span class="pull-right" id="subtotal">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="subtotal">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
             <td><strong>{{__('db.Order Tax')}}</strong>
-                <span class="pull-right" id="order_tax">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="order_tax">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
             <td><strong>{{__('db.grand total')}}</strong>
-                <span class="pull-right" id="grand_total">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="grand_total">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
         </table>
     </div>
@@ -311,7 +333,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="modal-header" class="modal-title"></h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                     <form>
@@ -396,7 +418,7 @@ for(rowindex  =0; rowindex <= rownumber; rowindex++){
     var total_discount = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount').text());
     var quantity = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val());
     exist_qty.push(quantity);
-    product_discount.push((total_discount / quantity).toFixed({{$general_setting->decimal}}));
+    product_discount.push((total_discount / quantity).toFixed({{gen_setting()->decimal}}));
     tax_rate.push(parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val()));
     tax_name.push($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-name').val());
     tax_method.push($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-method').val());
@@ -421,9 +443,9 @@ $('select[name="order_tax_rate"]').val($('input[name="order_tax_rate_hidden"]').
 $('.selectpicker').selectpicker('refresh');
 
 $('#item').text($('input[name="item"]').val() + '(' + $('input[name="total_qty"]').val() + ')');
-$('#subtotal').text(parseFloat($('input[name="total_cost"]').val()).toFixed({{$general_setting->decimal}}));
-$('#order_tax').text(parseFloat($('input[name="order_tax"]').val()).toFixed({{$general_setting->decimal}}));
-$('#grand_total').text(parseFloat($('input[name="grand_total"]').val()).toFixed({{$general_setting->decimal}}));
+$('#subtotal').text(parseFloat($('input[name="total_cost"]').val()).toFixed({{gen_setting()->decimal}}));
+$('#order_tax').text(parseFloat($('input[name="order_tax"]').val()).toFixed({{gen_setting()->decimal}}));
+$('#grand_total').text(parseFloat($('input[name="grand_total"]').val()).toFixed({{gen_setting()->decimal}}));
 
 var id = $('select[name="warehouse_id"]').val();
 $.get('../getproduct/' + id, function(data) {
@@ -487,7 +509,7 @@ $("#myTable").on('input', '.qty', function() {
     rowindex = $(this).closest('tr').index();
     if($(this).val() < 1 && $(this).val() != '') {
       $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val(1);
-      alert("Quantity can't be less than 1");
+      SaleProToast.show("Quantity can't be less than 1");
     }
     checkQuantity($(this).val(), true);
 });
@@ -499,7 +521,7 @@ $("#myTable").on("change", ".batch-no", function () {
     var warehouse_id = $('#warehouse_id').val();
     $.get('../../check-batch-availability/' + product_id + '/' + $(this).val() + '/' + warehouse_id, function(data) {
         if(data['message'] != 'ok') {
-            alert(data['message']);
+            SaleProToast.show(data['message']);
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.batch-no').val('');
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product-batch-id').val('');
         }
@@ -541,14 +563,14 @@ $('button[name="update_btn"]').on("click", function() {
     var edit_unit_cost = $('input[name="edit_unit_cost"]').val();
 
     if (parseFloat(edit_discount) > parseFloat(edit_unit_cost)) {
-        alert('Invalid Discount Input!');
+        SaleProToast.show('Invalid Discount Input!');
         return;
     }
 
     if(edit_qty < 1) {
         $('input[name="edit_qty"]').val(1);
         edit_qty = 1;
-        alert("Quantity can't be less than 1");
+        SaleProToast.show("Quantity can't be less than 1");
     }
 
     var row_unit_operator = unit_operator[rowindex].slice(0, unit_operator[rowindex].indexOf(","));
@@ -618,15 +640,15 @@ function productSearch(data) {
                 var cols = '';
                 temp_unit_name = (data[6]).split(',');
                 pos = product_code.indexOf(data[1]);
-                cols += '<td>' + data[0] + '<button type="button" class="edit-product btn btn-link" data-toggle="modal" data-target="#editModal"> <i class="dripicons-document-edit"></i></button></td>';
+                cols += '<td>' + data[0] + '<button type="button" class="edit-product btn btn-link" data-toggle="modal" data-target="#editModal"> <i class="ti ti-edit"></i></button></td>';
                 cols += '<td>' + data[1] + '</td>';
                 if(is_batch[pos])
                     cols += '<td><input type="text" class="form-control batch-no" required/> <input type="hidden" class="product-batch-id" name="product_batch_id[]"/> </td>';
                 else
                     cols += '<td><input type="text" class="form-control batch-no" disabled/> <input type="hidden" class="product-batch-id" name="product_batch_id[]"/> </td>';
-                cols += '<td><input type="number" class="form-control qty" name="qty[]" value="1" step="any" required/></td>';
+                cols += '<td><input type="number" class="form-control qty" name="qty[]" value="1" step="any" min="0.000001" required/></td>';
                 cols += '<td class="net_unit_cost"></td>';
-                cols += '<td class="discount">{{number_format(0, $general_setting->decimal, '.', '')}}</td>';
+                cols += '<td class="discount">{{number_format(0, gen_setting()->decimal, '.', '')}}</td>';
                 cols += '<td class="tax"></td>';
                 cols += '<td class="sub-total"></td>';
                 cols += '<td><button type="button" class="ibtnDel btn btn-md btn-danger">{{__("db.delete")}}</button></td>';
@@ -645,7 +667,7 @@ function productSearch(data) {
                 $("table.order-list tbody").prepend(newRow);
                 rowindex = newRow.index();
                 product_cost.splice(rowindex, 0, parseFloat(data[2]));
-                product_discount.splice(rowindex, 0, '{{number_format(0, $general_setting->decimal, '.', '')}}');
+                product_discount.splice(rowindex, 0, '{{number_format(0, gen_setting()->decimal, '.', '')}}');
                 tax_rate.splice(rowindex, 0, parseFloat(data[3]));
                 tax_name.splice(rowindex, 0, data[4]);
                 tax_method.splice(rowindex, 0, data[5]);
@@ -677,10 +699,10 @@ function edit(){
     var qty = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val();
     $('input[name="edit_qty"]').val(qty);
 
-    $('input[name="edit_discount"]').val(parseFloat(product_discount[rowindex]).toFixed({{$general_setting->decimal}}));
+    $('input[name="edit_discount"]').val(parseFloat(product_discount[rowindex]).toFixed({{gen_setting()->decimal}}));
 
     unitConversion();
-    $('input[name="edit_unit_cost"]').val(row_product_cost.toFixed({{$general_setting->decimal}}));
+    $('input[name="edit_unit_cost"]').val(row_product_cost.toFixed({{gen_setting()->decimal}}));
 
     var tax_name_all = <?php echo json_encode($tax_name_all) ?>;
     var pos = tax_name_all.indexOf(tax_name[rowindex]);
@@ -709,7 +731,7 @@ function checkQuantity(purchase_qty, flag) {
     else if(operator[0] == '/')
         total_qty = purchase_qty / operation_value[0];
     if (total_qty > parseFloat(product_qty[pos])) {
-        alert('Quantity exceeds stock quantity!');
+        SaleProToast.show('Quantity exceeds stock quantity!');
         if (flag) {
             purchase_qty = purchase_qty.substring(0, purchase_qty.length - 1);
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val(purchase_qty);
@@ -729,33 +751,33 @@ function checkQuantity(purchase_qty, flag) {
 
 function calculateRowProductData(quantity) {
     unitConversion();
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount').text((product_discount[rowindex] * quantity).toFixed({{$general_setting->decimal}}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount-value').val((product_discount[rowindex] * quantity).toFixed({{$general_setting->decimal}}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val(tax_rate[rowindex].toFixed({{$general_setting->decimal}}));
+    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount').text((product_discount[rowindex] * quantity).toFixed({{gen_setting()->decimal}}));
+    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount-value').val((product_discount[rowindex] * quantity).toFixed({{gen_setting()->decimal}}));
+    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val(tax_rate[rowindex].toFixed({{gen_setting()->decimal}}));
 
     if (tax_method[rowindex] == 1) {
         var net_unit_cost = row_product_cost - product_discount[rowindex];
         var tax = net_unit_cost * quantity * (tax_rate[rowindex] / 100);
         var sub_total = (net_unit_cost * quantity) + tax;
 
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').text(net_unit_cost.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax').text(tax.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text(sub_total.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total.toFixed({{$general_setting->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').text(net_unit_cost.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax').text(tax.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text(sub_total.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total.toFixed({{gen_setting()->decimal}}));
     } else {
         var sub_total_unit = row_product_cost - product_discount[rowindex];
         var net_unit_cost = (100 / (100 + tax_rate[rowindex])) * sub_total_unit;
         var tax = (sub_total_unit - net_unit_cost) * quantity;
         var sub_total = sub_total_unit * quantity;
 
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').text(net_unit_cost.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax').text(tax.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text(sub_total.toFixed({{$general_setting->decimal}}));
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total.toFixed({{$general_setting->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').text(net_unit_cost.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_cost').val(net_unit_cost.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax').text(tax.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text(sub_total.toFixed({{gen_setting()->decimal}}));
+        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val(sub_total.toFixed({{gen_setting()->decimal}}));
     }
 
     calculateTotal();
@@ -791,24 +813,24 @@ function calculateTotal() {
     $(".discount").each(function() {
         total_discount += parseFloat($(this).text());
     });
-    $("#total-discount").text(total_discount.toFixed({{$general_setting->decimal}}));
-    $('input[name="total_discount"]').val(total_discount.toFixed({{$general_setting->decimal}}));
+    $("#total-discount").text(total_discount.toFixed({{gen_setting()->decimal}}));
+    $('input[name="total_discount"]').val(total_discount.toFixed({{gen_setting()->decimal}}));
 
     //Sum of tax
     var total_tax = 0;
     $(".tax").each(function() {
         total_tax += parseFloat($(this).text());
     });
-    $("#total-tax").text(total_tax.toFixed({{$general_setting->decimal}}));
-    $('input[name="total_tax"]').val(total_tax.toFixed({{$general_setting->decimal}}));
+    $("#total-tax").text(total_tax.toFixed({{gen_setting()->decimal}}));
+    $('input[name="total_tax"]').val(total_tax.toFixed({{gen_setting()->decimal}}));
 
     //Sum of subtotal
     var total = 0;
     $(".sub-total").each(function() {
         total += parseFloat($(this).text());
     });
-    $("#total").text(total.toFixed({{$general_setting->decimal}}));
-    $('input[name="total_cost"]').val(total.toFixed({{$general_setting->decimal}}));
+    $("#total").text(total.toFixed({{gen_setting()->decimal}}));
+    $('input[name="total_cost"]').val(total.toFixed({{gen_setting()->decimal}}));
 
     calculateGrandTotal();
 }
@@ -824,9 +846,9 @@ function calculateGrandTotal() {
     var shipping_cost = parseFloat($('input[name="shipping_cost"]').val());
 
     if (!order_discount)
-        order_discount = {{number_format(0, $general_setting->decimal, '.', '')}};
+        order_discount = {{number_format(0, gen_setting()->decimal, '.', '')}};
     if (!shipping_cost)
-        shipping_cost = {{number_format(0, $general_setting->decimal, '.', '')}};
+        shipping_cost = {{number_format(0, gen_setting()->decimal, '.', '')}};
 
     item = ++item + '(' + total_qty + ')';
     order_tax = (subtotal - order_discount) * (order_tax / 100);
@@ -834,13 +856,13 @@ function calculateGrandTotal() {
 
     $('#item').text(item);
     $('input[name="item"]').val($('table.order-list tbody tr:last').index() + 1);
-    $('#subtotal').text(subtotal.toFixed({{$general_setting->decimal}}));
-    $('#order_tax').text(order_tax.toFixed({{$general_setting->decimal}}));
-    $('input[name="order_tax"]').val(order_tax.toFixed({{$general_setting->decimal}}));
-    $('#order_discount').text(order_discount.toFixed({{$general_setting->decimal}}));
-    $('#shipping_cost').text(shipping_cost.toFixed({{$general_setting->decimal}}));
-    $('#grand_total').text(grand_total.toFixed({{$general_setting->decimal}}));
-    $('input[name="grand_total"]').val(grand_total.toFixed({{$general_setting->decimal}}));
+    $('#subtotal').text(subtotal.toFixed({{gen_setting()->decimal}}));
+    $('#order_tax').text(order_tax.toFixed({{gen_setting()->decimal}}));
+    $('input[name="order_tax"]').val(order_tax.toFixed({{gen_setting()->decimal}}));
+    $('#order_discount').text(order_discount.toFixed({{gen_setting()->decimal}}));
+    $('#shipping_cost').text(shipping_cost.toFixed({{gen_setting()->decimal}}));
+    $('#grand_total').text(grand_total.toFixed({{gen_setting()->decimal}}));
+    $('input[name="grand_total"]').val(grand_total.toFixed({{gen_setting()->decimal}}));
 }
 
 $(window).keydown(function(e){
@@ -865,11 +887,39 @@ $(window).keydown(function(e){
 $('.payment-form').on('submit',function(e){
     var rownumber = $('table.order-list tbody tr:last').index();
     if (rownumber < 0) {
-        alert("Please insert product to order table!")
+        SaleProToast.show("Please insert product to order table!");
         e.preventDefault();
+        return false;
     }
-    else {
-        $("#submit-button").prop('disabled', true);
+
+    var invalidInput = null;
+    $('table.order-list tbody tr').each(function() {
+        var $qtyInput = $(this).find('input.qty');
+        var rawVal = String($qtyInput.val() === null ? '' : $qtyInput.val()).trim();
+        var numVal = Number(rawVal);
+        $qtyInput.removeClass('is-invalid');
+
+        if (rawVal === '' || !Number.isFinite(numVal) || numVal <= 0) {
+            invalidInput = $qtyInput;
+            return false;
+        }
+    });
+
+    if (invalidInput) {
+        invalidInput.addClass('is-invalid').focus();
+        SaleProToast.show("Quantity must be greater than zero.");
+        e.preventDefault();
+        return false;
+    }
+
+    $("#submit-button").prop('disabled', true);
+});
+
+$(document).on('input change', '.payment-form input.qty', function() {
+    var rawVal = String($(this).val() === null ? '' : $(this).val()).trim();
+    var numVal = Number(rawVal);
+    if (rawVal !== '' && Number.isFinite(numVal) && numVal > 0) {
+        $(this).removeClass('is-invalid');
     }
 });
 

@@ -1,4 +1,8 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
     <x-success-message key="message" />
 
@@ -24,7 +28,7 @@
 
                 <tbody>
                     @php
-                        $balance = $initial_balance->initial_balance;
+                        $balance = $opening_balance ?? $initial_balance->initial_balance;
                         $total_credit = 0;
                         $total_debit = 0;
                         $total_debit = 0;
@@ -37,15 +41,15 @@
                             <td>{{ $key + 1 }}</td>
 
                             <td data-sort="{{ $data[0] ? date('Y-m-d', strtotime($data[0])) : '' }}">
-                                {{ $data[0] ? date($general_setting->date_format, strtotime($data[0])) : '' }}
+                                {{ $data[0] ? date(gen_setting()->date_format, strtotime($data[0])) : '' }}
                             </td>
 
                             <td>{{ $data[1] }}</td>
                             <td>{{ $data[2] }}</td>
 
-                            <td>{{ number_format($data[3], $general_setting->decimal, '.', '') }}</td>
-                            <td>{{ number_format($data[4], $general_setting->decimal, '.', '') }}</td>
-                            <td>{{ number_format($data[5], $general_setting->decimal, '.', '') }}</td>
+                            <td>{{ number_format($data[3], gen_setting()->decimal, '.', '') }}</td>
+                            <td>{{ number_format($data[4], gen_setting()->decimal, '.', '') }}</td>
+                            <td>{{ number_format($data[5], gen_setting()->decimal, '.', '') }}</td>
                         </tr>
 
                         @if ($loop->last)
@@ -53,32 +57,32 @@
                             <td>{{ $key + 1 }}</td>
 
                             <td data-sort="{{ $data[0] ? date('Y-m-d', strtotime($initial_balance->created_at)) : '' }}">
-                                {{ $data[0] ? date($general_setting->date_format, strtotime($initial_balance->created_at)) : '' }}
+                                {{ $data[0] ? date(gen_setting()->date_format, strtotime($initial_balance->created_at)) : '' }}
                             </td>
 
-                            <td>{{ __('db.Initial Balance') }}</td>
+                            <td>Opening Balance</td>
                             <td>------</td>
 
-                            <td>{{ number_format($initial_balance->initial_balance, $general_setting->decimal, '.', '') }}</td>
+                            <td>{{ number_format($opening_balance ?? $initial_balance->initial_balance, gen_setting()->decimal, '.', '') }}</td>
                             <td>0</td>
-                            <td>{{ number_format($initial_balance->initial_balance, $general_setting->decimal, '.', '') }}</td>
+                            <td>{{ number_format($opening_balance ?? $initial_balance->initial_balance, gen_setting()->decimal, '.', '') }}</td>
                         </tr>
                         @endif
                     @empty
-                        @if ($initial_balance->initial_balance != 0)
+                        @if (($opening_balance ?? $initial_balance->initial_balance) != 0)
                             <tr>
                             <td>1</td>
 
                             <td data-sort="{{ $initial_balance->created_at ? date('Y-m-d', strtotime($initial_balance->created_at)) : '' }}">
-                                {{ $initial_balance->created_at ? date($general_setting->date_format, strtotime($initial_balance->created_at)) : '' }}
+                                {{ $initial_balance->created_at ? date(gen_setting()->date_format, strtotime($initial_balance->created_at)) : '' }}
                             </td>
 
-                            <td>{{ __('db.Initial Balance') }}</td>
+                            <td>Opening Balance</td>
                             <td>------</td>
 
-                            <td>{{ number_format($initial_balance->initial_balance, $general_setting->decimal, '.', '') }}</td>
+                            <td>{{ number_format($opening_balance ?? $initial_balance->initial_balance, gen_setting()->decimal, '.', '') }}</td>
                             <td>0</td>
-                            <td>{{ number_format($initial_balance->initial_balance, $general_setting->decimal, '.', '') }}</td>
+                            <td>{{ number_format($opening_balance ?? $initial_balance->initial_balance, gen_setting()->decimal, '.', '') }}</td>
                         </tr>
                         @endif
                     @endforelse
@@ -93,6 +97,7 @@
 
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
     <script type="text/javascript">
 
         jQuery.extend(jQuery.fn.dataTableExt.oSort, {
@@ -116,8 +121,8 @@
                 "info": '<small>{{ __('db.Showing') }} _START_ - _END_ (_TOTAL_)</small>',
                 "search": '{{ __('db.Search') }}',
                 'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
                 }
             },
             'columnDefs': [{
@@ -151,7 +156,7 @@
             dom: '<"row"lfB>rtip',
             buttons: [{
                     extend: 'pdf',
-                    text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                    text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -159,7 +164,7 @@
                 },
                 {
                     extend: 'csv',
-                    text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -167,7 +172,7 @@
                 },
                 {
                     extend: 'print',
-                    text: '<i title="print" class="fa fa-print"></i>',
+                    text: '<i title="print" class="ti ti-printer"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -175,7 +180,7 @@
                 },
                 {
                     extend: 'colvis',
-                    text: '<i title="column visibility" class="fa fa-eye"></i>',
+                    text: '<i title="column visibility" class="ti ti-eye"></i>',
                     columns: ':gt(0)'
                 },
             ],

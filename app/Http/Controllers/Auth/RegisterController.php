@@ -90,6 +90,11 @@ class RegisterController extends Controller
     protected function create(array $data)
     {
         $data['is_active'] = false;
+        app(\App\Services\WarehouseAccessService::class)->assertValidUserAssignment(
+            (int) $data['role_id'],
+            $data['warehouse_id'] ?? null,
+            (int) $data['role_id'] === 5
+        );
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],

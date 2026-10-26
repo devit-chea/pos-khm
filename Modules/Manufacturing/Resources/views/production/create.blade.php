@@ -25,7 +25,7 @@
                         <h4>{{__('db.Add Production')}}</h4>
                     </div>
                     <div class="card-body">
-                        <p class="italic"><small>{{__('db.The field labels marked with * are required input fields')}}.</small></p>
+                        <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
                         <form id="product-form" method="post" action="{{ route('manufacturing.productions.store') }}" enctype="multipart/form-data">
                             @csrf
                             <div class="row">
@@ -60,13 +60,14 @@
                                                 <label class="form-check-label" for="finalized">
                                                     {{ __('db.Finalized') }}
                                                 </label>
+                                                <small class="form-text text-muted">Finalizing locks this production; it does not post stock again.</small>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div class="col-md-4">
                                         <div class="form-group">
-                                            <label>{{__('db.Attach Document')}}</label> <i class="dripicons-question" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
+                                            <label>{{__('db.Attach Document')}}</label> <i class="ti ti-info-circle" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
                                             <input type="file" name="document" class="form-control" >
                                             @if($errors->has('extension'))
                                                 <span>
@@ -90,7 +91,7 @@
                                      <div class="col-md-4">
                                         <div class="form-group">
                                             <label>{{__('db.Total Qty')}}</label>
-                                            <input type="number" name="total_qty" min="1" class="form-control total_qty" value="1" step="any" />
+                                            <input type="number" name="total_qty" min="1" class="form-control total_qty" value="1" step="1" />
                                         </div>
                                     </div>
 
@@ -118,7 +119,7 @@
                                                     <th>{{__('db.Final Quantity')}}</th>
                                                     <th>{{__('db.Unit Price')}}</th>
                                                     <th>{{__('db.Sub total')}}</th>
-                                                    <th><i class="dripicons-trash"></i></th>
+                                                    <th><i class="ti ti-trash"></i></th>
                                                 </tr>
 
                                             </thead>
@@ -150,11 +151,12 @@
                                     <input type="hidden" name="grand_total" class="grand_total">
                                 <div class="col-md-12">
                                     <div class="form-group">
-                                        <label>{{__('db.Note')}}</label>
+                                        <label>{{__('db.note')}}</label>
                                         <textarea rows="5" class="form-control" name="note"></textarea>
                                     </div>
                                     <div class="form-group mt-3">
                                         <button type="submit" id="submit-btn" class="btn btn-primary submit-btn">{{__('db.add_production')}}</button>
+                                        <small class="form-text text-muted">Saving updates component and finished-product stock immediately, including when left Pending.</small>
                                     </div>
                                 </div>
                         </form>
@@ -189,7 +191,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="modal-header" class="modal-title"></h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                     <form>
@@ -269,7 +271,7 @@
                     $('.search_result').html('').css('height','200px');
                     $.each(data,function(key, value){
                         var image = value.image.split(',');
-                        $('.search_result').append('<div data-id="'+value.id+'"><img src="{{asset("images/product/small/")}}/'+image[0]+'"><h4>'+value.name+'</h4><i class="dripicons-checkmark d-none"></i></div>')
+                        $('.search_result').append('<div data-id="'+value.id+'"><img src="{{asset("images/product/small/")}}/'+image[0]+'"><h4>'+value.name+'</h4><i class="ti ti-checkmark d-none"></i></div>')
                     })
                 }
             })
@@ -280,11 +282,11 @@
 
     $(document).on('click','.search_result div',function(){
         $(this).find('i').removeClass('d-none');
-        var selected_item = '<div data-id="'+$(this).data('id')+'">'+$(this).html()+'<span class="remove_item"><i class="dripicons-cross"></i></span></div>';
+        var selected_item = '<div data-id="'+$(this).data('id')+'">'+$(this).html()+'<span class="remove_item"><i class="ti ti-x"></i></span></div>';
         if ($('.selected_ids').html().indexOf($(this).data('id')) === -1){
             $('.selected_items').prepend(selected_item);
             $('.selected_ids').append($(this).data('id')+',');
-            $('.selected_items .dripicons-checkmark').addClass('d-none');
+            $('.selected_items .ti ti-checkmark').addClass('d-none');
         }
     });
 
@@ -310,7 +312,7 @@
                     $('.search_result_addon').html('').css('height','200px');
                     $.each(data,function(key, value){
                         var image = value.image.split(',');
-                        $('.search_result_addon').append('<div data-id="'+value.id+'"><img src="{{asset("images/product/small/")}}/'+image[0]+'"><h4>'+value.name+'</h4><i class="dripicons-checkmark d-none"></i></div>')
+                        $('.search_result_addon').append('<div data-id="'+value.id+'"><img src="{{asset("images/product/small/")}}/'+image[0]+'"><h4>'+value.name+'</h4><i class="ti ti-checkmark d-none"></i></div>')
                     })
                 }
             })
@@ -321,11 +323,11 @@
 
     $(document).on('click','.search_result_addon div',function(){
         $(this).find('i').removeClass('d-none');
-        var selected_addon = '<div data-id="'+$(this).data('id')+'">'+$(this).html()+'<span class="remove_item"><i class="dripicons-cross"></i></span></div>';
+        var selected_addon = '<div data-id="'+$(this).data('id')+'">'+$(this).html()+'<span class="remove_item"><i class="ti ti-x"></i></span></div>';
         if ($('.selected_addon_ids').html().indexOf($(this).data('id')) === -1){
             $('.selected_addons').prepend(selected_addon);
             $('.selected_addon_ids').append($(this).data('id')+',');
-            $('.selected_addons .dripicons-checkmark').addClass('d-none');
+            $('.selected_addons .ti ti-checkmark').addClass('d-none');
         }
     });
 
@@ -338,9 +340,9 @@
     });
     @endif
 
-    $("ul#product").siblings('a').attr('aria-expanded','true');
-    $("ul#product").addClass("show");
-    $("ul#product #product-create-menu").addClass("active");
+    $("ul#manufacturing").siblings('a').attr('aria-expanded','true');
+    $("ul#manufacturing").addClass("show");
+    $("ul#manufacturing #production-create-menu").addClass("active");
 
     $("#digital").hide();
     // $("#combo").hide();
@@ -370,7 +372,7 @@
         });
 
     $('.add-more-variant').on("click", function() {
-        var htmlText = '<div class="row"><div class="col-md-4 form-group mt-2"><label>Option *</label><input type="text" name="variant_option[]" class="form-control variant-field" placeholder="Size, Color etc..."></div><div class="col-md-7 form-group mt-2"><label>Value *</label><input type="text" name="variant_value[]" class="type-variant form-control variant-field"></div><div class="col-sm-1 form-group mt-2" style="display:flex;flex-direction:column;align-items:center;justify-content:end;"><button type="button" class="delVarOption btn btn-danger btn-sm mr-3"><i class="dripicons-cross"></i></button></div></div>';
+        var htmlText = '<div class="row"><div class="col-md-4 form-group mt-2"><label>Option *</label><input type="text" name="variant_option[]" class="form-control variant-field" placeholder="Size, Color etc..."></div><div class="col-md-7 form-group mt-2"><label>Value *</label><input type="text" name="variant_value[]" class="type-variant form-control variant-field"></div><div class="col-sm-1 form-group mt-2" style="display:flex;flex-direction:column;align-items:center;justify-content:end;"><button type="button" class="delVarOption btn btn-danger btn-sm mr-3"><i class="ti ti-x"></i></button></div></div>';
         $("#variant-input-section").append(htmlText);
         $('.type-variant').tagsInput();
     });
@@ -875,8 +877,7 @@
                     var flag = 1;
                     $(".product-id").each(function() {
                         if ($(this).val() == data[8]) {
-                            alert('Duplicate input is not allowed!')
-                            flag = 0;
+                            SaleProToast.show('Duplicate input is not allowed!');flag = 0;
                         }
                     });
                     $("input[name='product_code_name']").val('');
@@ -896,7 +897,7 @@
                                     <div class="input-group" style="max-width: unset">
                                         <input type="number"
                                             class="form-control qty"
-                                            min="1"
+                                            min="0"
                                             name="product_qty[]"
                                             value="1"
                                             step="any"
@@ -1000,20 +1001,20 @@
         var exp = /^\d+$/;
 
         if(!(product_code.match(exp)) && (barcode_symbology == 'UPCA' || barcode_symbology == 'UPCE' || barcode_symbology == 'EAN8' || barcode_symbology == 'EAN13') ) {
-            alert('Product code must be numeric.');
+            SaleProToast.show('Product code must be numeric.');
             return false;
         }
         else if(product_code.match(exp)) {
             if(barcode_symbology == 'UPCA' && product_code.length > 11){
-                alert('Product code length must be less than 12');
+                SaleProToast.show('Product code length must be less than 12');
                 return false;
             }
             else if(barcode_symbology == 'EAN8' && product_code.length > 7){
-                alert('Product code length must be less than 8');
+                SaleProToast.show('Product code length must be less than 8');
                 return false;
             }
             /*else if(barcode_symbology == 'EAN13' && product_code.length > 12){
-                alert('Product code length must be less than 13');
+                SaleProToast.show('Product code length must be less than 13');
                 return false;
             }*/
         }
@@ -1021,14 +1022,13 @@
         if( $("#type").val() == 'combo' ) {
             var rownumber = $('table.order-list tbody tr:last').index();
             if (rownumber < 0) {
-                alert("Please insert product to table!")
-                return false;
+                SaleProToast.show("Please insert product to table!");return false;
             }
         }
         if($("#is-variant").is(":checked")) {
             rowindex = $("table#variant-table tbody tr:last").index();
             if (rowindex < 0) {
-                alert('This product has variant. Please insert variant to table');
+                SaleProToast.show('This product has variant. Please insert variant to table');
                 return false;
             }
         }
@@ -1050,7 +1050,7 @@
          $('.total_qty').val(1);
 
         if (!warehouseId) {
-            alert('Please select warehouse');
+            SaleProToast.show('Please select warehouse');
             $(this).val('');
             return; // Stop the function if warehouse not selected
         }
@@ -1089,7 +1089,7 @@
     $('.total_qty').on('keyup change', function(){
          var productId = $('#selectRecipe').val();
         if (!productId) {
-            alert('Please select Product');
+            SaleProToast.show('Please select Product');
             $(this).val(1);
             return; // Stop the function if warehouse not selected
         }
@@ -1124,26 +1124,30 @@
             let operationValue = parseFloat($selectedOption.data('operation_value')) || 1;
 
             let convertedQty = quantity;
-            var available = quantity
+            var available = quantity;
             if (operator === '*') {
                 convertedQty = quantity * operationValue;
-                var available = (stock / operationValue).toFixed(2);
-                if(stock < convertedQty && qty > 0){
-                   let errorMessage = `<span class="text-danger qty-error">Qty exceeds available stock (${available} - ${unit_name})</span>`;
-                   $row.find('.qty-error').html(errorMessage);
-                   submit_excess += 1;
-                }else{
-                    $row.find('.qty-error').html('');
-                }
-
+                available = (stock / operationValue).toFixed(2);
             } else if (operator === '/') {
                 convertedQty = quantity / operationValue;
+                available = (stock * operationValue).toFixed(2);
+            } else {
+                available = stock.toFixed(2);
+            }
+
+            let wastagePercent = parseFloat($row.find('.wastage_percent').val()) || 0;
+            if(stock < convertedQty * (1 + wastagePercent / 100) && qty > 0){
+               let errorMessage = `<span class="text-danger qty-error">Qty exceeds available stock (${available} - ${unit_name})</span>`;
+               $row.find('.qty-error').html(errorMessage);
+               submit_excess += 1;
+            }else{
+                $row.find('.qty-error').html('');
             }
 
             // Calculate subtotal and accumulate cost/price
 
 
-            let subtotal = convertedQty * unit_price;
+            let subtotal = convertedQty * (1 + wastagePercent / 100) * unit_price;
             cost += convertedQty * unit_cost;
             price += subtotal;
 

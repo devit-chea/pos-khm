@@ -1,199 +1,452 @@
 @extends('backend.layout.main')
 
-@if(in_array('ecommerce',explode(',',$general_setting->modules)) || in_array('restaurant',explode(',',$general_setting->modules)))
 @push('css')
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
+<link rel="stylesheet" href="{{ asset($asset_prefix . 'css/dropzone.css') }}">
 <style>
-.search_result, .search_result_addon {border:1px solid #e4e6fc;border-radius:5px;overflow-y: scroll;}
-.search_result > div, .search_result_addon > div, .selected_items > div, .selected_addons > div {border-top:1px solid #e4e6fc;cursor:pointer;display:flex;align-items:center;padding: 10px;position: relative;}
-.search_result > div > img, .search_result_addon > div > img, .selected_items > div > img, .selected_addons > div > img {margin-right: 10px;max-width: 40px;}
-.search_result > div h4, .search_result_addon > div h4, .selected_items > div h4, .selected_addons > div h4 {font-size: 0.9rem;}
-.search_result > div i,  .search_result_addon > div i, {color:#54b948;position:absolute;right:5px;top:30%}
-.search_result div:first-child, .search_result_addon div:first-child, {border-top:none}
-.selected_items .remove_item, .selected_addons .remove_item {position: absolute;right: 20px;top:20px};
-.delVarOption{display: flex;flex-direction: column;align-items: center;}
+    /* ── Shopify-style product create layout ── */
+    .product-create-page {
+        min-height: 100vh;
+    }
+
+    /* Sticky header */
+    .sp-sticky-header {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        padding: 10px 20px;
+    }
+
+    .sp-sticky-header .sp-sticky-header-inner {
+        background: #fff;
+        border: 1px solid #e4e6fc;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+    }
+
+    .sp-sticky-header .page-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin: 0 0 0 12px;
+        color: #343a40;
+    }
+
+    .sp-sticky-header .header-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    /* Section cards */
+    .sp-card {
+        background: #fff;
+        border: 1px solid #e4e6fc;
+        border-radius: 6px;
+        margin-bottom: 18px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+    }
+
+    .sp-card-header {
+        padding: 14px 18px 12px;
+        border-bottom: 1px solid #f0f1f7;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .sp-card-header h6 {
+        margin: 0;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #343a40;
+    }
+
+    .sp-card-header .section-icon {
+        font-size: 1rem;
+        color: #6c757d;
+    }
+
+    .sp-card-body {
+        padding: 18px;
+    }
+
+    /* Product type pills */
+    .type-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .type-pill {
+        padding: 5px 14px;
+        border: 1px solid #ced4da;
+        border-radius: 20px;
+        font-size: 0.82rem;
+        cursor: pointer;
+        background: #f8f9fa;
+        color: #495057;
+        transition: all .15s ease;
+        user-select: none;
+    }
+
+    .type-pill:hover {
+        border-color: #6c757d;
+        background: #e9ecef;
+    }
+
+    .type-pill.active {
+        background: #007bff;
+        border-color: #007bff;
+        color: #fff;
+    }
+
+    /* Status toggles */
+    .sp-switch-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .sp-switch-list li {
+        padding: 10px 18px;
+        border-bottom: 1px solid #f0f1f7;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .sp-switch-list li:last-child {
+        border-bottom: none;
+    }
+
+    .sp-switch-meta {
+        flex: 1;
+    }
+
+    .sp-switch-meta .switch-label {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #343a40;
+        display: block;
+        margin-bottom: 2px;
+    }
+
+    .sp-switch-meta .switch-hint {
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+
+    /* Inventory collapse toggles */
+    .sp-collapse-trigger {
+        font-size: 0.85rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #343a40;
+        font-weight: 500;
+        padding: 10px 0;
+        border-bottom: 1px solid #f0f1f7;
+        margin-bottom: 0;
+    }
+
+    .sp-collapse-trigger:last-of-type {
+        border-bottom: none;
+    }
+
+    .sp-collapse-trigger input[type="checkbox"] {
+        margin: 0;
+    }
+
+    /* Ecommerce / restaurant search result styles */
+    .search_result,
+    .search_result_addon {
+        border: 1px solid #e4e6fc;
+        border-radius: 5px;
+        overflow-y: scroll;
+    }
+
+    .search_result>div,
+    .search_result_addon>div,
+    .selected_items>div,
+    .selected_addons>div {
+        border-top: 1px solid #e4e6fc;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        position: relative;
+    }
+
+    .search_result>div>img,
+    .search_result_addon>div>img,
+    .selected_items>div>img,
+    .selected_addons>div>img {
+        margin-right: 10px;
+        max-width: 40px;
+    }
+
+    .search_result>div h4,
+    .search_result_addon>div h4,
+    .selected_items>div h4,
+    .selected_addons>div h4 {
+        font-size: 0.9rem;
+    }
+
+    .search_result>div i,
+    .search_result_addon>div i {
+        color: #54b948;
+        position: absolute;
+        right: 5px;
+        top: 30%;
+    }
+
+    .search_result div:first-child,
+    .search_result_addon div:first-child {
+        border-top: none;
+    }
+
+    .selected_items .remove_item,
+    .selected_addons .remove_item {
+        position: absolute;
+        right: 20px;
+        top: 20px;
+    }
+
+    .delVarOption {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    @media (max-width: 991px) {
+        .sp-sticky-header {
+            position: relative;
+        }
+
+        .sp-sticky-header .page-title {
+            font-size: 1rem;
+        }
+    }
+
+    /* ── Dark Mode overrides ── */
+    body.dark-mode .sp-sticky-header .sp-sticky-header-inner {
+        background: #283046;
+        border-color: #3b4253;
+    }
+    body.dark-mode .sp-sticky-header .page-title {
+        color: #d0d2d6;
+    }
+    body.dark-mode .sp-card {
+        background: #283046;
+        border-color: #3b4253;
+    }
+    body.dark-mode .sp-card-header {
+        border-bottom-color: #3b4253;
+    }
+    body.dark-mode .sp-card-header h6 {
+        color: #d0d2d6;
+    }
+    body.dark-mode .sp-card-header .section-icon {
+        color: #8a90a2;
+    }
+    body.dark-mode .type-pill {
+        background: #141b2e;
+        border-color: #3b4253;
+        color: #d0d2d6;
+    }
+    body.dark-mode .type-pill:hover {
+        background: #283046;
+        color: #fff;
+    }
+    body.dark-mode .type-pill.active {
+        background: #007bff;
+        border-color: #007bff;
+        color: #fff;
+    }
+    body.dark-mode .sp-switch-list li {
+        border-bottom-color: #3b4253;
+    }
+    body.dark-mode .sp-switch-meta .switch-label {
+        color: #d0d2d6;
+    }
+    body.dark-mode .sp-switch-meta .switch-hint {
+        color: #8a90a2;
+    }
+    body.dark-mode .sp-collapse-trigger {
+        color: #d0d2d6;
+        border-bottom-color: #3b4253;
+    }
+    body.dark-mode .search_result,
+    body.dark-mode .search_result_addon {
+        border-color: #3b4253;
+        background-color: #141b2e;
+    }
+    body.dark-mode .search_result>div,
+    body.dark-mode .search_result_addon>div,
+    body.dark-mode .selected_items>div,
+    body.dark-mode .selected_addons>div {
+        border-top-color: #3b4253;
+    }
+    body.dark-mode .dropzone {
+        background: #141b2e;
+        border-color: #3b4253;
+    }
+    body.dark-mode .dropzone .dz-message {
+        color: #8a90a2;
+    }
 </style>
 @endpush
-@endif
 
 @section('content')
-<section class="forms">
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-header d-flex align-items-center">
-                        <h4>{{__('db.add_product')}}</h4>
-                    </div>
-                    <div class="card-body">
-                        <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
-                        <div id="alert-container" style="display:none;" class="alert alert-dismissible fade show" role="alert">
-                            <span id="alert-message"></span>
-                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
+<section class="product-create-page">
+
+    {{-- ═══════════════════ STICKY HEADER ═══════════════════ --}}
+    <div class="sp-sticky-header">
+        <div class="sp-sticky-header-inner">
+            <div>
+                <span class="page-title">{{__('db.add_product')}}</span>
+            </div>
+            <div class="header-actions">
+                <button type="button" id="submit-and-insert-btn" class="btn btn-outline-secondary btn-sm">
+                    Save and Insert Another
+                </button>
+                <button type="button" id="submit-btn" class="btn btn-primary btn-sm">
+                    <i class="ti ti-check"></i> {{__('db.add_product')}}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid pt-3 pb-5">
+
+        {{-- Alert --}}
+        <div id="alert-container" style="display:none;" class="alert alert-dismissible fade show" role="alert">
+            <span id="alert-message"></span>
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+
+        <form id="product-form">
+            <div class="row">
+
+                {{-- ═══════════ MAIN COLUMN ═══════════ --}}
+                <div class="col-lg-8">
+
+                    {{-- ── 1. Basic Information ── --}}
+                    <div class="sp-card">
+                        <div class="sp-card-header">
+                            <i class="ti ti-package section-icon"></i>
+                            <h6>{{__('db.Basic Information')}}</h6>
                         </div>
-                        <form id="product-form">
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label>{{__('db.Product Type')}} *</strong> </label>
-                                        <div class="input-group">
-                                            <select name="type" required class="form-control selectpicker" id="type">
-                                                <option value="standard">Standard</option>
-                                                <option value="combo">Combo</option>
-                                                <option value="digital">Digital</option>
-                                                <option value="service">Service</option>
-                                            </select>
-                                        </div>
-                                    </div>
+                        <div class="sp-card-body">
+                            {{-- Product Type pills --}}
+                            <div class="form-group">
+                                <label class="d-block mb-2" style="font-size:.85rem;font-weight:500;">
+                                    {{__('db.Product Type')}} <span class="text-danger">*</span>
+                                </label>
+                                <div class="type-pills">
+                                    <span class="type-pill active" data-value="standard">Standard</span>
+                                    <span class="type-pill" data-value="combo">Combo</span>
+                                    <span class="type-pill" data-value="digital">Digital</span>
+                                    <span class="type-pill" data-value="service">Service</span>
                                 </div>
-                                <div class="col-md-4">
+                                {{-- hidden select preserved for existing JS --}}
+                                <select name="type" required id="type" class="d-none">
+                                    <option value="standard">Standard</option>
+                                    <option value="combo">Combo</option>
+                                    <option value="digital">Digital</option>
+                                    <option value="service">Service</option>
+                                </select>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
                                     <div class="form-group">
-                                        <label>{{__('db.Product Name')}} *</strong> </label>
-                                        <input type="text" name="name" class="form-control" id="name" aria-describedby="name" required>
+                                        <label>{{__('db.Product Name')}} <span class="text-danger">*</span></label>
+                                        <input type="text" name="name" class="form-control" id="name" required>
                                         <span class="validation-msg" id="name-error"></span>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-6">
                                     <div class="form-group">
-                                        <label>{{__('db.Product Code')}} *</strong> </label>
+                                        <label>{{__('db.Product Code')}} <span class="text-danger">*</span></label>
                                         <div class="input-group">
-                                            <input type="text" name="code" class="form-control" id="code" aria-describedby="code" required>
+                                            <input type="text" name="code" class="form-control" id="code" required>
                                             <div class="input-group-append">
-                                                <button id="genbutton" type="button" class="btn btn-sm btn-default" title="{{__('db.Generate')}}"><i class="fa fa-refresh"></i></button>
+                                                <button id="genbutton" type="button" class="btn btn-sm btn-default" title="{{__('db.Generate')}}">
+                                                    <i class="ti ti-refresh"></i>
+                                                </button>
                                             </div>
                                         </div>
                                         <span class="validation-msg" id="code-error"></span>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-6">
                                     <div class="form-group">
-                                        <label>{{__('db.Barcode Symbology')}} *</strong> </label>
-                                        <div class="input-group">
-                                            <select name="barcode_symbology" required class="form-control selectpicker">
-                                                <option value="C128">Code 128</option>
-                                                <option value="C39">Code 39</option>
-                                                <option value="UPCA">UPC-A</option>
-                                                <option value="UPCE">UPC-E</option>
-                                                <option value="EAN8">EAN-8</option>
-                                                <option value="EAN13">EAN-13</option>
-                                            </select>
-                                        </div>
+                                        <label>{{__('db.Barcode Symbology')}} <span class="text-danger">*</span></label>
+                                        <select name="barcode_symbology" required class="form-control selectpicker">
+                                            <option value="C128">Code 128</option>
+                                            <option value="C39">Code 39</option>
+                                            <option value="UPCA">UPC-A</option>
+                                            <option value="UPCE">UPC-E</option>
+                                            <option value="EAN8">EAN-8</option>
+                                            <option value="EAN13">EAN-13</option>
+                                        </select>
                                     </div>
                                 </div>
-                                <div id="digital" class="col-md-4">
+                                {{-- Digital: attach file --}}
+                                <div id="digital" class="col-md-6">
                                     <div class="form-group">
-                                        <label>{{__('db.Attach File')}} *</strong> </label>
-                                        <div class="input-group">
-                                            <input type="file" id="file" name="file" class="form-control">
-                                        </div>
+                                        <label>{{__('db.Attach File')}} <span class="text-danger">*</span></label>
+                                        <input type="file" id="file" name="file" class="form-control">
                                         <span class="validation-msg"></span>
                                     </div>
                                 </div>
-                                <div id="combo" class="col-md-12 mb-1">
-                                    <label>{{__('db.add_product')}}</label>
-                                    <div class="search-box input-group mb-3">
-                                        <button class="btn btn-secondary"><i class="fa fa-barcode"></i></button>
-                                        <input type="text" name="product_code_name" id="lims_productcodeSearch" placeholder="{{ __('db.Please type product code and select') }}" class="form-control" />
-                                    </div>
-                                    <label>{{__('db.Combo Products')}}</label>
-                                    <div class="table-responsive">
-                                        <table id="myTable" class="table table-hover order-list">
-                                            <thead>
-                                                <tr>
-                                                    <th>{{__('db.product')}}</th>
-                                                    <th>{{__('db.Wastage Percent')}}</th>
-                                                    <th>{{__('db.Quantity')}}</th>
-                                                    <th>{{__('db.Unit Cost')}}</th>
-                                                    <th>{{__('db.Unit Price')}}</th>
-                                                    <th>{{__('db.Sub total')}}</th>
-                                                    <th><i class="dripicons-trash"></i></th>
-                                                </tr>
+                            </div>
 
-                                            </thead>
-                                            <tbody class="combo_product_list_table">
+                            <div class="form-group mb-0">
+                                <label>{{__('db.Product Details')}}</label>
+                                <textarea name="product_details" class="form-control" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
 
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                {{-- <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label>{{__('db.Production Cost')}}</strong> </label>
-                                        <div class="input-group pos">
-                                            <input type="text" name="production_cost" class="form-control" placeholder="Enter production">
-                                      </div>
-                                    </div>
-                                </div> --}}
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label>{{__('db.Brand')}}</strong> </label>
-                                        <div class="input-group pos">
-                                          <select name="brand_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" title="Select Brand...">
-                                            @foreach($lims_brand_list as $brand)
-                                                <option value="{{$brand->id}}">{{$brand->title}}</option>
-                                            @endforeach
-                                          </select>
-                                          <button type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#addBrand"><i class="dripicons-plus"></i></button>
-                                      </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label>{{__('db.category')}} *</strong> </label>
-                                        <div class="input-group pos">
-                                          <select name="category_id" required class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" title="Select Category...">
-                                            @foreach($lims_category_list as $category)
-                                                <option value="{{$category->id}}">{{$category->name}}</option>
-                                            @endforeach
-                                          </select>
-                                          <div class="input-group-append">
-                                            <button type="button" class="btn btn-default btn-sm category-model" data-toggle="modal" data-target="#category-modal"><i class="dripicons-plus"></i></button>
-                                          </div>
-                                        </div>
-                                      <span class="validation-msg"></span>
-                                    </div>
-                                </div>
-                                <div id="unit" class="col-md-12">
-                                    <div class="row ">
-                                        <div class="col-md-4 form-group">
-                                                <label>{{__('db.Product Unit')}} *</strong> </label>
-                                                <div class="input-group pos">
-                                                  <select required class="form-control selectpicker" name="unit_id">
-                                                    <option value="" disabled selected>Select Product Unit...</option>
-                                                    @foreach($lims_unit_list as $unit)
-                                                        @if($unit->base_unit==null)
-                                                            <option value="{{$unit->id}}">{{$unit->unit_name}}</option>
-                                                        @endif
-                                                    @endforeach
-                                                  </select>
-                                                  <div class="input-group-append">
-                                                    <button type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#createUnitModal"><i class="dripicons-plus"></i></button>
-                                                  </div>
-                                              </div>
-                                              <span class="validation-msg"></span>
-                                        </div>
-                                        <div class="col-md-4">
-                                                <label>{{__('db.Sale Unit')}}</strong> </label>
-                                                <div class="input-group pos">
-                                                  <select class="form-control selectpicker" name="sale_unit_id">
-                                                  </select>
-                                              </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="form-group">
-                                                <label>{{__('db.Purchase Unit')}}</strong> </label>
-                                                <div class="input-group pos">
-                                                    <select class="form-control selectpicker" name="purchase_unit_id">
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                    {{-- ── 2. Media ── --}}
+                    <div class="sp-card">
+                        <div class="sp-card-header">
+                            <i class="ti ti-photo section-icon"></i>
+                            <h6>{{__('db.Media')}}</h6>
+                            <small class="text-muted ml-auto" style="font-size:.75rem;">
+                                jpeg, jpg, png, gif &bull; First image = base image
+                            </small>
+                        </div>
+                        <div class="sp-card-body">
+                            <div id="imageUpload" class="dropzone"></div>
+                            <span class="validation-msg" id="image-error"></span>
+                            <input type="hidden" name="qty" value="{{number_format(0, gen_setting()->decimal, '.', '')}}">
+                        </div>
+                    </div>
+
+                    {{-- ── 3. Pricing ── --}}
+                    <div class="sp-card">
+                        <div class="sp-card-header">
+                            <i class="ti ti-currency-dollar section-icon"></i>
+                            <h6>{{__('db.Pricing')}}</h6>
+                        </div>
+                        <div class="sp-card-body">
+                            <div class="row">
                                 <div id="cost" class="col-md-4">
-                                     <div class="form-group">
-                                        <label>{{__('db.Product Cost')}} *</strong> </label>
+                                    <div class="form-group">
+                                        <label>{{__('db.Product Cost')}} <span class="text-danger">*</span></label>
                                         <input type="number" name="cost" required class="form-control" step="any">
                                         <div class="alert alert-warning very-small-text d-none p-2 position-absolute" id="product-cost-warning">
                                             Cost must be higher than 0!
@@ -203,518 +456,740 @@
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>{{ __('db.profit_margin_type') }}</label>
+                                        <label>{{ __('db.profit_margin_type') }} <span class="text-danger">*</span></label>
                                         <select name="profit_margin_type" class="form-control" required>
-
-                                            <option value="percentage"
-                                                {{ $general_setting->margin_type == 2 ? 'selected' : '' }}>
-                                                Percentage (%)
-                                            </option>
-
-                                            <option value="flat"
-                                                {{ $general_setting->margin_type == 1 ? 'selected' : '' }}>
-                                                Flat
-                                            </option>
+                                            <option value="percentage" {{ gen_setting()->margin_type == 2 ? 'selected' : '' }}>Percentage (%)</option>
+                                            <option value="flat" {{ gen_setting()->margin_type == 1 ? 'selected' : '' }}>Flat</option>
                                         </select>
                                         <span class="validation-msg"></span>
                                     </div>
                                 </div>
                                 <div id="profit_margin" class="col-md-4">
-                                     <div class="form-group">
-                                        <label>{{__('db.Profit Margin')}}</strong> </label>
+                                    <div class="form-group">
+                                        <label>{{__('db.Profit Margin')}}</label>
                                         <input type="number" name="profit_margin" value="0" required class="form-control" step="0.01">
                                         <span class="validation-msg"></span>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>{{__('db.Product Price')}} *</strong> </label>
+                                        <label>{{__('db.product_price')}} <span class="text-danger">*</span></label>
                                         <input type="number" name="price" required class="form-control" step="any">
                                         <div class="alert alert-warning very-small-text d-none p-2 position-absolute" id="product-price-warning">
                                             Price must be higher than Cost to make Profit!
                                         </div>
                                         <span class="validation-msg"></span>
                                     </div>
-                                    <div class="form-group">
-                                        <input type="hidden" name="qty" value="{{number_format(0, $general_setting->decimal, '.', '')}}">
-                                    </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>{{__('db.Wholesale Price')}}</strong> </label>
+                                        <label>{{__('db.Wholesale Price')}}</label>
                                         <input type="number" name="wholesale_price" class="form-control" step="any">
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label>{{__('db.Daily Sale Objective')}}</strong></label> <i class="dripicons-question" data-toggle="tooltip" title="{{__('db.Minimum qty which must be sold in a day If not, you will be notified on dashboard But you have to set up the cron job properly for that Follow the documentation in that regard')}}"></i>
-                                        <input type="number" name="daily_sale_objective" class="form-control" step="any">
-                                    </div>
-                                </div>
-                                <div id="alert-qty" class="col-md-4">
-                                    <div class="form-group">
-                                        <label>{{__('db.Alert Quantity')}}</strong> </label>
-                                        <input type="number" name="alert_quantity" class="form-control" step="any">
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
                                         <label>{{__('db.Product Tax')}}</label>
                                         <div class="input-group pos">
-
-                                        <select name="tax_id" class="selectpicker form-control" style="width: 100px">
-                                            <option value="">No Tax</option>
-                                            @foreach($lims_tax_list as $tax)
+                                            <select name="tax_id" class="selectpicker form-control">
+                                                <option value="">No Tax</option>
+                                                @foreach($lims_tax_list as $tax)
                                                 <option value="{{$tax->id}}">{{$tax->name}}</option>
-                                            @endforeach
-                                        </select>
-                                        <button type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#addTax"><i class="dripicons-plus"></i></button>
-                                    </div>
+                                                @endforeach
+                                            </select>
+                                            <button type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#addTax">
+                                                <i class="ti ti-plus"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>{{__('db.Tax Method')}}</strong> </label> <i class="dripicons-question" data-toggle="tooltip" title="{{__('db.Exclusive: Poduct price = Actual product price + Tax Inclusive: Actual product price = Product price - Tax')}}"></i>
+                                        <label>
+                                            {{__('db.Tax Method')}}
+                                            <i class="ti ti-info-circle" data-toggle="tooltip" title="{{__('db.Exclusive: Poduct price = Actual product price + Tax Inclusive: Actual product price = Product price - Tax')}}"></i>
+                                        </label>
                                         <select name="tax_method" class="form-control selectpicker">
                                             <option value="1">{{__('db.Exclusive')}}</option>
                                             <option value="2">{{__('db.Inclusive')}}</option>
                                         </select>
                                     </div>
                                 </div>
+                            </div>
 
-                                <!-- Warranty and Guarantee [20-01-2025] -->
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label>{{ __('db.Warranty') }}</label>
-                                        <div class="d-flex justify-content-between">
-                                            <input type="number" name="warranty" min="1" class="form-control" style="width: 48%;" placeholder="{{ __('db.eg: 1') }}">
-                                            <select name="warranty_type" class="form-control selectpicker" style="width: 48%;">
-                                                <option value="days">{{ __('db.Days') }}</option>
-                                                <option value="months" selected>{{ __('db.Months') }}</option>
-                                                <option value="years">{{ __('db.Years') }}</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label>{{ __('db.Guarantee') }}</label>
-                                        <div class="d-flex justify-content-between">
-                                            <input type="number" name="guarantee" min="1" class="form-control" style="width: 48%;" placeholder="{{ __('db.eg: 1') }}">
-                                            <select name="guarantee_type" class="form-control selectpicker" style="width: 48%;">
-                                                <option value="days">{{ __('db.Days') }}</option>
-                                                <option value="months" selected>{{ __('db.Months') }}</option>
-                                                <option value="years">{{ __('db.Years') }}</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- Warranty and Guarantee end -->
-
-                                @foreach($custom_fields as $field)
-                                @if(!$field->is_admin || \Auth::user()->role_id == 1)
-                                    <div class="{{'col-md-'.$field->grid_value}}">
+                            {{-- Promotional pricing (collapsible) --}}
+                            <div class="border-top pt-3 mt-1">
+                                <label class="sp-collapse-trigger mb-2" style="border-bottom:none;">
+                                    <input name="promotion" type="checkbox" id="promotion" value="1">
+                                    &nbsp; {{__('db.Add Promotional Price')}}
+                                </label>
+                                <div class="row mt-2">
+                                    <div class="col-md-4" id="promotion_price">
                                         <div class="form-group">
-                                            <label>{{$field->name}}</label>
-                                            @if($field->type == 'text')
-                                                <input type="text" name="{{str_replace(' ', '_', strtolower($field->name))}}" value="{{$field->default_value}}" class="form-control" @if($field->is_required){{'required'}}@endif>
-                                            @elseif($field->type == 'number')
-                                                <input type="number" name="{{str_replace(' ', '_', strtolower($field->name))}}" value="{{$field->default_value}}" class="form-control" @if($field->is_required){{'required'}}@endif>
-                                            @elseif($field->type == 'textarea')
-                                                <textarea rows="5" name="{{str_replace(' ', '_', strtolower($field->name))}}" value="{{$field->default_value}}" class="form-control" @if($field->is_required){{'required'}}@endif></textarea>
-                                            @elseif($field->type == 'checkbox')
-                                                <br>
-                                                <?php $option_values = explode(",", $field->option_value); ?>
-                                                @foreach($option_values as $value)
-                                                    <label>
-                                                        <input type="checkbox" name="{{str_replace(' ', '_', strtolower($field->name))}}[]" value="{{$value}}" @if($value == $field->default_value){{'checked'}}@endif @if($field->is_required){{'required'}}@endif> {{$value}}
-                                                    </label>
-                                                    &nbsp;
-                                                @endforeach
-                                            @elseif($field->type == 'radio_button')
-                                                <br>
-                                                <?php $option_values = explode(",", $field->option_value); ?>
-                                                @foreach($option_values as $value)
-                                                    <label class="radio-inline">
-                                                        <input type="radio" name="{{str_replace(' ', '_', strtolower($field->name))}}" value="{{$value}}" @if($value == $field->default_value){{'checked'}}@endif @if($field->is_required){{'required'}}@endif> {{$value}}
-                                                    </label>
-                                                    &nbsp;
-                                                @endforeach
-                                            @elseif($field->type == 'select')
-                                                <?php $option_values = explode(",", $field->option_value); ?>
-                                                <select class="form-control" name="{{str_replace(' ', '_', strtolower($field->name))}}" @if($field->is_required){{'required'}}@endif>
-                                                    @foreach($option_values as $value)
-                                                        <option value="{{$value}}" @if($value == $field->default_value){{'selected'}}@endif>{{$value}}</option>
-                                                    @endforeach
-                                                </select>
-                                            @elseif($field->type == 'multi_select')
-                                                <?php $option_values = explode(",", $field->option_value); ?>
-                                                <select class="form-control" name="{{str_replace(' ', '_', strtolower($field->name))}}[]" @if($field->is_required){{'required'}}@endif multiple>
-                                                    @foreach($option_values as $value)
-                                                        <option value="{{$value}}" @if($value == $field->default_value){{'selected'}}@endif>{{$value}}</option>
-                                                    @endforeach
-                                                </select>
-                                            @elseif($field->type == 'date_picker')
-                                                <input type="date" name="{{str_replace(' ', '_', strtolower($field->name))}}" value="{{$field->default_value}}" class="form-control" @if($field->is_required){{'required'}}@endif>
-                                            @endif
-                                        </div>
-                                    </div>
-                                @endif
-                            @endforeach
-                                <div id="featured" class="col-md-4">
-                                    <div class="form-group mt-3">
-                                        <input type="checkbox" name="featured" value="1">&nbsp;
-                                        <label>{{__('db.Featured')}}</label>
-                                        <p class="italic">{{__('db.Featured product will be displayed in POS')}}</p>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-group mt-3">
-                                        <input type="checkbox" name="is_embeded" value="1">&nbsp;
-                                        <label>{{__('db.Embedded Barcode')}}</label>
-                                        <p class="italic">{{__('db.Check this if this product will be used in weight scale machine')}}</p>
-                                    </div>
-                                </div>
-                                <div id="stock-section" class="col-md-12">
-                                    <div class="form-group mt-3">
-                                        <input type="checkbox" name="is_initial_stock" value="1">&nbsp;
-                                        <label>{{__('db.Initial Stock')}}</label>
-                                        <p class="italic">{{__('db.This feature will not work for product with variants and batches')}}</p>
-                                    </div>
-                                </div>
-                                <div class="col-md-12" id="initial-stock-section">
-                                    <div class="table-responsive ml-2">
-                                        <table class="table table-hover">
-                                            <thead>
-                                                <tr>
-                                                    <th>{{__('db.Warehouse')}}</th>
-                                                    <th>{{__('db.qty')}}</th>
-                                                </tr>
-                                                @foreach($lims_warehouse_list as $warehouse)
-                                                <tr>
-                                                    <td>
-                                                        <input type="hidden" name="stock_warehouse_id[]" value="{{$warehouse->id}}">
-                                                        {{$warehouse->name}}
-                                                    </td>
-                                                    <td><input type="number" name="stock[]" min="0" class="form-control"></td>
-                                                </tr>
-                                                @endforeach
-                                            </thead>
-                                            <tbody>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                <div class="col-md-12">
-                                    <div class="form-group">
-                                        <label>{{__('db.Product Image')}}</strong> </label> <i class="dripicons-question" data-toggle="tooltip" title="{{__('db.You can upload multiple image Only jpeg, jpg, png, gif file can be uploaded First image will be base image')}}"></i>
-                                        <div id="imageUpload" class="dropzone"></div>
-                                        <span class="validation-msg" id="image-error"></span>
-                                    </div>
-                                </div>
-                                <div class="col-md-12">
-                                    <div class="form-group">
-                                        <label>{{__('db.Product Details')}}</label>
-                                        <textarea name="product_details" class="form-control" rows="3"></textarea>
-                                    </div>
-                                </div>
-                                <div class="col-md-12 mt-3" id="variant-option">
-                                    <h5><input name="is_variant" type="checkbox" id="is-variant" value="1">&nbsp; {{__('db.This product has variant')}}</h5>
-                                </div>
-                                <div class="col-md-12" id="variant-section">
-                                    <div id="variant-input-section">
-                                        <div class="row">
-                                            <div class="col-md-4 form-group mt-2">
-                                                <label>{{__('db.Option')}} *</label>
-                                                <input type="text" name="variant_option[]" class="form-control variant-field" placeholder="{{ __('db.Size, Color etc') }}">
-                                            </div>
-                                            <div class="col-md-7 form-group mt-2">
-                                                <label>{{__('db.Value')}} *</label>
-                                                <input type="text" name="variant_value[]" class="type-variant form-control variant-field">
-                                            </div>
-                                            <div class="col-sm-1 form-group mt-2" style="display:flex;flex-direction:column;align-items:center;justify-content:end;">
-                                                <button type="button" class="delVarOption btn btn-danger btn-sm mr-3"><i class="dripicons-cross"></i></button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-12 form-group">
-                                        <button type="button" class="btn btn-info add-more-variant"><i class="dripicons-plus"></i> {{__('db.Add More Variant')}}</button>
-                                    </div>
-                                    <div class="table-responsive ml-2">
-                                        <table id="variant-table" class="table table-hover variant-list">
-                                            <thead>
-                                                <tr>
-                                                    <th>{{__('db.name')}}</th>
-                                                    <th>{{__('db.Item Code')}}</th>
-                                                    <th>{{__('db.Additional Cost')}}</th>
-                                                    <th>{{__('db.Additional Price')}}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                <div class="col-md-12 mt-2" id="groupPrice-option">
-                                    <h5><input name="is_groupPrice" type="checkbox" id="is-groupPrice" value="1">&nbsp; {{__('db.This product has different price for different customer group')}}</h5>
-                                </div>
-                                <div class="col-md-6" id="groupPrice-section" style="display: none">
-                                    <div class="table-responsive ml-2">
-                                        <table id="groupPrice-table" class="table table-hover">
-                                            <thead>
-                                                <tr>
-                                                    <th>{{__('db.Customer Group')}}</th>
-                                                    <th>{{__('db.Customer Group Price')}}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach($lims_customer_group_list as $customer_group)
-                                                <tr>
-                                                    <td>
-                                                        <input type="hidden" name="customer_group_id[]" value="{{$customer_group->id}}">
-                                                        {{$customer_group->name}}
-                                                    </td>
-                                                    <td><input type="number" name="group_price[]" class="form-control" step="any" min="0"></td>
-                                                </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                <div class="col-md-12 mt-2" id="diffPrice-option">
-                                    <h5><input name="is_diffPrice" type="checkbox" id="is-diffPrice" value="1">&nbsp; {{__('db.This product has different price for different warehouse')}}</h5>
-                                </div>
-                                <div class="col-md-6" id="diffPrice-section">
-                                    <div class="table-responsive ml-2">
-                                        <table id="diffPrice-table" class="table table-hover">
-                                            <thead>
-                                                <tr>
-                                                    <th>{{__('db.Warehouse')}}</th>
-                                                    <th>{{__('db.Price')}}</th>
-                                                </tr>
-                                                @foreach($lims_warehouse_list as $warehouse)
-                                                <tr>
-                                                    <td>
-                                                        <input type="hidden" name="warehouse_id[]" value="{{$warehouse->id}}">
-                                                        {{$warehouse->name}}
-                                                    </td>
-                                                    <td><input type="number" name="diff_price[]" class="form-control"></td>
-                                                </tr>
-                                                @endforeach
-                                            </thead>
-                                            <tbody>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                <div class="col-md-12 mt-3" id="batch-option">
-                                    <h5><input name="is_batch" type="checkbox" id="is-batch" value="1">&nbsp; {{__('db.This product has batch and expired date')}}</h5>
-                                </div>
-                                <div class="col-md-12 mt-3" id="imei-option">
-                                    <h5><input name="is_imei" type="checkbox" id="is-imei" value="1">&nbsp; {{__('db.This product has IMEI or Serial numbers')}}</h5>
-                                </div>
-                                <div class="col-md-12 mt-3">
-                                    <h5><input name="promotion" type="checkbox" id="promotion" value="1">&nbsp; {{__('db.Add Promotional Price')}}</h5>
-                                </div>
-                                <div class="col-md-12">
-                                    <div class="row">
-                                        <div class="col-md-4" id="promotion_price">
                                             <label>{{__('db.Promotional Price')}}</label>
                                             <input type="number" name="promotion_price" class="form-control" step="any" />
                                         </div>
-                                        <div class="col-md-4" id="start_date">
-                                            <div class="form-group">
-                                                <label>{{__('db.Promotion Starts')}}</label>
-                                                <div class="input-group">
-                                                    <div class="input-group-prepend">
-                                                        <div class="input-group-text"><i class="dripicons-calendar"></i></div>
-                                                    </div>
-                                                    <input type="text" name="starting_date" id="starting_date" class="form-control" />
+                                    </div>
+                                    <div class="col-md-4" id="start_date">
+                                        <div class="form-group">
+                                            <label>{{__('db.Promotion Starts')}}</label>
+                                            <div class="input-group">
+                                                <div class="input-group-prepend">
+                                                    <div class="input-group-text"><i class="ti ti-calendar"></i></div>
                                                 </div>
+                                                <input type="text" name="starting_date" id="starting_date" class="form-control" />
                                             </div>
                                         </div>
-                                        <div class="col-md-4" id="last_date">
-                                            <div class="form-group">
-                                                <label>{{__('db.Promotion Ends')}}</label>
-                                                <div class="input-group">
-                                                    <div class="input-group-prepend">
-                                                        <div class="input-group-text"><i class="dripicons-calendar"></i></div>
-                                                    </div>
-                                                    <input type="text" name="last_date" id="ending_date" class="form-control" />
+                                    </div>
+                                    <div class="col-md-4" id="last_date">
+                                        <div class="form-group">
+                                            <label>{{__('db.Promotion Ends')}}</label>
+                                            <div class="input-group">
+                                                <div class="input-group-prepend">
+                                                    <div class="input-group-text"><i class="ti ti-calendar"></i></div>
                                                 </div>
+                                                <input type="text" name="last_date" id="ending_date" class="form-control" />
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                @if (\Schema::hasColumn('products', 'woocommerce_product_id'))
-                                <div class="col-md-12 mt-3">
-                                    <h5><input name="is_sync_disable" type="checkbox" id="is_sync_disable" value="1">&nbsp; {{__('db.Disable Woocommerce Sync')}}</h5>
-                                </div>
-                                @endif
-
-                                @if(in_array('ecommerce',explode(',',$general_setting->modules)) || in_array('restaurant',explode(',',$general_setting->modules)))
-                                <div class="col-md-12 mt-3">
-                                    <h5><input name="is_online" type="checkbox" id="is_online" value="1" checked>&nbsp; {{__('db.Sell Online')}}</h5>
-                                </div>
-                                @endif
-
-                                @if(in_array('restaurant',explode(',',$general_setting->modules)))
-                                <div class="col-md-12 mt-3">
-                                    <h5><input name="is_addon" type="checkbox" id="is_addon" value="1">&nbsp; {{__('db.This is topping')}} <i class="dripicons-question" data-toggle="tooltip" title="{{__('db.Check this if the item is a topping or extra or add-on only to be served with a main course')}}"></i></h5>
-                                </div>
-                                @endif
-
-                                @if(in_array('ecommerce',explode(',',$general_setting->modules)))
-                                <div class="col-md-12 mt-3">
-                                    <h5><input name="in_stock" type="checkbox" id="in_stock" value="1" checked>&nbsp; {{__('db.In Stock')}}</h5>
-                                </div>
-                                <!-- <div class="col-md-12 mt-3 track_inventory" style="display:none">
-                                    <h5><input name="track_inventory" type="checkbox" id="track_inventory" value="0">&nbsp; {{__('db.Track Inventory')}}</h5>
-                                </div> -->
-                                @endif
                             </div>
-                            @if(in_array('ecommerce',explode(',',$general_setting->modules)) || in_array('restaurant',explode(',',$general_setting->modules)))
+                        </div>
+                    </div>
+
+                    {{-- ── 4. Units ── --}}
+                    <div id="unit" class="sp-card">
+                        <div class="sp-card-header">
+                            <i class="ti ti-ruler-2 section-icon"></i>
+                            <h6>{{__('db.Units')}}</h6>
+                        </div>
+                        <div class="sp-card-body">
                             <div class="row">
-                                <div class="col-12 mt-3">
+                                <div class="col-md-4 form-group">
+                                    <label>{{__('db.Product Unit')}} <span class="text-danger">*</span></label>
+                                    <div class="input-group pos">
+                                        <select required class="form-control selectpicker" name="unit_id">
+                                            <option value="" disabled selected>Select Product Unit...</option>
+                                            @foreach($lims_unit_list as $unit)
+                                            @if($unit->base_unit==null)
+                                            <option value="{{$unit->id}}">{{$unit->unit_name}}</option>
+                                            @endif
+                                            @endforeach
+                                        </select>
+                                        <div class="input-group-append">
+                                            <button type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#createUnitModal">
+                                                <i class="ti ti-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <span class="validation-msg"></span>
+                                </div>
+                                <div class="col-md-4">
+                                    <label>{{__('db.Sale Unit')}}</label>
+                                    <div class="input-group pos">
+                                        <select class="form-control selectpicker" name="sale_unit_id"></select>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>{{__('db.Product Tags')}}</strong> </label>
-                                        <input type="text" name="tags" class="form-control" value="">
-                                        <span class="validation-msg" id="tags-error"></span>
+                                        <label>{{__('db.Purchase Unit')}}</label>
+                                        <div class="input-group pos">
+                                            <select class="form-control selectpicker" name="purchase_unit_id"></select>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="col-md-12">
-                                    <br/>
-                                    <h6>For SEO</h6>
-                                    <br>
-                                </div>
-                                <div class="col-md-12 form-group">
-                                    <label>{{ __('Meta Title') }} *</label>
-                                    <input type="text" name="meta_title" class="form-control" value="">
-                                </div>
-                                <div class="col-md-12 form-group">
-                                    <label>{{ __('Meta Description') }} *</label>
-                                    <input type="text" name="meta_description" class="form-control" value="">
-                                </div>
-                                <div class="col-md-12 form-group related-section">
-                                    <label>{{__('db.Related Products')}}</label>
-                                    <input type="text" id="search_products" class="form-control">
-                                    <div class="search_result"></div>
-                                    <h4 class="mt-5 mb-3">Selected Items</h4>
-                                    <div class="selected_items"></div>
-                                    <textarea class="selected_ids hidden no-tiny" name="products"></textarea>
-                                </div>
                             </div>
-                            @endif
+                        </div>
+                    </div>
 
-                            @if(in_array('restaurant',explode(',',$general_setting->modules)))
+                    {{-- ── 5. Variants ── --}}
+                    <div class="sp-card">
+                        <div class="sp-card-header">
+                            <i class="ti ti-adjustments section-icon"></i>
+                            <h6>{{__('db.Variants')}}</h6>
+                        </div>
+                        <div class="sp-card-body">
+                            <div class="sp-collapse-trigger" id="variant-option">
+                                <input name="is_variant" type="checkbox" id="is-variant" value="1">
+                                &nbsp; {{__('db.This product has variant')}}
+                            </div>
+                            <div id="variant-section" style="display:none; margin-top:12px;">
+                                <div id="variant-input-section">
+                                    <div class="row">
+                                        <div class="col-md-4 form-group mt-2">
+                                            <label>{{__('db.Option')}} *</label>
+                                            <input type="text" name="variant_option[]" class="form-control variant-field" placeholder="{{ __('db.Size, Color etc') }}">
+                                        </div>
+                                        <div class="col-md-7 form-group mt-2">
+                                            <label>{{__('db.Value')}} *</label>
+                                            <input type="text" name="variant_value[]" class="type-variant form-control variant-field">
+                                        </div>
+                                        <div class="col-sm-1 form-group mt-2" style="display:flex;flex-direction:column;align-items:center;justify-content:end;">
+                                            <button type="button" class="delVarOption btn btn-danger btn-sm mr-3"><i class="ti ti-x"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group mt-2">
+                                    <button type="button" class="btn btn-info btn-sm add-more-variant">
+                                        <i class="ti ti-plus"></i> {{__('db.Add More Variant')}}
+                                    </button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table id="variant-table" class="table table-hover variant-list">
+                                        <thead>
+                                            <tr>
+                                                <th>{{__('db.name')}}</th>
+                                                <th>{{__('db.Item Code')}}</th>
+                                                <th>{{__('db.Additional Cost')}}</th>
+                                                <th>{{__('db.Additional Price')}}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ── 6. Inventory ── --}}
+                    <div class="sp-card">
+                        <div class="sp-card-header">
+                            <i class="ti ti-building-warehouse section-icon"></i>
+                            <h6>{{__('db.inventory')}}</h6>
+                        </div>
+                        <div class="sp-card-body">
+                            {{-- Initial stock --}}
+                            <div class="sp-collapse-trigger" id="stock-section">
+                                <input type="checkbox" name="is_initial_stock" value="1">
+                                &nbsp; {{__('db.Initial Stock')}}
+                                <small class="text-muted ml-2">{{__('db.This feature will not work for product with variants and batches')}}</small>
+                            </div>
+                            <div id="initial-stock-section" style="display:none; margin-top:8px;">
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>{{__('db.Warehouse')}}</th>
+                                                <th>{{__('db.qty')}}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($lims_warehouse_list as $warehouse)
+                                            <tr>
+                                                <td>
+                                                    <input type="hidden" name="stock_warehouse_id[]" value="{{$warehouse->id}}">
+                                                    {{$warehouse->name}}
+                                                </td>
+                                                <td><input type="number" name="stock[]" min="0" class="form-control form-control-sm"></td>
+                                            </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {{-- Different customer group price --}}
+                            <div class="sp-collapse-trigger mt-2" id="groupPrice-option">
+                                <input name="is_groupPrice" type="checkbox" id="is-groupPrice" value="1">
+                                &nbsp; {{__('db.This product has different price for different customer group')}}
+                            </div>
+                            <div id="groupPrice-section" style="display:none; margin-top:8px;">
+                                <div class="table-responsive">
+                                    <table id="groupPrice-table" class="table table-hover table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>{{__('db.Customer Group')}}</th>
+                                                <th>{{__('db.Customer Group Price')}}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($lims_customer_group_list as $customer_group)
+                                            <tr>
+                                                <td>
+                                                    <input type="hidden" name="customer_group_id[]" value="{{$customer_group->id}}">
+                                                    {{$customer_group->name}}
+                                                </td>
+                                                <td><input type="number" name="group_price[]" class="form-control form-control-sm" step="any" min="0"></td>
+                                            </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {{-- Different warehouse price --}}
+                            <div class="sp-collapse-trigger mt-2" id="diffPrice-option">
+                                <input name="is_diffPrice" type="checkbox" id="is-diffPrice" value="1">
+                                &nbsp; {{__('db.This product has different price for different warehouse')}}
+                            </div>
+                            <div id="diffPrice-section" style="display:none; margin-top:8px;">
+                                <div class="table-responsive">
+                                    <table id="diffPrice-table" class="table table-hover table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>{{__('db.Warehouse')}}</th>
+                                                <th>{{__('db.Price')}}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($lims_warehouse_list as $warehouse)
+                                            <tr>
+                                                <td>
+                                                    <input type="hidden" name="warehouse_id[]" value="{{$warehouse->id}}">
+                                                    {{$warehouse->name}}
+                                                </td>
+                                                <td><input type="number" name="diff_price[]" class="form-control form-control-sm"></td>
+                                            </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {{-- Batch --}}
+                            <div class="sp-collapse-trigger mt-2" id="batch-option">
+                                <input name="is_batch" type="checkbox" id="is-batch" value="1">
+                                &nbsp; {{__('db.This product has batch and expired date')}}
+                            </div>
+
+                            {{-- IMEI --}}
+                            <div class="sp-collapse-trigger mt-2" id="imei-option">
+                                <input name="is_imei" type="checkbox" id="is-imei" value="1">
+                                &nbsp; {{__('db.This product has IMEI or Serial numbers')}}
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ── 7. Combo Products (shown only when type=combo) ── --}}
+                    <div id="combo" class="sp-card" style="display:none;">
+                        <div class="sp-card-header">
+                            <i class="ti ti-layers-linked section-icon"></i>
+                            <h6>{{__('db.Combo Products')}}</h6>
+                        </div>
+                        <div class="sp-card-body">
+                            <div class="form-group">
+                                <label>{{__('db.add_product')}}</label>
+                                <div class="search-box input-group mb-3">
+                                    <button class="btn btn-secondary" type="button"><i class="ti ti-barcode"></i></button>
+                                    <input type="text" name="product_code_name" id="lims_productcodeSearch"
+                                        placeholder="{{ __('db.Please type product code and select') }}" class="form-control" />
+                                </div>
+                            </div>
+                            <label>{{__('db.Combo Products')}}</label>
+                            <div class="table-responsive">
+                                <table id="myTable" class="table table-hover order-list">
+                                    <thead>
+                                        <tr>
+                                            <th>{{__('db.product')}}</th>
+                                            <th>{{__('db.Wastage Percent')}}</th>
+                                            <th>{{__('db.Quantity')}}</th>
+                                            <th>{{__('db.Unit Cost')}}</th>
+                                            <th>{{__('db.Unit Price')}}</th>
+                                            <th>{{__('db.Sub total')}}</th>
+                                            <th><i class="ti ti-trash"></i></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="combo_product_list_table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ── 8. Online Store & SEO (ecommerce / restaurant only) ── --}}
+                    @if(app(\App\Services\ModuleAccessService::class)->userCanAccess(auth()->user(), 'ecommerce'))
+                    <div class="sp-card">
+                        <div class="sp-card-header">
+                            <i class="ti ti-world section-icon"></i>
+                            <h6>{{__('db.Online Store & SEO')}}</h6>
+                        </div>
+                        <div class="sp-card-body">
+                            <div class="form-group">
+                                <label>{{__('db.Product Tags')}}</label>
+                                <input type="text" name="tags" class="form-control" value="">
+                                <span class="validation-msg" id="tags-error"></span>
+                            </div>
+                            <div class="form-group">
+                                <label>{{ __('Meta Title') }}</label>
+                                <input type="text" name="meta_title" class="form-control" value="">
+                            </div>
+                            <div class="form-group">
+                                <label>{{ __('Meta Description') }}</label>
+                                <input type="text" name="meta_description" class="form-control" value="">
+                            </div>
+                            <div class="form-group related-section">
+                                <label>{{__('db.Related Products')}}</label>
+                                <input type="text" id="search_products" class="form-control" placeholder="Search products...">
+                                <div class="search_result mt-1"></div>
+                                <h6 class="mt-3 mb-2">Selected Items</h6>
+                                <div class="selected_items"></div>
+                                <textarea class="selected_ids hidden no-tiny" name="products"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
+
+                    {{-- ── 8. Online Store & SEO (ecommerce / restaurant only) ── --}}
+                    @module('restaurant')
+                    <div class="sp-card">
+                        <div class="sp-card-header">
+                            <i class="ti ti-world section-icon"></i>
+                            <h6>{{__('db.restaurant_settings')}}</h6>
+                        </div>
+                        <div class="sp-card-body">
                             <div class="row">
-                                <div class="col-md-12 form-group extra-section">
-                                    <label>{{__('db.Extras')}}</label>
-                                    <input type="text" id="search_addons" class="form-control">
-                                    <div class="search_result_addon"></div>
-                                    <h4 class="mt-5 mb-3">Selected Extras</h4>
-                                    <div class="selected_addons"></div>
-                                    <textarea class="selected_addon_ids hidden no-tiny" name="extras"></textarea>
-                                </div>
-                                <div class="col-md-4 col-6">
-                                    <div class="form-group top-fields">
+                                <div class="col-md-6">
+                                    <div class="form-group">
                                         <label>{{__('db.Kitchen')}}</label>
-                                        <div class="input-group pos">
-                                            <select id="kitchen_id" name="kitchen_id" class="selectpicker form-control" title="Select kitchen...">
-                                                @foreach($kitchen_list as $kitchen)
-                                                <option value="{{$kitchen->id}}">{{$kitchen->name}}</option>
-                                                @endforeach
-                                            </select>
-                                        </div>
+                                        <select id="kitchen_id" name="kitchen_id" class="selectpicker form-control" title="Select kitchen...">
+                                            @if(isset($kitchen_list) && count($kitchen_list) > 0)
+                                            @foreach($kitchen_list as $kitchen)
+                                            <option value="{{$kitchen->id}}">{{$kitchen->name}}</option>
+                                            @endforeach
+                                            @endif
+                                        </select>
                                     </div>
                                 </div>
-                                <div class="col-md-4 col-6">
-                                    <div class="form-group top-fields">
+                                <div class="col-md-6">
+                                    <div class="form-group">
                                         <label>{{__('db.Menu Type')}}</label>
-                                        <div class="input-group pos">
-                                            <select required id="menu_type" name="menu_type[]" class="selectpicker form-control" multiple>
-                                                @foreach($menu_type_list as $menu_type)
-                                                <option value="{{$menu_type->id}}">{{$menu_type->name}}</option>
-                                                @endforeach
-                                            </select>
-                                        </div>
+                                        <select id="menu_type" name="menu_type[]" class="selectpicker form-control" multiple>
+                                            @if(isset($menu_type_list) && count($menu_type_list) > 0)
+                                            @foreach($menu_type_list as $menu_type)
+                                            <option value="{{$menu_type->id}}">{{$menu_type->name}}</option>
+                                            @endforeach
+                                            @endif
+                                        </select>
                                     </div>
                                 </div>
                             </div>
-                            @endif
-                            <div class="form-group mt-3">
-                                <button type="submit" id="submit-btn" class="btn btn-primary">{{__('db.add_product')}}</button>
-                                <button type="submit" id="submit-and-insert-btn" class="btn btn-info">Save and Insert Another</button>
+                            <p class="text-muted mb-0">{{__('Modifier groups are managed from Restaurant > Modifier Group.')}}</p>
+                        </div>
+                    </div>
+                    @endmodule
+
+                    {{-- ── 9. Custom Fields ── --}}
+                    @if(count($custom_fields) > 0)
+                    <div class="sp-card">
+                        <div class="sp-card-header">
+                            <i class="ti ti-list-details section-icon"></i>
+                            <h6>{{__('db.additional_fields')}}</h6>
+                        </div>
+                        <div class="sp-card-body">
+                            <div class="row">
+                                @foreach($custom_fields as $field)
+                                @if(!$field->is_admin || \Auth::user()->role_id == 1)
+                                <div class="{{'col-md-'.$field->grid_value}}">
+                                    <div class="form-group">
+                                        <label>{{$field->name}}</label>
+                                        @if($field->type == 'text')
+                                        <input type="text" name="{{str_replace(' ', '_', strtolower($field->name))}}" value="{{$field->default_value}}" class="form-control" @if($field->is_required){{'required'}}@endif>
+                                        @elseif($field->type == 'number')
+                                        <input type="number" name="{{str_replace(' ', '_', strtolower($field->name))}}" value="{{$field->default_value}}" class="form-control" @if($field->is_required){{'required'}}@endif>
+                                        @elseif($field->type == 'textarea')
+                                        <textarea rows="5" name="{{str_replace(' ', '_', strtolower($field->name))}}" class="form-control" @if($field->is_required){{'required'}}@endif>{{$field->default_value}}</textarea>
+                                        @elseif($field->type == 'checkbox')
+                                        <br>
+                                        <?php $option_values = explode(",", $field->option_value); ?>
+                                        @foreach($option_values as $value)
+                                        <label>
+                                            <input type="checkbox" name="{{str_replace(' ', '_', strtolower($field->name))}}[]" value="{{$value}}" @if($value==$field->default_value){{'checked'}}@endif @if($field->is_required){{'required'}}@endif> {{$value}}
+                                        </label>&nbsp;
+                                        @endforeach
+                                        @elseif($field->type == 'radio_button')
+                                        <br>
+                                        <?php $option_values = explode(",", $field->option_value); ?>
+                                        @foreach($option_values as $value)
+                                        <label class="radio-inline">
+                                            <input type="radio" name="{{str_replace(' ', '_', strtolower($field->name))}}" value="{{$value}}" @if($value==$field->default_value){{'checked'}}@endif @if($field->is_required){{'required'}}@endif> {{$value}}
+                                        </label>&nbsp;
+                                        @endforeach
+                                        @elseif($field->type == 'select')
+                                        <?php $option_values = explode(",", $field->option_value); ?>
+                                        <select class="form-control" name="{{str_replace(' ', '_', strtolower($field->name))}}" @if($field->is_required){{'required'}}@endif>
+                                            @foreach($option_values as $value)
+                                            <option value="{{$value}}" @if($value==$field->default_value){{'selected'}}@endif>{{$value}}</option>
+                                            @endforeach
+                                        </select>
+                                        @elseif($field->type == 'multi_select')
+                                        <?php $option_values = explode(",", $field->option_value); ?>
+                                        <select class="form-control" name="{{str_replace(' ', '_', strtolower($field->name))}}[]" @if($field->is_required){{'required'}}@endif multiple>
+                                            @foreach($option_values as $value)
+                                            <option value="{{$value}}" @if($value==$field->default_value){{'selected'}}@endif>{{$value}}</option>
+                                            @endforeach
+                                        </select>
+                                        @elseif($field->type == 'date_picker')
+                                        <input type="date" name="{{str_replace(' ', '_', strtolower($field->name))}}" value="{{$field->default_value}}" class="form-control" @if($field->is_required){{'required'}}@endif>
+                                        @endif
+                                    </div>
+                                </div>
+                                @endif
+                                @endforeach
                             </div>
-                        </form>
+                        </div>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- Brand Create Modal Start -->
-    <div id="addBrand" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" class="modal fade text-left">
+                    @endif
+
+                    @module('socialcommerce')
+                    <div class="sp-card">
+                        <div class="sp-card-header">
+                            <i class="ti ti-share section-icon"></i>
+                            <h6>{{ __('db.Social Commerce') }}</h6>
+                        </div>
+                        <div class="sp-card-body">
+                            <div class="row">
+                                <div class="col-md-12 form-group">
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="sc_is_published" name="sc_is_published" value="1">
+                                        <label class="custom-control-label" for="sc_is_published">{{ __('db.Publish to Social Commerce') }}</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-12 form-group">
+                                    <label>{{ __('db.Custom Social Title') }}</label>
+                                    <input type="text" name="sc_social_title" class="form-control" placeholder="{{ __('db.Leave blank to use product name') }}">
+                                </div>
+                                <div class="col-md-12 form-group">
+                                    <label>{{ __('db.Custom Social Description') }}</label>
+                                    <textarea name="sc_social_description" class="form-control" rows="3" placeholder="{{ __('db.Leave blank to use product description') }}"></textarea>
+                                </div>
+                                <div class="col-md-12 form-group">
+                                    <label>{{ __('db.Custom Social Image') }}</label>
+                                    <input type="file" name="sc_social_image" class="form-control">
+                                    <small class="text-muted">{{ __('db.Leave blank to use standard product image') }}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    @endmodule
+
+                </div>{{-- /main col --}}
+
+                {{-- ═══════════ SIDEBAR ═══════════ --}}
+                <div class="col-lg-4">
+
+                    {{-- ── Status ── --}}
+                    <div class="sp-card">
+                        <div class="sp-card-header">
+                            <i class="ti ti-toggle-right section-icon"></i>
+                            <h6>{{__('db.Status')}}</h6>
+                        </div>
+                        <div class="sp-card-body p-0">
+                            <ul class="sp-switch-list">
+                                <li id="featured">
+                                    <div class="sp-switch-meta">
+                                        <span class="switch-label">{{__('db.Featured')}}</span>
+                                        <span class="switch-hint">{{__('db.Featured product will be displayed in POS')}}</span>
+                                    </div>
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="switch-featured" name="featured" value="1">
+                                        <label class="custom-control-label" for="switch-featured"></label>
+                                    </div>
+                                </li>
+                                <li>
+                                    <div class="sp-switch-meta">
+                                        <span class="switch-label">{{__('db.Embedded Barcode')}}</span>
+                                        <span class="switch-hint">{{__('db.Check this if this product will be used in weight scale machine')}}</span>
+                                    </div>
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="switch-embeded" name="is_embeded" value="1">
+                                        <label class="custom-control-label" for="switch-embeded"></label>
+                                    </div>
+                                </li>
+                                <li id="embedded-scale-notice" style="display:none; background: #fffbe6; border: 1px solid #ffe58f; padding: 10px 14px; border-radius: 6px; margin: 8px 0; font-size: 0.85rem; color: #873800;display:block">
+                                    <i class="ti ti-info-circle mr-1"></i>
+                                    <strong>{{__('db.Weight-Scale Product')}}:</strong>
+                                    <div class="d-block">{{__('db.Product code must be exactly 7 numeric digits (e.g. 2831421). The same 7-digit item code must be programmed into your electronic weighing scale.')}}</div>
+                                </li>
+                                @if(app(\App\Services\ModuleAccessService::class)->userCanAccess(auth()->user(), 'ecommerce'))
+                                <li>
+                                    <div class="sp-switch-meta">
+                                        <span class="switch-label">{{__('db.Sell Online')}}</span>
+                                    </div>
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="switch-online" name="is_online" value="1" checked>
+                                        <label class="custom-control-label" for="switch-online"></label>
+                                    </div>
+                                </li>
+                                @endif
+                                @if(app(\App\Services\ModuleAccessService::class)->userCanAccess(auth()->user(), 'ecommerce'))
+                                <li>
+                                    <div class="sp-switch-meta">
+                                        <span class="switch-label">{{__('db.In Stock')}}</span>
+                                    </div>
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="switch-in-stock" name="in_stock" value="1" checked>
+                                        <label class="custom-control-label" for="switch-in-stock"></label>
+                                    </div>
+                                </li>
+                                @endif
+
+                                @if(app(\App\Services\ModuleAccessService::class)->userCanAccess(auth()->user(), 'woocommerce') && \Schema::hasColumn('products', 'woocommerce_product_id'))
+                                <li>
+                                    <div class="sp-switch-meta">
+                                        <span class="switch-label">{{__('db.Disable Woocommerce Sync')}}</span>
+                                    </div>
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="is_sync_disable" name="is_sync_disable" value="1">
+                                        <label class="custom-control-label" for="is_sync_disable"></label>
+                                    </div>
+                                </li>
+                                @endif
+                            </ul>
+                        </div>
+                    </div>
+
+                    {{-- ── Organization ── --}}
+                    <div class="sp-card">
+                        <div class="sp-card-header">
+                            <i class="ti ti-folder section-icon"></i>
+                            <h6>{{__('db.Organization')}}</h6>
+                        </div>
+                        <div class="sp-card-body">
+                            <div class="form-group">
+                                <label>{{__('db.Brand')}}</label>
+                                <div class="input-group pos">
+                                    <select name="brand_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" title="Select Brand...">
+                                        @foreach($lims_brand_list as $brand)
+                                        <option value="{{$brand->id}}">{{$brand->title}}</option>
+                                        @endforeach
+                                    </select>
+                                    <button type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#addBrand">
+                                        <i class="ti ti-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group mb-0">
+                                <label>{{__('db.category')}} <span class="text-danger">*</span></label>
+                                <div class="input-group pos">
+                                    <select name="category_id" required class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" title="Select Category...">
+                                        @foreach (get_active_categories() as $category)
+                                        <option value="{{$category->id}}">{{$category->name}}</option>
+                                        @endforeach
+                                    </select>
+                                    <div class="input-group-append">
+                                        <button type="button" class="btn btn-default btn-sm category-model" data-toggle="modal" data-target="#category-modal">
+                                            <i class="ti ti-plus"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <span class="validation-msg"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ── Warranty & Guarantee ── --}}
+                    <div class="sp-card">
+                        <div class="sp-card-header">
+                            <i class="ti ti-shield-check section-icon"></i>
+                            <h6>{{__('db.Warranty & Guarantee')}}</h6>
+                        </div>
+                        <div class="sp-card-body">
+                            <div class="form-group">
+                                <label>{{ __('db.Warranty') }}</label>
+                                <div class="d-flex" style="gap:8px;">
+                                    <input type="number" name="warranty" min="1" class="form-control" placeholder="{{ __('db.eg: 1') }}">
+                                    <select name="warranty_type" class="form-control selectpicker" style="width:110px;">
+                                        <option value="days">{{ __('db.Days') }}</option>
+                                        <option value="months" selected>{{ __('db.Months') }}</option>
+                                        <option value="years">{{ __('db.Years') }}</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group mb-0">
+                                <label>{{ __('db.Guarantee') }}</label>
+                                <div class="d-flex" style="gap:8px;">
+                                    <input type="number" name="guarantee" min="1" class="form-control" placeholder="{{ __('db.eg: 1') }}">
+                                    <select name="guarantee_type" class="form-control selectpicker" style="width:110px;">
+                                        <option value="days">{{ __('db.Days') }}</option>
+                                        <option value="months" selected>{{ __('db.Months') }}</option>
+                                        <option value="years">{{ __('db.Years') }}</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ── Inventory Settings ── --}}
+                    <div id="alert-qty" class="sp-card">
+                        <div class="sp-card-header">
+                            <i class="ti ti-bell section-icon"></i>
+                            <h6>{{__('db.Inventory Settings')}}</h6>
+                        </div>
+                        <div class="sp-card-body">
+                            <div class="form-group">
+                                <label>
+                                    {{__('db.Daily Sale Objective')}}
+                                    <i class="ti ti-info-circle" data-toggle="tooltip" title="{{__('db.Minimum qty which must be sold in a day If not, you will be notified on dashboard But you have to set up the cron job properly for that Follow the documentation in that regard')}}"></i>
+                                </label>
+                                <input type="number" name="daily_sale_objective" class="form-control" step="any">
+                            </div>
+                            <div class="form-group mb-0">
+                                <label>{{__('db.Alert Quantity')}}</label>
+                                <input type="number" name="alert_quantity" class="form-control" step="any">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>{{-- /sidebar --}}
+            </div>{{-- /row --}}
+        </form>
+    </div>{{-- /container --}}
+
+    {{-- ═══════════ Modals ═══════════ --}}
+
+    {{-- Brand Modal --}}
+    <div id="addBrand" tabindex="-1" role="dialog" aria-labelledby="addBrandLabel" aria-hidden="true" class="modal fade text-left">
         <div role="document" class="modal-dialog">
-          <div class="modal-content">
-            <form id="brand-form">
-            <div class="modal-header">
-              <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Brand')}}</h5>
-              <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+            <div class="modal-content">
+                <form id="brand-form">
+                    <div class="modal-header">
+                        <h5 id="addBrandLabel" class="modal-title">{{__('db.Add Brand')}}</h5>
+                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
+                        <div class="form-group">
+                            <label>{{__('db.Title')}} *</label>
+                            <input type="text" name="title" class="form-control" placeholder="{{ __('db.Type brand title') }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>{{__('db.Image')}}</label>
+                            <input type="file" name="image" class="form-control">
+                        </div>
+                        @if(app(\App\Services\ModuleAccessService::class)->userCanAccess(auth()->user(), 'ecommerce'))
+                        <div class="form-group">
+                            <label>{{ __('Meta Title') }}</label>
+                            <input type="text" name="page_title" class="form-control" placeholder="{{ __('db.Meta Title') }}">
+                        </div>
+                        <div class="form-group">
+                            <label>{{ __('Meta Description') }}</label>
+                            <input type="text" name="short_description" class="form-control" placeholder="{{ __('db.Meta Description') }}">
+                        </div>
+                        @endif
+                        <div class="form-group">
+                            <input type="hidden" name="ajax" value="1">
+                            <button type="button" class="btn btn-primary brand-submit-btn">{{__('db.submit')}}</button>
+                        </div>
+                    </div>
+                </form>
             </div>
-            <div class="modal-body">
-              <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
-                <div class="form-group">
-                    <label>{{__('db.Title')}} *</label>
-                    <input type="text" name="title" class="form-control" placeholder="{{ __('db.Type brand title') }}" required>
-                </div>
-                <div class="form-group">
-                    <label>{{__('db.Image')}}</label>
-                    <input type="file" name="image" class="form-control">
-                </div>
-                @if(in_array('ecommerce',explode(',',$general_setting->modules)) || in_array('restaurant',explode(',',$general_setting->modules)))
-                <div class="row">
-                    <div class="col-md-12 mt-3">
-                        <h6><strong>{{ __('For SEO') }}</strong></h6>
-                        <hr>
-                    </div>
-                    <div class="col-md-12 form-group">
-                        <label>{{ __('Meta Title') }}</label>
-                        <input type="text" name="page_title" class="form-control" placeholder="{{ __('db.Meta Title') }}">
-                    </div>
-                    <div class="col-md-12 form-group">
-                        <label>{{ __('Meta Description') }}</label>
-                        <input type="text" name="short_description" class="form-control" placeholder="{{ __('db.Meta Description') }}">
-                    </div>
-                </div>
-                @endif
-                <div class="form-group">
-                    <input type="hidden" name="ajax" value="1">
-                    <button type="button" class="btn btn-primary brand-submit-btn">{{__('db.submit')}}</button>
-                </div>
-            </div>
-            </form>
-          </div>
         </div>
     </div>
-    <!-- Brand Create Modal End -->
-    <!-- Tax Create Modal Start -->
-    <div id="addTax" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" class="modal fade text-left">
+
+    {{-- Tax Modal --}}
+    <div id="addTax" tabindex="-1" role="dialog" aria-labelledby="addTaxLabel" aria-hidden="true" class="modal fade text-left">
         <div role="document" class="modal-dialog">
             <div class="modal-content">
                 <form action="{{ route('tax.store') }}" method="POST">
                     @csrf
                     <div class="modal-header">
-                        <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Tax')}}</h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                        <h5 id="addTaxLabel" class="modal-title">{{__('db.Add Tax')}}</h5>
+                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                     </div>
                     <div class="modal-body">
                         <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
-                        <form>
-                            <div class="form-group">
-                                <label>{{__('db.Tax Name')}} *</label>
-                                <input type="text" name="name" class="form-control" required>
-                            </div>
+                        <div class="form-group">
+                            <label>{{__('db.Tax Name')}} *</label>
+                            <input type="text" name="name" class="form-control" required>
                         </div>
                         <div class="form-group">
                             <label>{{__('db.Rate')}}(%) *</label>
@@ -722,21 +1197,21 @@
                         </div>
                         <input type="hidden" name="ajax" value="1">
                         <button type="button" class="btn btn-primary tax-submit-btn">{{__('db.submit')}}</button>
-                    </form>
-                </div>
-            </form>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
-    <!-- Tax Create Modal End -->
 
-    <!-- Unit Create Modal Start -->
+    {{-- Unit Modal --}}
     @include('backend.unit.add_unit_modal')
+
 </section>
 @endsection
-@push('scripts')
-<script type="text/javascript">
 
+@push('scripts')
+<script type="text/javascript" src="{{ asset($asset_prefix . 'js/dropzone.js') }}"></script>
+<script type="text/javascript">
     var submit_type = 'add';
 
     $.ajaxSetup({
@@ -748,12 +1223,14 @@
     function showAlert(message, type = 'success') {
         const container = $('#alert-container');
         container.removeClass('alert-success alert-danger alert-warning alert-info')
-                 .addClass('alert-' + type)
-                 .show();
+            .addClass('alert-' + type)
+            .show();
         $('#alert-message').text(message);
-        
+
         // Auto-scroll to top
-        $('html, body').animate({ scrollTop: 0 }, 'slow');
+        $('html, body').animate({
+            scrollTop: 0
+        }, 'slow');
 
         // Auto-fade after 5 seconds
         setTimeout(() => {
@@ -761,28 +1238,31 @@
         }, 8000);
     }
 
-    $("#is_addon").on('click', function(){
-        if($("#is_addon").prop('checked') == false){
-            $('.extra-section,.related-section').css('display','block');
-        }else{
-            $('.extra-section,.related-section').css('display','none');
-        }
-    })
+    // ── Type pill selector ──
+    $('.type-pill').on('click', function() {
+        $('.type-pill').removeClass('active');
+        $(this).addClass('active');
+        $('select[name="type"]').val($(this).data('value')).trigger('change');
+    });
 
-    @if(in_array('ecommerce',explode(',',$general_setting->modules)) || in_array('restaurant',explode(',',$general_setting->modules)))
+    // ── Promo pricing row show/hide (pill layout wraps the promo fields differently) ──
+    // The original JS handles #promotion_price, #start_date, #last_date individually.
+    // We keep those IDs so the existing handler still works.
+
+    @if(app(\App\Services\ModuleAccessService::class)->userCanAccess(auth()->user(), 'ecommerce'))
     $('#search_products').on('input', function() {
         var item = $(this).val();
         $('.search_result').html('<div class="d-block text-center"><div class="spinner-border text-secondary" role="status"><span class="sr-only">Loading...</span></div></div>');
 
-        if(item.length >= 3){
+        if (item.length >= 3) {
             $.ajax({
                 type: "get",
                 url: "{{url('search')}}/" + item,
                 success: function(data) {
-                    $('.search_result').html('').css('height','200px');
-                    $.each(data,function(key, value){
+                    $('.search_result').html('').css('height', '200px');
+                    $.each(data, function(key, value) {
                         var image = value.image.split(',');
-                        $('.search_result').append('<div data-id="'+value.id+'"><img src="{{asset("images/product/small/")}}/'+image[0]+'"><h4>'+value.name+'</h4><i class="dripicons-checkmark d-none"></i></div>')
+                        $('.search_result').append('<div data-id="' + value.id + '"><img src="{{asset("images/product/small/")}}/' + image[0] + '"><h4>' + value.name + '</h4><i class="ti ti-checkmark d-none"></i></div>')
                     })
                 }
             })
@@ -791,82 +1271,41 @@
         }
     });
 
-    $(document).on('click','.search_result div',function(){
+    $(document).on('click', '.search_result div', function() {
         $(this).find('i').removeClass('d-none');
-        var selected_item = '<div data-id="'+$(this).data('id')+'">'+$(this).html()+'<span class="remove_item"><i class="dripicons-cross"></i></span></div>';
-        if ($('.selected_ids').html().indexOf($(this).data('id')) === -1){
+        var selected_item = '<div data-id="' + $(this).data('id') + '">' + $(this).html() + '<span class="remove_item"><i class="ti ti-x"></i></span></div>';
+        if ($('.selected_ids').html().indexOf($(this).data('id')) === -1) {
             $('.selected_items').prepend(selected_item);
-            $('.selected_ids').append($(this).data('id')+',');
-            $('.selected_items .dripicons-checkmark').addClass('d-none');
+            $('.selected_ids').append($(this).data('id') + ',');
+            $('.selected_items .ti ti-checkmark').addClass('d-none');
         }
     });
 
-    $(document).on('click','.remove_item',function(){
+    $(document).on('click', '.remove_item', function() {
         var item = $(this).parent().remove();
         var remove_id = $(this).parent().data('id');
-        var selected_ids = $('.selected_ids').html().replace(remove_id+',','');
+        var selected_ids = $('.selected_ids').html().replace(remove_id + ',', '');
         $('.selected_ids').html(selected_ids);
     });
     @endif
 
-    @if(in_array('restaurant',explode(',',$general_setting->modules)))
-    $('#search_addons').on('input', function() {
-        var item = $(this).val();
-        $('.search_result_addon').html('<div class="d-block text-center"><div class="spinner-border text-secondary" role="status"><span class="sr-only">Loading...</span></div></div>');
-
-        if(item.length >= 3){
-            $.ajax({
-                type: "get",
-                url: "{{url('search')}}/" + item,
-                success: function(data) {
-                    $('.search_result_addon').html('').css('height','200px');
-                    $.each(data,function(key, value){
-                        var image = value.image.split(',');
-                        $('.search_result_addon').append('<div data-id="'+value.id+'"><img src="{{asset("images/product/small/")}}/'+image[0]+'"><h4>'+value.name+'</h4><i class="dripicons-checkmark d-none"></i></div>')
-                    })
-                }
-            })
-        } else if (item.length < 3) {
-            $('.search_result_addon').html('');
-        }
-    });
-
-    $(document).on('click','.search_result_addon div',function(){
-        $(this).find('i').removeClass('d-none');
-        var selected_addon = '<div data-id="'+$(this).data('id')+'">'+$(this).html()+'<span class="remove_item"><i class="dripicons-cross"></i></span></div>';
-        if ($('.selected_addon_ids').html().indexOf($(this).data('id')) === -1){
-            $('.selected_addons').prepend(selected_addon);
-            $('.selected_addon_ids').append($(this).data('id')+',');
-            $('.selected_addons .dripicons-checkmark').addClass('d-none');
-        }
-    });
-
-    $(document).on('click','.remove_item',function(){
-        var item = $(this).parent().remove();
-        var remove_addon_id = $(this).parent().data('id');
-        var selected_addon_ids = $('.selected_addon_ids').html().replace(remove_addon_id +',','');
-        $('.selected_addon_ids').html(selected_addon_ids);
-
-    });
-    @endif
-
-    $("ul#product").siblings('a').attr('aria-expanded','true');
+    $("ul#product").siblings('a').attr('aria-expanded', 'true');
     $("ul#product").addClass("show");
     $("ul#product #product-create-menu").addClass("active");
 
     @if(config('database.connections.saleprosaas_landlord'))
-        numberOfProduct = <?php echo json_encode($numberOfProduct)?>;
-        $.ajax({
-            type: 'GET',
-            async: false,
-            url: '{{route("package.fetchData", $general_setting->package_id)}}',
-            success: function(data) {
-                if(data['number_of_product'] > 0 && data['number_of_product'] <= numberOfProduct) {
-                    localStorage.setItem("message", "You don't have permission to create another product as you already exceed the limit! Subscribe to another package if you wants more!");
-                    location.href = "{{route('products.index')}}";
-                }
+    numberOfProduct = <?php echo json_encode($numberOfProduct) ?>;
+    $.ajax({
+        type: 'GET',
+        async: false,
+        url: '{{route("package.fetchData", gen_setting()->package_id)}}',
+        success: function(data) {
+            if (data['number_of_product'] > 0 && data['number_of_product'] <= numberOfProduct) {
+                localStorage.setItem("message", "You don't have permission to create another product as you already exceed the limit! Subscribe to another package if you wants more!");
+                location.href = "{{route('products.index')}}";
             }
-        });
+        }
+    });
     @endif
 
     $("#digital").hide();
@@ -888,14 +1327,68 @@
 
     $('[data-toggle="tooltip"]').tooltip();
 
-    $('#genbutton').on("click", function(){
-      $.get('gencode', function(data){
-        $("input[name='code']").val(data);
-      });
+    function updateEmbeddedUiState() {
+        var isEmbedded = $('#switch-embeded').is(':checked');
+        if (isEmbedded) {
+            $('#embedded-scale-notice').slideDown('fast');
+            var currentCode = $("input[name='code']").val().trim();
+            if (currentCode && !/^\d{7}$/.test(currentCode)) {
+                $('#code-error').text("{{__('db.Embedded barcode products require exactly 7 numeric digits for the product code.')}}").show();
+            } else {
+                $('#code-error').hide();
+            }
+        } else {
+            $('#embedded-scale-notice').slideUp('fast');
+            $('#code-error').hide();
+        }
+    }
+
+    $('#switch-embeded').on('change', function() {
+        updateEmbeddedUiState();
+        var currentCode = $("input[name='code']").val().trim();
+        if ($(this).is(':checked') && (!currentCode || currentCode.length === 8)) {
+            $.get('gencode', { is_embeded: 1 }, function(data) {
+                $("input[name='code']").val(data);
+                updateEmbeddedUiState();
+            });
+        }
+    });
+
+    $("input[name='code']").on('input', function() {
+        updateEmbeddedUiState();
+    });
+
+    $('#genbutton').on("click", function() {
+        var isEmbedded = $('#switch-embeded').is(':checked') ? 1 : 0;
+        $.get('gencode', { is_embeded: isEmbedded }, function(data) {
+            $("input[name='code']").val(data);
+            updateEmbeddedUiState();
+        });
+    });
+
+    $(document).ready(function() {
+        if ($('#switch-embeded').is(':checked')) {
+            updateEmbeddedUiState();
+        }
+    });
+
+    $("#product-form").on("submit", function(e) {
+        if ($('#switch-embeded').is(':checked')) {
+            var codeVal = $("input[name='code']").val().trim();
+            if (!/^\d{7}$/.test(codeVal)) {
+                e.preventDefault();
+                $('#code-error').text("{{__('db.Embedded barcode products require exactly 7 numeric digits for the product code.')}}").show();
+                $("input[name='code']").focus();
+                if (typeof SaleProToast !== 'undefined') {
+                    SaleProToast.show("{{__('db.Embedded barcode products require exactly 7 numeric digits for the product code.')}}");
+                }
+                return false;
+            }
+        }
     });
 
     $('.add-more-variant').on("click", function() {
-        var htmlText = '<div class="row"><div class="col-md-4 form-group mt-2"><label>Option *</label><input type="text" name="variant_option[]" class="form-control variant-field" placeholder="Size, Color etc..."></div><div class="col-md-7 form-group mt-2"><label>Value *</label><input type="text" name="variant_value[]" class="type-variant form-control variant-field"></div><div class="col-sm-1 form-group mt-2" style="display:flex;flex-direction:column;align-items:center;justify-content:end;"><button type="button" class="delVarOption btn btn-danger btn-sm mr-3"><i class="dripicons-cross"></i></button></div></div>';
+        var htmlText = '<div class="row"><div class="col-md-4 form-group mt-2"><label>Option *</label><input type="text" name="variant_option[]" class="form-control variant-field" placeholder="Size, Color etc..."></div><div class="col-md-7 form-group mt-2"><label>Value *</label><input type="text" name="variant_value[]" class="type-variant form-control variant-field"></div><div class="col-sm-1 form-group mt-2" style="display:flex;flex-direction:column;align-items:center;justify-content:end;"><button type="button" class="delVarOption btn btn-danger btn-sm mr-3"><i class="ti ti-x"></i></button></div></div>';
         $("#variant-input-section").append(htmlText);
         $('.type-variant').tagsInput();
     });
@@ -932,9 +1425,15 @@
                     return false;
                 }
 
-                $('<span>', {class: 'tag'}).append(
-                    $('<span>', {class: 'tag-text'}).text(value),
-                    $('<button>', {class: 'tag-remove'}).click(function() {
+                $('<span>', {
+                    class: 'tag'
+                }).append(
+                    $('<span>', {
+                        class: 'tag-text'
+                    }).text(value),
+                    $('<button>', {
+                        class: 'tag-remove'
+                    }).click(function() {
                         return $('#' + id).removeTag(encodeURI(value));
                     })
                 ).insertBefore('#' + id + '_addTag');
@@ -965,22 +1464,22 @@
                 });
 
                 //start custom code
-                first_variant_values = $('#'+variantIds[0]).val().split(_getDelimiter(delimiter[variantIds[0] ]));
+                first_variant_values = $('#' + variantIds[0]).val().split(_getDelimiter(delimiter[variantIds[0]]));
                 combinations = first_variant_values;
                 step = 1;
-                while(step < variantIds.length) {
+                while (step < variantIds.length) {
                     var newCombinations = [];
                     for (var i = 0; i < combinations.length; i++) {
-                        new_variant_values = $('#'+variantIds[step]).val().split(_getDelimiter(delimiter[variantIds[step] ]));
+                        new_variant_values = $('#' + variantIds[step]).val().split(_getDelimiter(delimiter[variantIds[step]]));
                         for (var j = 0; j < new_variant_values.length; j++) {
-                            newCombinations.push(combinations[i]+'/'+new_variant_values[j]);
+                            newCombinations.push(combinations[i] + '/' + new_variant_values[j]);
                         }
                     }
                     combinations = newCombinations;
                     step++;
                 }
                 var rownumber = $('table.variant-list tbody tr:last').index();
-                if(rownumber > -1) {
+                if (rownumber > -1) {
                     oldCombinations = [];
                     oldAdditionalCost = [];
                     oldAdditionalPrice = [];
@@ -992,20 +1491,19 @@
                 }
                 $("table.variant-list tbody").remove();
                 var newBody = $("<tbody>");
-                for(i = 0; i < combinations.length; i++) {
+                for (i = 0; i < combinations.length; i++) {
                     var variant_name = combinations[i];
-                    var item_code = variant_name+'-'+$("#code").val();
+                    var item_code = variant_name + '-' + $("#code").val();
                     var newRow = $("<tr>");
                     var cols = '';
-                    cols += '<td class="variant-name">'+variant_name+'<input type="hidden" name="variant_name[]" value="' + variant_name + '" /></td>';
-                    cols += '<td><input type="text" class="form-control item-code" name="item_code[]" value="'+item_code+'" /></td>';
+                    cols += '<td class="variant-name">' + variant_name + '<input type="hidden" name="variant_name[]" value="' + variant_name + '" /></td>';
+                    cols += '<td><input type="text" class="form-control item-code" name="item_code[]" value="' + item_code + '" /></td>';
                     //checking if this variant already exist in the variant table
                     oldIndex = oldCombinations.indexOf(combinations[i]);
-                    if(oldIndex >= 0) {
-                        cols += '<td><input type="number" class="form-control additional-cost" name="additional_cost[]" value="'+oldAdditionalCost[oldIndex]+'" step="any" /></td>';
-                        cols += '<td><input type="number" class="form-control additional-price" name="additional_price[]" value="'+oldAdditionalPrice[oldIndex]+'" step="any" /></td>';
-                    }
-                    else {
+                    if (oldIndex >= 0) {
+                        cols += '<td><input type="number" class="form-control additional-cost" name="additional_cost[]" value="' + oldAdditionalCost[oldIndex] + '" step="any" /></td>';
+                        cols += '<td><input type="number" class="form-control additional-price" name="additional_price[]" value="' + oldAdditionalPrice[oldIndex] + '" step="any" /></td>';
+                    } else {
                         cols += '<td><input type="number" class="form-control additional-cost" name="additional_cost[]" value="" step="any" /></td>';
                         cols += '<td><input type="number" class="form-control additional-price" name="additional_price[]" value="" step="any" /></td>';
                     }
@@ -1113,9 +1611,19 @@
                     callbacks[id]['onChange'] = settings.onChange;
                 }
 
-                var markup = $('<div>', {id: id + '_tagsinput', class: 'tagsinput'}).append(
-                    $('<div>', {id: id + '_addTag'}).append(
-                        settings.interactive ? $('<input>', {id: id + '_tag', class: 'tag-input', value: '', placeholder: settings.placeholder}) : null
+                var markup = $('<div>', {
+                    id: id + '_tagsinput',
+                    class: 'tagsinput'
+                }).append(
+                    $('<div>', {
+                        id: id + '_addTag'
+                    }).append(
+                        settings.interactive ? $('<input>', {
+                            id: id + '_tag',
+                            class: 'tag-input',
+                            value: '',
+                            placeholder: settings.placeholder
+                        }) : null
                     )
                 );
 
@@ -1188,7 +1696,7 @@
                     }
                 });
 
-                $(data.fake_input).on('paste', function () {
+                $(data.fake_input).on('paste', function() {
                     $(this).data('pasted', true);
                 });
 
@@ -1220,11 +1728,11 @@
                 // Deletes last tag on backspace
                 data.removeWithBackspace && $(data.fake_input).on('keydown', function(event) {
                     if (event.keyCode == 8 && $(this).val() === '') {
-                         event.preventDefault();
-                         var lastTag = $(this).closest('.tagsinput').find('.tag:last > span').text();
-                         var id = $(this).attr('id').replace(/_tag$/, '');
-                         $('#' + id).removeTag(encodeURI(lastTag));
-                         $(this).trigger('focus');
+                        event.preventDefault();
+                        var lastTag = $(this).closest('.tagsinput').find('.tag:last > span').text();
+                        var id = $(this).attr('id').replace(/_tag$/, '');
+                        $('#' + id).removeTag(encodeURI(lastTag));
+                        $(this).trigger('focus');
                     }
                 });
 
@@ -1315,87 +1823,84 @@
             }
 
             return found;
-         };
+        };
 
-         var _splitIntoTags = function(delimiter, value) {
-             if (value === '') return [];
+        var _splitIntoTags = function(delimiter, value) {
+            if (value === '') return [];
 
-             if (typeof delimiter === 'string') {
-                 return value.split(delimiter);
-             } else {
-                 var tmpDelimiter = '∞';
-                 var text = value;
+            if (typeof delimiter === 'string') {
+                return value.split(delimiter);
+            } else {
+                var tmpDelimiter = '∞';
+                var text = value;
 
-                 $.each(delimiter, function(index, _delimiter) {
-                     text = text.split(_delimiter).join(tmpDelimiter);
-                 });
+                $.each(delimiter, function(index, _delimiter) {
+                    text = text.split(_delimiter).join(tmpDelimiter);
+                });
 
-                 return text.split(tmpDelimiter);
-             }
+                return text.split(tmpDelimiter);
+            }
 
-             return [];
-         };
+            return [];
+        };
     })(jQuery);
     //end of variant related js
 
     tinymce.init({
-      selector: 'textarea:not(.no-tiny)',
-      height: 130,
-      plugins: [
-        'advlist autolink lists link image charmap print preview anchor textcolor',
-        'searchreplace visualblocks code fullscreen',
-        'insertdatetime media table contextmenu paste code wordcount'
-      ],
-      toolbar: 'insert | undo redo |  formatselect | bold italic backcolor  | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat',
-      branding:false
+        selector: 'textarea:not(.no-tiny)',
+        height: 130,
+        plugins: [
+            'advlist autolink lists link image charmap print preview anchor textcolor',
+            'searchreplace visualblocks code fullscreen',
+            'insertdatetime media table contextmenu paste code wordcount'
+        ],
+        toolbar: 'insert | undo redo |  formatselect | bold italic backcolor  | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat',
+        branding: false
     });
     $('select[name="type"]').on('change', function() {
-        if($(this).val() == 'combo'){
-            $("input[name='cost']").prop('required',false);
-            $("select[name='unit_id']").prop('required',false);
+        if ($(this).val() == 'combo') {
+            $("input[name='cost']").prop('required', false);
+            $("select[name='unit_id']").prop('required', false);
             hide();
             $("#profit_margin").show(300);
             $("#stock-section").hide(300);
             $("#cost").show(300);
             $("#unit").show(300);
             $("#combo").show(300);
-            //$("input[name='price']").prop('disabled',true);
+            //$(\"input[name='price']\").prop('disabled',true);
             $("#is-variant").prop("checked", false);
             $("#is-diffPrice").prop("checked", false);
             $("#variant-section, #variant-option, #diffPrice-option, #diffPrice-section").hide(300);
-        }
-        else if($(this).val() == 'digital'){
-            $("input[name='cost']").prop('required',false);
-            $("select[name='unit_id']").prop('required',false);
-            $("input[name='file']").prop('required',true);
+        } else if ($(this).val() == 'digital') {
+            $("input[name='cost']").prop('required', false);
+            $("select[name='unit_id']").prop('required', false);
+            $("input[name='file']").prop('required', true);
             hide();
             $("#profit_margin").hide(300);
             $("#digital").show(300);
             $("#combo").hide(300);
             $("#stock-section").show(300);
-            $("input[name='price']").prop('disabled',false);
+            $("input[name='price']").prop('disabled', false);
             $("#is-variant").prop("checked", false);
             $("#is-diffPrice").prop("checked", false);
             $("#variant-section, #variant-option, #diffPrice-option, #diffPrice-section, #batch-option").hide(300);
-        }
-        else if($(this).val() == 'service') {
-            $("input[name='cost']").prop('required',false);
-            $("select[name='unit_id']").prop('required',false);
-            $("input[name='file']").prop('required',true);
+        } else if ($(this).val() == 'service') {
+            $("input[name='cost']").prop('required', false);
+            $("select[name='unit_id']").prop('required', false);
+            $("input[name='file']").prop('required', true);
             hide();
             $("#profit_margin").hide(300);
             $("#stock-section").show(300);
             $("#combo").hide(300);
             $("#digital").hide(300);
-            $("input[name='price']").prop('disabled',false);
+            $("input[name='price']").prop('disabled', false);
             $("#is-variant").prop("checked", false);
             $("#is-diffPrice").prop("checked", false);
             $("#variant-section, #variant-option, #diffPrice-option, #diffPrice-section, #batch-option, #imei-option").hide(300);
-        }
-        else if($(this).val() == 'standard') {
-            $("input[name='cost']").prop('required',true);
-            $("select[name='unit_id']").prop('required',true);
-            $("input[name='file']").prop('required',false);
+        } else if ($(this).val() == 'standard') {
+            $("input[name='cost']").prop('required', true);
+            $("select[name='unit_id']").prop('required', true);
+            $("input[name='file']").prop('required', false);
             $("#stock-section").show(300);
             $("#cost").show(300);
             $("#profit_margin").show(300);
@@ -1404,16 +1909,16 @@
             $("#variant-option, #diffPrice-option, #batch-option, #imei-option").show(300);
             $("#digital").hide(300);
             $("#combo").hide(300);
-            $("input[name='price']").prop('disabled',false);
+            $("input[name='price']").prop('disabled', false);
         }
     });
 
     $('select[name="unit_id"]').on('change', function() {
 
         unitID = $(this).val();
-        if(unitID) {
+        if (unitID) {
             populate_category(unitID);
-        }else{
+        } else {
             $('select[name="sale_unit_id"]').empty();
             $('select[name="purchase_unit_id"]').empty();
         }
@@ -1421,18 +1926,19 @@
     <?php $productArray = []; ?>
     var lims_product_code = [
         @foreach($lims_product_list_without_variant as $product)
-            <?php
-                $productArray[] = htmlspecialchars($product->code) . ' (' . preg_replace('/[\n\r]/', "<br>", htmlspecialchars($product->name)) . ')';
-            ?>
+        <?php
+        $productArray[] = htmlspecialchars($product->code) . ' (' . preg_replace('/[\n\r]/', "<br>", htmlspecialchars($product->name)) . ')';
+        ?>
         @endforeach
         @foreach($lims_product_list_with_variant as $product)
-            <?php
-                $productArray[] = htmlspecialchars($product->item_code) . ' (' . preg_replace('/[\n\r]/', "<br>", htmlspecialchars($product->name)) . ')';
-            ?>
+        <?php
+        $productArray[] = htmlspecialchars($product->item_code) . ' (' . preg_replace('/[\n\r]/', "<br>", htmlspecialchars($product->name)) . ')';
+        ?>
         @endforeach
-            <?php
-                echo  '"'.implode('","', $productArray).'"';
-            ?> ];
+        <?php
+        echo  '"' . implode('","', $productArray) . '"';
+        ?>
+    ];
 
     var lims_productcodeSearch = $('#lims_productcodeSearch');
 
@@ -1458,15 +1964,14 @@
                     var flag = 1;
                     $(".varient_id").each(function() {
                         if ($(this).val() == data[1]) {
-                            alert('Duplicate input is not allowed!')
-                            flag = 0;
+                            SaleProToast.show('Duplicate input is not allowed!');flag = 0;
                         }
                     });
                     $("input[name='product_code_name']").val('');
-                    if(flag){
+                    if (flag) {
                         var newRow = $("<tr>");
                         var cols = '';
-                        cols += '<td>' + data[0] +' [' + data[1] + ']</td>';
+                        cols += '<td>' + data[0] + ' [' + data[1] + ']</td>';
                         cols += `<td>
                                     <div class="input-group">
                                         <input type="number" name="wastage_percent[]" class="form-control wastage_percent" value="0"/>
@@ -1486,7 +1991,7 @@
                                             placeholder="Qty"
                                             aria-label="Quantity">
                                         <div class="input-group-append">
-                                            `+data[13]+`
+                                            ` + data[13] + `
                                         </div>
                                     </div>
                                 </td>`;
@@ -1531,7 +2036,7 @@
         var cost = 0
         $(".qty").each(function() {
             rowindex = $(this).closest('tr').index();
-            quantity =  $(this).val();
+            quantity = $(this).val();
             unit_price = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .product_unit_price').val();
             product_unit_price = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .product_unit_price').val();
             product_unit_cost = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')  .product_unit_cost').val();
@@ -1586,35 +2091,35 @@
 
     }
 
-    function populate_category(unitID){
+    function populate_category(unitID) {
         $.ajax({
-            url: 'saleunit/'+unitID,
+            url: 'saleunit/' + unitID,
             type: "GET",
             dataType: "json",
-            success:function(data) {
-                  $('select[name="sale_unit_id"]').empty();
-                  $('select[name="purchase_unit_id"]').empty();
-                  $.each(data, function(key, value) {
-                      $('select[name="sale_unit_id"]').append('<option value="'+ key +'">'+ value +'</option>');
-                      $('select[name="purchase_unit_id"]').append('<option value="'+ key +'">'+ value +'</option>');
-                  });
-                  $('.selectpicker').selectpicker('refresh');
+            success: function(data) {
+                $('select[name="sale_unit_id"]').empty();
+                $('select[name="purchase_unit_id"]').empty();
+                $.each(data, function(key, value) {
+                    $('select[name="sale_unit_id"]').append('<option value="' + key + '">' + value + '</option>');
+                    $('select[name="purchase_unit_id"]').append('<option value="' + key + '">' + value + '</option>');
+                });
+                $('.selectpicker').selectpicker('refresh');
             },
         });
     }
 
-    $('input[name="profit_margin"]').val("{{ $general_setting->default_margin_value }}");
+    $('input[name="profit_margin"]').val("{{ gen_setting()->default_margin_value }}");
 
     let marginType = $('select[name="profit_margin_type"]').val();
 
-    $('input[name="profit_margin"]').on("input", function () {
+    $('input[name="profit_margin"]').on("input", function() {
         if (marginType === "flat" && parseFloat($(this).val()) < 0) {
             $(this).val(0);
         }
     });
 
     // Profit type change
-    $('select[name="profit_margin_type"]').on("change", function () {
+    $('select[name="profit_margin_type"]').on("change", function() {
         marginType = $(this).val();
 
         // update placeholder
@@ -1628,13 +2133,13 @@
 
     // Recalc price function
     function recalcPrice() {
-        let cost   = parseFloat($('input[name="cost"]').val()) || 0;
+        let cost = parseFloat($('input[name="cost"]').val()) || 0;
         let margin = parseFloat($('input[name="profit_margin"]').val()) || 0;
 
         let price =
-            marginType === "percentage"
-                ? cost + (cost * margin / 100)
-                : cost + margin;
+            marginType === "percentage" ?
+            cost + (cost * margin / 100) :
+            cost + margin;
 
         $('input[name="price"]').val(price.toFixed(2)).trigger("change");
     }
@@ -1642,29 +2147,29 @@
     // Recalc margin when price edited manually
     function recalcMargin() {
         let price = parseFloat($('input[name="price"]').val()) || 0;
-        let cost  = parseFloat($('input[name="cost"]').val()) || 0;
+        let cost = parseFloat($('input[name="cost"]').val()) || 0;
 
         let margin =
-            marginType === "percentage"
-                ? ((price - cost) / cost * 100).toFixed(2)
-                : (price - cost).toFixed(2);
+            marginType === "percentage" ?
+            ((price - cost) / cost * 100).toFixed(2) :
+            (price - cost).toFixed(2);
 
         $('input[name="profit_margin"]').val(margin);
     }
 
     // Live calculations
-    $('input[name="cost"], input[name="profit_margin"]').on("input", function () {
+    $('input[name="cost"], input[name="profit_margin"]').on("input", function() {
         recalcPrice();
     });
 
-    $('input[name="price"]').on("input", function () {
+    $('input[name="price"]').on("input", function() {
         recalcMargin();
     });
 
     // Warning UI
-    $('input[name="price"], input[name="cost"]').on("change keyup", function () {
+    $('input[name="price"], input[name="cost"]').on("change keyup", function() {
 
-        let curCost  = parseFloat($('input[name="cost"]').val()) || 0;
+        let curCost = parseFloat($('input[name="cost"]').val()) || 0;
         let curPrice = parseFloat($('input[name="price"]').val()) || 0;
 
         if (isNaN(curPrice) || curPrice === 0) {
@@ -1685,35 +2190,33 @@
         }
     });
 
-    $("input[name='is_initial_stock']").on("change", function () {
+    $("input[name='is_initial_stock']").on("change", function() {
         if ($(this).is(':checked')) {
-            if(numberOfWarehouse > 0)
+            if (numberOfWarehouse > 0)
                 $("#initial-stock-section").show(300);
             else {
                 showAlert('Please create warehouse first before adding stock!', 'danger');
                 $(this).prop("checked", false);
             }
-        }
-        else {
+        } else {
             $("#initial-stock-section").hide(300);
         }
     });
 
-    function initialStockUncheck(){
+    function initialStockUncheck() {
         $("input[name='is_initial_stock']").prop("checked", false);
         $("input[name='featured']").prop("checked", false);
         $("#initial-stock-section").hide(300);
     }
 
-    $("input[name='is_batch']").on("change", function () {
+    $("input[name='is_batch']").on("change", function() {
         if ($(this).is(':checked')) {
             initialStockUncheck()
             $("#variant-option").hide(300);
             $("#stock-section").hide(300);
             $("#featured").hide(300);
 
-        }
-        else {
+        } else {
             $("#variant-option").show(300);
             $("#stock-section").show(300);
             $("#featured").show(300);
@@ -1721,28 +2224,26 @@
 
     });
 
-    $("input[name='is_imei']").on("change", function () {
+    $("input[name='is_imei']").on("change", function() {
         if ($(this).is(':checked')) {
             initialStockUncheck()
             $("#stock-section").hide(300);
             $("#featured").hide(300);
-        }
-        else {
+        } else {
             $("#stock-section").show(300);
             $("#featured").show(300);
         }
 
     });
 
-    $("input[name='is_variant']").on("change", function () {
+    $("input[name='is_variant']").on("change", function() {
         if ($(this).is(':checked')) {
             initialStockUncheck()
             $("#variant-section").show(300);
             $("#batch-option").hide(300);
             $(".variant-field").prop("required", true);
             $("#stock-section").hide(300);
-        }
-        else {
+        } else {
             $("#variant-section").hide(300);
             $("#batch-option").show(300);
             $(".variant-field").prop("required", false);
@@ -1757,22 +2258,20 @@
             $("#groupPrice-section").hide(300);
     });
 
-    $("input[name='is_diffPrice']").on("change", function () {
+    $("input[name='is_diffPrice']").on("change", function() {
         if ($(this).is(':checked')) {
             $("#diffPrice-section").show(300);
-        }
-        else
+        } else
             $("#diffPrice-section").hide(300);
     });
 
-    $( "#promotion" ).on( "change", function() {
+    $("#promotion").on("change", function() {
         if ($(this).is(':checked')) {
             $("#starting_date").val($.datepicker.formatDate('dd-mm-yy', new Date()));
             $("#promotion_price").show(300);
             $("#start_date").show(300);
             $("#last_date").show(300);
-        }
-        else {
+        } else {
             $("#promotion_price").hide(300);
             $("#start_date").hide(300);
             $("#last_date").hide(300);
@@ -1781,31 +2280,30 @@
 
     var starting_date = $('#starting_date');
     starting_date.datepicker({
-     format: "dd-mm-yyyy",
-     startDate: "<?php echo date('d-m-Y'); ?>",
-     autoclose: true,
-     todayHighlight: true
-     });
+        format: "dd-mm-yyyy",
+        startDate: "<?php echo date('d-m-Y'); ?>",
+        autoclose: true,
+        todayHighlight: true
+    });
 
     var ending_date = $('#ending_date');
     ending_date.datepicker({
-     format: "dd-mm-yyyy",
-     startDate: "<?php echo date('d-m-Y'); ?>",
-     autoclose: true,
-     todayHighlight: true
-     });
+        format: "dd-mm-yyyy",
+        startDate: "<?php echo date('d-m-Y'); ?>",
+        autoclose: true,
+        todayHighlight: true
+    });
 
-    $(window).keydown(function(e){
+    $(window).keydown(function(e) {
         if (e.which == 13) {
             var $targ = $(e.target);
 
             if (!$targ.is("textarea") && !$targ.is(":button,:submit")) {
                 var focusNext = false;
-                $(this).find(":input:visible:not([disabled],[readonly]), a").each(function(){
+                $(this).find(":input:visible:not([disabled],[readonly]), a").each(function() {
                     if (this === e.target) {
                         focusNext = true;
-                    }
-                    else if (focusNext){
+                    } else if (focusNext) {
                         $(this).focus();
                         return false;
                     }
@@ -1819,15 +2317,15 @@
     Dropzone.autoDiscover = false;
 
     jQuery.validator.setDefaults({
-        errorPlacement: function (error, element) {
-            if(error.html() == 'Select Category...')
+        errorPlacement: function(error, element) {
+            if (error.html() == 'Select Category...')
                 error.html('This field is required.');
             $(element).closest('div.form-group').find('.validation-msg').html(error.html());
         },
-        highlight: function (element) {
+        highlight: function(element) {
             $(element).closest('div.form-group').removeClass('has-success').addClass('has-error');
         },
-        unhighlight: function (element, errorClass, validClass) {
+        unhighlight: function(element, errorClass, validClass) {
             $(element).closest('div.form-group').removeClass('has-error').addClass('has-success');
             $(element).closest('div.form-group').find('.validation-msg').html('');
         }
@@ -1839,40 +2337,38 @@
         var barcode_symbology = $('select[name="barcode_symbology"]').val();
         var exp = /^\d+$/;
 
-        if(!(product_code.match(exp)) && (barcode_symbology == 'UPCA' || barcode_symbology == 'UPCE' || barcode_symbology == 'EAN8' || barcode_symbology == 'EAN13') ) {
+        if (!(product_code.match(exp)) && (barcode_symbology == 'UPCA' || barcode_symbology == 'UPCE' || barcode_symbology == 'EAN8' || barcode_symbology == 'EAN13')) {
             showAlert('Product code must be numeric.', 'danger');
             return false;
-        }
-        else if(product_code.match(exp)) {
-            if(barcode_symbology == 'UPCA' && product_code.length > 11){
+        } else if (product_code.match(exp)) {
+            if (barcode_symbology == 'UPCA' && product_code.length > 11) {
                 showAlert('Product code length must be less than 12', 'danger');
                 return false;
-            }
-            else if(barcode_symbology == 'EAN8' && product_code.length > 7){
+            } else if (barcode_symbology == 'EAN8' && product_code.length > 7) {
                 showAlert('Product code length must be less than 8', 'danger');
                 return false;
             }
             /*else if(barcode_symbology == 'EAN13' && product_code.length > 12){
-                alert('Product code length must be less than 13');
+                SaleProToast.show('Product code length must be less than 13');
                 return false;
             }*/
         }
 
-        if( $("#type").val() == 'combo' ) {
+        if ($("#type").val() == 'combo') {
             var rownumber = $('table.order-list tbody tr:last').index();
             if (rownumber < 0) {
                 showAlert("Please insert product to table!", 'danger')
                 return false;
             }
         }
-        if($("#is-variant").is(":checked")) {
+        if ($("#is-variant").is(":checked")) {
             rowindex = $("table#variant-table tbody tr:last").index();
             if (rowindex < 0) {
                 showAlert('This product has variant. Please insert variant to table', 'danger');
                 return false;
             }
         }
-        $("input[name='price']").prop('disabled',false);
+        $("input[name='price']").prop('disabled', false);
         return true;
     }
 
@@ -1881,26 +2377,63 @@
     })*/
 
     $(".dropzone").sortable({
-        items:'.dz-preview',
+        items: '.dz-preview',
         cursor: 'grab',
         opacity: 0.5,
         containment: '.dropzone',
         distance: 20,
         tolerance: 'pointer',
-        stop: function () {
-          var queue = myDropzone.getAcceptedFiles();
-          newQueue = [];
-          $('#imageUpload .dz-preview .dz-filename [data-dz-name]').each(function (count, el) {
+        stop: function() {
+            var queue = myDropzone.getAcceptedFiles();
+            newQueue = [];
+            $('#imageUpload .dz-preview .dz-filename [data-dz-name]').each(function(count, el) {
                 var name = el.innerHTML;
                 queue.forEach(function(file) {
                     if (file.name === name) {
                         newQueue.push(file);
                     }
                 });
-          });
-          myDropzone.files = newQueue;
+            });
+            myDropzone.files = newQueue;
         }
     });
+
+    function extractErrorMessage(response) {
+        if (!response) return 'Failed to create product';
+        if (typeof response === 'object') {
+            if (response.responseJSON) {
+                if (response.responseJSON.errors) {
+                    var msgs = [];
+                    $.each(response.responseJSON.errors, function(k, v) {
+                        msgs.push(Array.isArray(v) ? v.join(', ') : v);
+                    });
+                    if (msgs.length > 0) return msgs.join('<br>');
+                }
+                if (response.responseJSON.message) return response.responseJSON.message;
+            }
+            if (response.message) return response.message;
+        }
+        if (typeof response === 'string') {
+            var trimmed = response.trim();
+            if (trimmed.indexOf('503 Service Unavailable') !== -1) {
+                return 'Server returned 503 Service Unavailable. The server may have hit PHP memory/execution limits or ModSecurity is blocking the request. Please check server error logs or increase memory_limit in cPanel/php.ini.';
+            }
+            if (trimmed.indexOf('413 Request Entity Too Large') !== -1 || trimmed.indexOf('Payload Too Large') !== -1) {
+                return 'The uploaded image exceeds the server upload limit (upload_max_filesize / post_max_size). Please upload a smaller image.';
+            }
+            if (trimmed.indexOf('500 Internal Server Error') !== -1) {
+                return 'Server returned 500 Internal Server Error. Please check your PHP error logs.';
+            }
+            if (trimmed.startsWith('<') || trimmed.indexOf('<!DOCTYPE') !== -1) {
+                var div = document.createElement("div");
+                div.innerHTML = trimmed;
+                var text = (div.textContent || div.innerText || '').trim();
+                return text ? text.substring(0, 250) : 'Server error occurred during upload.';
+            }
+            return response;
+        }
+        return 'An unexpected error occurred during creation.';
+    }
 
     myDropzone = new Dropzone('div#imageUpload', {
         addRemoveLinks: true,
@@ -1921,115 +2454,133 @@
             return time + file.name;
         },
         acceptedFiles: ".jpeg,.jpg,.png,.gif",
-        init: function () {
+        init: function() {
             var myDropzone = this;
-            $('#submit-btn, #submit-and-insert-btn').on("click", function (e) {
+            $('#submit-btn, #submit-and-insert-btn').on("click", function(e) {
                 e.preventDefault();
                 submit_type = $(this).attr('id') == 'submit-btn' ? 'add' : 'insert';
-                if ( $("#product-form").valid() && validate() ) {
-                    $(this).attr('disabled','true').html('<span class="spinner-border text-light" role="status"></span> {{__("db.Saving")}}...');
+                if ($("#product-form").valid() && validate()) {
+                    $(this).attr('disabled', 'true').html('<span class="spinner-border text-light" role="status"></span> {{__("db.Saving")}}...');
                     tinyMCE.triggerSave();
-                    if(myDropzone.getAcceptedFiles().length) {
+                    if (myDropzone.getAcceptedFiles().length) {
                         myDropzone.processQueue();
-                    }
-                    else {
+                    } else {
                         var formData = new FormData();
                         var data = $("#product-form").serializeArray();
-                        $.each(data, function (key, el) {
+                        $.each(data, function(key, el) {
                             formData.append(el.name, el.value);
                         });
                         var file = $('#file')[0].files;
-                        if(file.length > 0)
-                            formData.append('file',file[0]);
+                        if (file.length > 0)
+                            formData.append('file', file[0]);
 
                         $.ajax({
-                            type:'POST',
-                            url:"{{route('products.store')}}",
+                            type: 'POST',
+                            url: "{{route('products.store')}}",
                             data: formData,
                             contentType: false,
                             processData: false,
-                            success:function(response) {
-                                if(submit_type == 'add')
+                            success: function(response) {
+                                if (submit_type == 'add') {
+                                    localStorage.setItem("message", response.message || 'Product created successfully');
                                     location.href = '../products';
-                                else {
+                                } else {
                                     showAlert(response.message, 'success');
                                     resetForm();
                                 }
                             },
-                            error:function(response) {
+                            error: function(response) {
                                 // console.log(response);
-                              if(response.responseJSON.errors.name) {
-                                  $("#name-error").text(response.responseJSON.errors.name);
-                              }
-                              else if(response.responseJSON.errors.code) {
-                                  $("#code-error").text(response.responseJSON.errors.code);
-                              }
+                                if (response.responseJSON.errors.name) {
+                                    $("#name-error").text(response.responseJSON.errors.name);
+                                } else if (response.responseJSON.errors.code) {
+                                    $("#code-error").text(response.responseJSON.errors.code);
+                                }
                             },
                         });
                     }
                 }
             });
 
-            this.on('sending', function (file, xhr, formData) {
+            this.on('sending', function(file, xhr, formData) {
                 // Append all form inputs to the formData Dropzone will POST
                 var data = $("#product-form").serializeArray();
-                $.each(data, function (key, el) {
+                $.each(data, function(key, el) {
                     formData.append(el.name, el.value);
                 });
-                var file = $('#file')[0].files;
-                if(file.length > 0)
-                    formData.append('file',file[0]);
-                // console.log(formData);
+                var file = $('#file')[0]?.files;
+                if (file && file.length > 0)
+                    formData.append('file', file[0]);
+                var scFile = $('input[name="sc_social_image"]')[0]?.files;
+                if (scFile && scFile.length > 0)
+                    formData.append('sc_social_image', scFile[0]);
+            });
+
+            this.on('sendingmultiple', function(files, xhr, formData) {
+                // Append all form inputs to the formData Dropzone will POST
+                var data = $("#product-form").serializeArray();
+                $.each(data, function(key, el) {
+                    formData.append(el.name, el.value);
+                });
+                var file = $('#file')[0]?.files;
+                if (file && file.length > 0)
+                    formData.append('file', file[0]);
+                var scFile = $('input[name="sc_social_image"]')[0]?.files;
+                if (scFile && scFile.length > 0)
+                    formData.append('sc_social_image', scFile[0]);
             });
         },
-        error: function (file, response) {
+        errormultiple: function(files, response) {
+            $('#submit-btn, #submit-and-insert-btn').removeAttr('disabled').html("{{__('db.submit')}}");
+            showAlert(extractErrorMessage(response), 'danger');
+        },
+        error: function(file, response) {
             console.log(response.message, 'hi');
-            if(response.message) {
-              $("#name-error").text(response.message);
-              this.removeAllFiles(true);
-            }
-            else if(response.code) {
-              $("#code-error").text(response.code);
-              this.removeAllFiles(true);
-            }
-            else {
-              try {
-                  var res = JSON.parse(response);
-                  if (typeof res.message !== 'undefined' && !$modal.hasClass('in')) {
-                      $("#success-icon").attr("class", "fas fa-thumbs-down");
-                      $("#success-text").html(res.message);
-                      $modal.modal("show");
-                  } else {
-                      if ($.type(response) === "string")
-                          var message = response; //dropzone sends it's own error messages in string
-                      else
-                          var message = response.message;
-                      file.previewElement.classList.add("dz-error");
-                      _ref = file.previewElement.querySelectorAll("[data-dz-errormessage]");
-                      _results = [];
-                      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-                          node = _ref[_i];
-                          _results.push(node.textContent = message);
-                      }
-                      return _results;
-                  }
-              } catch (error) {
-                  console.log(error, 'hi');
-              }
+            if (response.message) {
+                $("#name-error").text(response.message);
+                this.removeAllFiles(true);
+            } else if (response.code) {
+                $("#code-error").text(response.code);
+                this.removeAllFiles(true);
+            } else {
+                try {
+                    var res = JSON.parse(response);
+                    if (typeof res.message !== 'undefined' && !$modal.hasClass('in')) {
+                        $("#success-icon").attr("class", "fas fa-thumbs-down");
+                        $("#success-text").html(res.message);
+                        $modal.modal("show");
+                    } else {
+                        if ($.type(response) === "string")
+                            var message = response; //dropzone sends it's own error messages in string
+                        else
+                            var message = response.message;
+                        file.previewElement.classList.add("dz-error");
+                        _ref = file.previewElement.querySelectorAll("[data-dz-errormessage]");
+                        _results = [];
+                        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+                            node = _ref[_i];
+                            _results.push(node.textContent = message);
+                        }
+                        return _results;
+                    }
+                } catch (error) {
+                    console.log(error, 'hi');
+                }
             }
         },
-        successmultiple: function (file, response) {
-            if(submit_type == 'add')
+        successmultiple: function(file, response) {
+            if (submit_type == 'add') {
+                localStorage.setItem("message", response.message || 'Product created successfully');
                 location.href = '../products';
-            else {
+            } else {
                 showAlert(response.message, 'success');
                 resetForm();
             }
         },
-        completemultiple: function (file, response) {
+        completemultiple: function(file, response) {
             console.log(file, response, "completemultiple");
         },
-        reset: function () {
+        reset: function() {
             console.log("resetFiles");
             this.removeAllFiles(true);
         }
@@ -2037,13 +2588,13 @@
     // brand create ajax start
     $('.brand-submit-btn').on("click", function() {
         $.ajax({
-            type:'POST',
-            url:'{{route('brand.store')}}',
+            type: 'POST',
+            url: '{{route('brand.store')}}',
             data: $("#brand-form").serialize(),
-            success:function(response) {
+            success: function(response) {
                 key = response['id'];
                 value = response['title'];
-                $('select[name="brand_id"]').append('<option value="'+ key +'">'+ value +'</option>');
+                $('select[name="brand_id"]').append('<option value="' + key + '">' + value + '</option>');
                 $('select[name="brand_id"]').val(key);
                 $('.selectpicker').selectpicker('refresh');
                 $("#addBrand").modal('hide');
@@ -2057,13 +2608,13 @@
     // category create ajax start
     $('.category-submit-btn').on("click", function() {
         $.ajax({
-            type:'POST',
-            url:'{{route('category.store')}}',
+            type: 'POST',
+            url: '{{route('category.store')}}',
             data: $("#category-form").serialize(),
-            success:function(response) {
+            success: function(response) {
                 key = response['id'];
                 value = response['name'];
-                $('select[name="category_id"]').append('<option value="'+ key +'">'+ value +'</option>');
+                $('select[name="category_id"]').append('<option value="' + key + '">' + value + '</option>');
                 $('select[name="category_id"]').val(key);
                 $('.selectpicker').selectpicker('refresh');
                 $("#category-modal").modal('hide');
@@ -2071,16 +2622,16 @@
         });
     });
     // Tax Ajax Create
-        // category create ajax start
-        $('.tax-submit-btn').on("click", function() {
+    // category create ajax start
+    $('.tax-submit-btn').on("click", function() {
         $.ajax({
-            type:'POST',
-            url:'{{route('tax.store')}}',
+            type: 'POST',
+            url: '{{route('tax.store')}}',
             data: $("#tax-form").serialize(),
-            success:function(response) {
+            success: function(response) {
                 key = response['id'];
                 value = response['name'];
-                $('select[name="tax_id"]').append('<option value="'+ key +'">'+ value +'</option>');
+                $('select[name="tax_id"]').append('<option value="' + key + '">' + value + '</option>');
                 $('select[name="tax_id"]').val(key);
                 $('.selectpicker').selectpicker('refresh');
                 $("#addTax").modal('hide');
@@ -2093,73 +2644,75 @@
         $('#submit-btn, #submit-and-insert-btn').removeAttr('disabled');
         $('#submit-btn').html('{{__("db.add_product")}}');
         $('#submit-and-insert-btn').html('Save and Insert Another');
-        
+
         // Core Reset logic
-        if(typeof myDropzone !== 'undefined') {
+        if (typeof myDropzone !== 'undefined') {
             myDropzone.removeAllFiles(true);
         }
         $('.combo_product_list_table').empty();
         $('.selectpicker').selectpicker('refresh');
-        
+
         // Sync Profit Margin & Type
         $('select[name="profit_margin_type"]').trigger('change');
-        $('input[name="profit_margin"]').val("{{ $general_setting->default_margin_value }}");
-        
+        $('input[name="profit_margin"]').val("{{ gen_setting()->default_margin_value }}");
+
+        // Reset type pills
+        $('.type-pill').removeClass('active');
+        $('.type-pill[data-value="standard"]').addClass('active');
+
         // Clear dynamic sections
-        if(typeof $('.type-variant').importTags === 'function') {
+        if (typeof $('.type-variant').importTags === 'function') {
             $('.type-variant').importTags('');
         }
         $('table.variant-list tbody').empty();
-        
+
         // Reset TinyMCE
-        if(tinyMCE.get(0)) {
+        if (tinyMCE.get(0)) {
             tinyMCE.get(0).setContent('');
         }
-        
+
         // Hide conditional sections
         $("#digital, #combo, #variant-section, #initial-stock-section, #diffPrice-section, #promotion_price, #start_date, #last_date").hide();
-        
+
         // Reset numerical defaults
-        $("input[name='qty']").val("{{number_format(0, $general_setting->decimal, '.', '')}}");
+        $("input[name='qty']").val("{{number_format(0, gen_setting()->decimal, '.', '')}}");
         $("input[name='code']").val(""); // Cleared for unique entry
     }
-
 </script>
 
 <script>
-$(document).on('click', '#create_unit', function (e) {
-    e.preventDefault();
+    $(document).on('click', '#create_unit', function(e) {
+        e.preventDefault();
 
-    let form = $(this).closest('form');
-    let formData = form.serialize();
+        let form = $(this).closest('form');
+        let formData = form.serialize();
 
-    $.ajax({
-        url: form.attr('action'),
-        method: 'POST',
-        data: formData,
-        headers: {
-            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-        },
-        success: function (response) {
-            if (response.success) {
-                // close modal
-                $('#createUnitModal').modal('hide');
+        $.ajax({
+            url: form.attr('action'),
+            method: 'POST',
+            data: formData,
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            },
+            success: function(response) {
+                if (response.success) {
+                    // close modal
+                    $('#createUnitModal').modal('hide');
 
-                // clear form
-                form.trigger('reset');
+                    // clear form
+                    form.trigger('reset');
 
-                // append new unit to dropdown (example)
-                if (response.unit) {
-                    $("select[name='unit_id']").append(
-                        `<option value="${response.unit.id}">${response.unit.unit_name}</option>`
-                    ).selectpicker('refresh');
-                }
+                    // append new unit to dropdown (example)
+                    if (response.unit) {
+                        $("select[name='unit_id']").append(
+                            `<option value="${response.unit.id}">${response.unit.unit_name}</option>`
+                        ).selectpicker('refresh');
+                    }
 
-            } else {
+                } else {}
             }
-        }
+        });
     });
-});
 </script>
 
 @endpush

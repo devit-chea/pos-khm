@@ -9,7 +9,7 @@
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Payment')}}</h5>
                 <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                    <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                    <span aria-hidden="true"><i class="ti ti-x"></i></span>
                 </button>
             </div>
             <div class="modal-body">
@@ -33,7 +33,7 @@
                         {{-- Change --}}
                         <div class="col-md-4 mt-1">
                             <label>{{__('db.Change')}} : </label>
-                            <p class="change ml-2">{{number_format(0, $general_setting->decimal, '.', '')}}</p>
+                            <p class="change ml-2">{{number_format(0, gen_setting()->decimal, '.', '')}}</p>
                         </div>
 
                         {{-- Paid By --}}
@@ -58,7 +58,7 @@
                                     strlen($lims_pos_setting_data->paypal_live_api_password) > 0 &&
                                     strlen($lims_pos_setting_data->paypal_live_api_secret) > 0
                                 )
-                                    <option value="5">{{ __('db.Paypal') }}</option>
+                                    <option value="5">{{ __('db.paypal') }}</option>
                                 @endif
                                 @if(in_array("deposit", $options))
                                     <option value="6">{{ __('db.Deposit') }}</option>
@@ -164,7 +164,7 @@
                             <input type="checkbox" class="custom-control-input" id="print_receipt"
                                 name="print_receipt" value="1">
                             <label class="custom-control-label" for="print_receipt">
-                                <i class="dripicons-print"></i> {{__('db.Print Payment Receipt')}}
+                                <i class="ti ti-printer"></i> {{__('db.Print Payment Receipt')}}
                             </label>
                         </div>
                     </div>
@@ -278,7 +278,7 @@
             if (id == 6) {
                 // Deposit
                 if ($('#add-payment input[name="amount"]').val() > parseFloat(deposit))
-                    alert('Amount exceeds customer deposit! Customer deposit : ' + deposit);
+                    SaleProToast.show('Amount exceeds customer deposit! Customer deposit : ' + deposit);
             } else if (id == 7) {
                 // Points
                 pointCalculation($('#add-payment input[name="amount"]').val());
@@ -290,16 +290,16 @@
     $('#add-payment select[name="gift_card_id"]').on("change", function () {
         var id = $(this).val();
         if (expired_date[id] < current_date)
-            alert('This card is expired!');
+            SaleProToast.show('This card is expired!');
         else if ($('#add-payment input[name="amount"]').val() > balance[id])
-            alert('Amount exceeds card balance! Gift Card balance: ' + balance[id]);
+            SaleProToast.show('Amount exceeds card balance! Gift Card balance: ' + balance[id]);
     });
 
     // ─── Received Amount: Live Change Calculation ─────────────────────────────────
     $('input[name="paying_amount"]').on("input", function () {
         $(".change").text(
             parseFloat($(this).val() - $('input[name="amount"]').val())
-                .toFixed({{$general_setting->decimal}})
+                .toFixed({{gen_setting()->decimal}})
         );
     });
 
@@ -310,15 +310,15 @@
         var due     = parseFloat($('input[name="balance"]').val());
 
         if (val > received) {
-            alert('Paying amount cannot be bigger than recieved amount');
+            SaleProToast.show('Paying amount cannot be bigger than recieved amount');
             $(this).val('');
         } else if (val > due) {
-            alert('Paying amount cannot be bigger than due amount');
+            SaleProToast.show('Paying amount cannot be bigger than due amount');
             $(this).val('');
         }
 
         $(".change").text(
-            parseFloat(received - $(this).val()).toFixed({{$general_setting->decimal}})
+            parseFloat(received - $(this).val()).toFixed({{gen_setting()->decimal}})
         );
 
         var id     = $('#add-payment select[name="paid_by_id"]').val();
@@ -327,10 +327,10 @@
         if (id == 2) {
             var giftId = $('#add-payment select[name="gift_card_id"]').val();
             if (amount > balance[giftId])
-                alert('Amount exceeds card balance! Gift Card balance: ' + balance[giftId]);
+                SaleProToast.show('Amount exceeds card balance! Gift Card balance: ' + balance[giftId]);
         } else if (id == 6) {
             if (amount > parseFloat(deposit))
-                alert('Amount exceeds customer deposit! Customer deposit : ' + deposit);
+                SaleProToast.show('Amount exceeds customer deposit! Customer deposit : ' + deposit);
         } else if (id == 7) {
             pointCalculation(amount);
         }
@@ -347,11 +347,11 @@
     // ─── Form Submit: Global Paying Amount Validation ─────────────────────────────
     $(document).on('submit', '.payment-form', function (e) {
         if ($('input[name="paying_amount"]').val() < parseFloat($('#amount').val())) {
-            alert('Paying amount cannot be bigger than recieved amount');
+            SaleProToast.show('Paying amount cannot be bigger than recieved amount');
             $('input[name="amount"]').val('');
             $(".change").text(
                 parseFloat($('input[name="paying_amount"]').val() - $('#amount').val())
-                    .toFixed({{$general_setting->decimal}})
+                    .toFixed({{gen_setting()->decimal}})
             );
             e.preventDefault();
         }

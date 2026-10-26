@@ -1,4 +1,8 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
 
 <x-error-message key="not_permitted" />
@@ -90,7 +94,7 @@
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">Finalized</h5>
                 <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                    <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                    <span aria-hidden="true"><i class="ti ti-x"></i></span>
                 </button>
             </div>
             <div class="modal-body">
@@ -181,18 +185,14 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
     <script type="text/javascript">
 
         $("ul#sale").siblings('a').attr('aria-expanded','true');
         $("ul#sale").addClass("show");
         $("ul#sale #challan-list-menu").addClass("active");
 
-        function confirmDelete() {
-            if (confirm("Are you sure want to delete?")) {
-                return true;
-            }
-            return false;
-        }
+        function confirmDelete() { return true; }
 
         $("#courier-id").val(<?php echo json_encode($courier_id) ?>);
         var challan_id = [];
@@ -292,7 +292,7 @@
 
                 if (!isReadonly && paidAmount > 0) {
                     if (paidAmount > (maxPayable + 0.01)) {
-                        alert('Error: Paid amount (' + paidAmount + ') cannot exceed the maximum payable amount (' + maxPayable.toFixed(2) + ') for Order: ' + orderRef);
+                        SaleProToast.show('Error: Paid amount (' + paidAmount + ');cannot exceed the maximum payable amount (' + maxPayable.toFixed(2) + ') for Order: ' + orderRef);
                         isValid = false;
                         return false;
                     }
@@ -310,11 +310,11 @@
 
         $('input[name="amount"]').on("input", function() {
             if (parseFloat($(this).val()) > parseFloat($('input[name="paying_amount"]').val())) {
-                alert('Paying amount cannot be bigger than recieved amount');
+                SaleProToast.show('Paying amount cannot be bigger than recieved amount');
                 $(this).val('');
             }
             else if (parseFloat($(this).val()) > parseFloat($('input[name="balance"]').val())) {
-                alert('Paying amount cannot be bigger than due amount');
+                SaleProToast.show('Paying amount cannot be bigger than due amount');
                 $(this).val('');
             }
             $(".change").text(parseFloat($('input[name="paying_amount"]').val() - $(this).val()).toFixed(2));

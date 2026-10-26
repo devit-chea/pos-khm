@@ -1,4 +1,14 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
+<style type="text/css">
+    .top-fields{margin-top:10px;position: relative;}
+    .top-fields label {font-size:11px;font-weight:600;margin-left:10px;padding:0 3px;position:absolute;top:-8px;z-index:9;}
+    .top-fields input{font-size:13px;height:45px}
+    .dt-buttons{width: 100%}
+</style>
     <section class="forms">
         <div class="container-fluid">
             <div class="card">
@@ -11,7 +21,7 @@
                 <div class="row mb-3 product-report-filter">
                     <div class="col-md-3 offset-md-2 mt-3">
                         <div class="form-group top-fields">
-                            <label class="d-tc mt-2"><strong>{{ __('db.Choose Your Date') }}</strong> &nbsp;</label>
+                            <label class="d-tc">{{ __('db.Choose Your Date') }}</label>
                             <div class="d-tc">
                                 <div class="input-group">
                                     <input type="text" class="daterangepicker-field form-control"
@@ -24,29 +34,14 @@
                     </div>
                     <div class="col-md-3 offset-md-2 mt-3">
                         <div class="form-group top-fields">
-                            <label class="d-tc mt-2">
-                                <strong>{{ __('db.Payment Method') }}</strong> &nbsp;
-                            </label>
-
+                            <label class="d-tc">{{ __('db.Payment Method') }}</label>
                             <select name="payment_method" class="form-control" style="width: 30%;">
                                 <option value="">{{ __('db.All') }}</option>
-
-                                <option value="Cash" {{ ($payment_method ?? '') == 'Cash' ? 'selected' : '' }}>Cash
-                                </option>
-                                <option value="Card" {{ ($payment_method ?? '') == 'Card' ? 'selected' : '' }}>Card
-                                </option>
-                                <option value="Credit Card"
-                                    {{ ($payment_method ?? '') == 'Credit Card' ? 'selected' : '' }}>Credit Card</option>
-                                <option value="Bank" {{ ($payment_method ?? '') == 'Bank' ? 'selected' : '' }}>Bank
-                                </option>
-                                <option value="Cheque" {{ ($payment_method ?? '') == 'Cheque' ? 'selected' : '' }}>Cheque
-                                </option>
-                                <option value="Moneipoint" {{ ($payment_method ?? '') == 'Moneipoint' ? 'selected' : '' }}>
-                                    Moneipoint</option>
-                                <option value="Pesapal" {{ ($payment_method ?? '') == 'Pesapal' ? 'selected' : '' }}>
-                                    Pesapal</option>
-                                <option value="Points" {{ ($payment_method ?? '') == 'Points' ? 'selected' : '' }}>Points
-                                </option>
+                                @foreach($payment_methods ?? [] as $method)
+                                    <option value="{{ $method }}" {{ ($payment_method ?? '') === $method ? 'selected' : '' }}>
+                                        {{ $method }}
+                                    </option>
+                                @endforeach
                             </select>
                         </div>
                     </div>
@@ -61,7 +56,35 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
+    @php
+        $paymentReportLoadingText = __('db.Loading');
+        if (is_array($paymentReportLoadingText)) {
+            $paymentReportLoadingText = 'Loading';
+        }
+    @endphp
     <script type="text/javascript">
+        const paymentReportLoadingText = @json($paymentReportLoadingText);
+
+        function formatPaymentReportExportBody(data, row, column, node) {
+            if (!data) return "";
+            var $node = $(node);
+            var $partyInfo = $node.find('.party-info');
+            if ($partyInfo.length) {
+                var name = $partyInfo.find('.party-name').text().trim();
+                var phone = $partyInfo.find('.party-phone').text().trim();
+                var badge = $partyInfo.find('.badge').text().trim();
+                var parts = [];
+                if (name) parts.push(name);
+                if (phone) parts.push(phone);
+                if (badge) parts.push(badge);
+                return parts.join(' | ');
+            }
+            if (typeof data === 'string' && (data.indexOf('&mdash;') !== -1 || data.trim() === '—')) {
+                return '—';
+            }
+            return $('<div>').html(data).text().trim();
+        }
 
         function initializePaymentTable() {
             $('#report-table').DataTable({
@@ -72,8 +95,8 @@
                     "info": '<small>{{ __('db.Showing') }} _START_ - _END_ (_TOTAL_)</small>',
                     "search": '{{ __('db.Search') }}',
                     'paginate': {
-                        'previous': '<i class="dripicons-chevron-left"></i>',
-                        'next': '<i class="dripicons-chevron-right"></i>'
+                        'previous': '<i class="ti ti-chevron-left"></i>',
+                        'next': '<i class="ti ti-chevron-right"></i>'
                     }
                 },
                 'columnDefs': [{
@@ -107,10 +130,13 @@
                 dom: '<"row"lfB>rtip',
                 buttons: [{
                         extend: 'pdf',
-                        text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                        text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                         exportOptions: {
                             columns: ':visible:Not(.not-exported)',
-                            rows: ':visible'
+                            rows: ':visible',
+                            format: {
+                                body: formatPaymentReportExportBody
+                            }
                         },
                         action: function(e, dt, button, config) {
                             datatable_sum(dt, true);
@@ -121,10 +147,13 @@
                     },
                     {
                         extend: 'excel',
-                        text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                        text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                         exportOptions: {
                             columns: ':visible:Not(.not-exported)',
-                            rows: ':visible'
+                            rows: ':visible',
+                            format: {
+                                body: formatPaymentReportExportBody
+                            }
                         },
                         action: function(e, dt, button, config) {
                             datatable_sum(dt, true);
@@ -135,10 +164,13 @@
                     },
                     {
                         extend: 'csv',
-                        text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                        text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                         exportOptions: {
                             columns: ':visible:Not(.not-exported)',
-                            rows: ':visible'
+                            rows: ':visible',
+                            format: {
+                                body: formatPaymentReportExportBody
+                            }
                         },
                         action: function(e, dt, button, config) {
                             datatable_sum(dt, true);
@@ -149,10 +181,13 @@
                     },
                     {
                         extend: 'print',
-                        text: '<i title="print" class="fa fa-print"></i>',
+                        text: '<i title="print" class="ti ti-printer"></i>',
                         exportOptions: {
                             columns: ':visible:Not(.not-exported)',
-                            rows: ':visible'
+                            rows: ':visible',
+                            format: {
+                                body: formatPaymentReportExportBody
+                            }
                         },
                         action: function(e, dt, button, config) {
                             datatable_sum(dt, true);
@@ -163,13 +198,12 @@
                     },
                     {
                         extend: 'colvis',
-                        text: '<i title="column visibility" class="fa fa-eye"></i>',
+                        text: '<i title="column visibility" class="ti ti-eye"></i>',
                         columns: ':gt(0)'
                     }
                 ],
                 drawCallback: function() {
-                    var api = this.api();
-                    datatable_sum(api, false);
+                    datatable_sum(this.api(), false);
                 }
             });
         }
@@ -183,7 +217,7 @@
                 data: formData,
                 method: 'POST',
                 beforeSend: function () {
-                    $('#table-container').html('<div class="text-center mt-4"><i class="fa fa-spin fa-spinner"></i> {{__("db.Loading")}}...</div>');
+                    $('#table-container').html('<div class="text-center mt-4"><i class="ti ti-spin fa-spinner"></i> ' + paymentReportLoadingText + '...</div>');
                 },
                 success: function (response) {
                     $('#table-container').html(response);
@@ -192,18 +226,25 @@
             });
         }
 
-        function datatable_sum(dt_selector, is_calling_first) {
-            if (dt_selector.rows('.selected').any() && is_calling_first) {
-                var rows = dt_selector.rows('.selected').indexes();
+        function paymentReportAmount(value) {
+            var parsed = Number(String(value || '').replace(/[^0-9.-]/g, ''));
+            return Number.isFinite(parsed) ? parsed : 0;
+        }
 
-                $(dt_selector.column(6).footer()).html(dt_selector.cells(rows, 6, {
-                    page: 'current'
-                }).data().sum().toFixed({{ $general_setting->decimal }}));
+        function datatable_sum(dt_selector, selectedRowsForExport) {
+            var values;
+            if (selectedRowsForExport && dt_selector.rows('.selected').any()) {
+                var rows = dt_selector.rows('.selected').indexes();
+                values = dt_selector.cells(rows, 9).data();
             } else {
-                $(dt_selector.column(6).footer()).html(dt_selector.column(6, {
-                    page: 'current'
-                }).data().sum().toFixed({{ $general_setting->decimal }}));
+                values = dt_selector.column(9, { search: 'applied' }).data();
             }
+
+            var total = 0;
+            values.each(function(value) {
+                total += paymentReportAmount(value);
+            });
+            $(dt_selector.column(9).footer()).html(total.toFixed({{ gen_setting()->decimal }}));
         }
 
         // payment method change

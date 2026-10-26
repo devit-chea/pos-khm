@@ -1,4 +1,8 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
     <x-success-message key="message" />
     <x-error-message key="not_permitted" />
@@ -6,18 +10,19 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/style.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/index.js"></script>
-    <section>
+<section>
+    @include('backend.hrm.partials.warehouse_filter')
         <div class="container-fluid">
 
             <!-- Add Multiple Payroll Button -->
             <button class="btn btn-success" data-toggle="modal" data-target="#addMultipleModal">
-                <i class="dripicons-plus"></i> {{ __('db.Generate Payroll') }}
+                <i class="ti ti-plus"></i> {{ __('db.Generate Payroll') }}
             </button>
 
             <div class="d-inline-block ml-2">
                 <button class="btn btn-secondary" type="button" data-toggle="collapse" data-target="#filterCollapse"
                     aria-expanded="false" aria-controls="filterCollapse">
-                    <i class="dripicons-filter"></i> {{ __('db.Filter') }}
+                    <i class="ti ti-filter"></i> {{ __('db.Filter') }}
                 </button>
             </div>
 
@@ -39,7 +44,7 @@
                         <!-- Month Filter -->
                         <div class="col-md-4">
                             <div class="form-group">
-                                <label>{{ __('db.Select Month') }}:</label>
+                                <label>{{ __('db.select_month') }}:</label>
                                 <input type="text" id="filterMonth" class="form-control filter-month-picker" />
                             </div>
                         </div>
@@ -63,7 +68,7 @@
                 <div class="modal-content">
                     <div class="modal-header bg-light">
                         <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                            <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                            <span aria-hidden="true"><i class="ti ti-x"></i></span>
                         </button>
                     </div>
                     <div class="modal-body">
@@ -76,7 +81,7 @@
                             <div class="col-md-6 form-group">
                                 <label>{{ __('db.Warehouse') }} *</label>
                                 <select id="warehouseSelect" name="warehouse_id" class="form-control selectpicker"
-                                    data-live-search="true" title="{{ __('db.Select Warehouse') }}" required>
+                                    data-live-search="true" title="{{ __('db.select_warehouse') }}" required>
                                     <option value="0">{{ __('db.All Warehouse') }}</option>
                                     @foreach ($lims_warehouse_list as $warehouse)
                                         <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
@@ -86,7 +91,7 @@
 
                             {{-- Month --}}
                             <div class="col-md-6 form-group">
-                                <label>{{ __('db.Select Month') }}:</label>
+                                <label>{{ __('db.select_month') }}:</label>
                                 <input type="text" name="month" id="modalMonthPicker" class="form-control modal-month-picker" required />
                             </div>
 
@@ -104,7 +109,7 @@
                                     multiple
                                     required
                                     data-live-search="true"
-                                    title="{{ __('db.Select Employees') }}"
+                                    title="{{ __('db.select_employees') }}"
                                     data-actions-box="true">
                                     {{-- Options will load dynamically --}}
                                 </select>
@@ -113,7 +118,7 @@
 
                         <div class="text-right mt-3">
                             <button type="submit" class="btn btn-primary">
-                                <i class="dripicons-checkmark"></i> {{ __('db.Submit Payrolls') }}
+                                <i class="ti ti-checkmark"></i> {{ __('db.Submit Payrolls') }}
                             </button>
                         </div>
                         </form>
@@ -154,11 +159,11 @@
                         <tr data-id="{{ $payroll->id }}" data-employee_id="{{ $payroll->employee_id }}"
                             data-month="{{ $payroll->month }}" data-date="{{ $payroll->created_at->format('Y-m-d') }}">
                             <td>{{ $key }}</td>
-                            <td>{{ date($general_setting->date_format, strtotime($payroll->created_at->toDateString())) }}</td>
+                            <td>{{ date(gen_setting()->date_format, strtotime($payroll->created_at->toDateString())) }}</td>
                             <td>{{ $payroll->reference_no }}</td>
                             <td>{{ $employee->name }}</td>
                             <td>{{ @$account->name }}</td>
-                            <td>{{ number_format((float) $payroll->amount, $general_setting->decimal, '.', '') }}</td>
+                            <td>{{ number_format((float) $payroll->amount, gen_setting()->decimal, '.', '') }}</td>
                             @if ($payroll->paying_method == 0)
                                 <td>{{ __('db.Cash') }}</td>
                             @elseif($payroll->paying_method == 1)
@@ -195,7 +200,7 @@
                                                 data-prev="{{ $amountArray['previous'] ?? 0 }}"
                                                 data-toggle="modal"
                                                 data-target="#editModal">
-                                                <i class="dripicons-document-edit"></i> {{ __('db.Edit') }}
+                                                <i class="ti ti-edit"></i> {{ __('db.Edit') }}
                                             </button>
                                         </li>
 
@@ -219,7 +224,7 @@
                                                 data-note="{{ $payroll->note }}"
                                                 data-toggle="modal"
                                                 data-target="#viewModal">
-                                                <i class="dripicons-preview"></i> {{ __('db.View') }}
+                                                <i class="ti ti-eye"></i> {{ __('db.View') }}
                                             </button>
                                         </li>
 
@@ -230,8 +235,8 @@
                                             @csrf
                                             @method('DELETE')
                                             <li>
-                                                <button type="submit" class="btn btn-link" onclick="return confirmDelete()">
-                                                    <i class="dripicons-trash"></i> {{ __('db.Delete') }}
+                                                <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}">
+                                                    <i class="ti ti-trash"></i> {{ __('db.Delete') }}
                                                 </button>
                                             </li>
                                         </form>
@@ -267,7 +272,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                        <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                        <span aria-hidden="true"><i class="ti ti-x"></i></span>
                     </button>
                 </div>
 
@@ -306,7 +311,7 @@
                         {{-- Salary Amount --}}
                         <div class="col-md-6 form-group">
                             <label>
-                                {{ __('db.Salary Amount') }}
+                                {{ __('db.salary_amount') }}
                                 <x-info title="Salary Amount = Basic Salary + (Allowances - Deductions)" />
                             </label>
                             <input type="number" step="any" name="salary_amount" id="salaryAmount" class="form-control">
@@ -314,13 +319,13 @@
 
                         {{-- Previous Transactions --}}
                         <div class="col-md-6 form-group">
-                            <label>{{ __('db.Expense') }} <x-info title="{{ __('db.Loan/Advance/Expense') }}" /></label>
+                            <label>{{ __('db.Expense') }} <x-info title="{{ __('db.loan_advance_expense') }}" /></label>
                             <input type="number" step="any" name="previous_transactions" id="previousTransactions" class="form-control">
                         </div>
 
                         {{-- Sale Commission --}}
                         <div class="col-md-6 form-group">
-                            <label>{{ __('db.Sale Commission') }} <x-info title="Sale Commission = (Total Sale × Target Commission %) / 100" /></label>
+                            <label>{{ __('db.sale_commission') }} <x-info title="Sale Commission = (Total Sale × Target Commission %) / 100" /></label>
                             <input type="number" step="any" name="commission" id="commissionAmount" class="form-control">
                         </div>
 
@@ -364,7 +369,7 @@
 
                         {{-- Note --}}
                         <div class="col-md-12 form-group">
-                            <label>{{ __('db.Note') }}</label>
+                            <label>{{ __('db.note') }}</label>
                             <textarea name="note" rows="3" class="form-control"
                                 placeholder="Write any note about this payroll..."></textarea>
                         </div>
@@ -373,7 +378,7 @@
 
                     <div class="text-end mt-3">
                         <button type="submit" class="btn btn-primary">
-                            <i class="dripicons-checkmark"></i> {{ __('db.Submit') }}
+                            <i class="ti ti-checkmark"></i> {{ __('db.submit') }}
                         </button>
                     </div>
 
@@ -390,10 +395,10 @@
             <div class="modal-content border-0 shadow-sm">
                 <div class="modal-header">
                     <h5 id="editModalLabel" class="modal-title">
-                        <i class="dripicons-wallet"></i> {{ __('db.Update Payroll') }}
+                        <i class="ti ti-wallet"></i> {{ __('db.Update Payroll') }}
                     </h5>
                     <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                        <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                        <span aria-hidden="true"><i class="ti ti-x"></i></span>
                     </button>
                 </div>
 
@@ -427,21 +432,21 @@
 
                         <!-- Salary Amount -->
                         <div class="col-md-6 form-group">
-                            <label>{{ __('db.Salary Amount') }}</label>
+                            <label>{{ __('db.salary_amount') }}</label>
                             <input type="number" step="any" name="salary_amount" id="editSalaryAmount"
                                 class="form-control salary-input" data-emp="editEmp">
                         </div>
 
                         <!-- Previous Transactions -->
                         <div class="col-md-6 form-group">
-                            <label>{{ __('db.Transactions') }}</label>
+                            <label>{{ __('db.transactions') }}</label>
                             <input type="number" step="any" name="previous_transactions" id="editPreviousTransactions"
                                 class="form-control prev-input" data-emp="editEmp">
                         </div>
 
                         <!-- Sale Commission -->
                         <div class="col-md-6 form-group">
-                            <label>{{ __('db.Sale Commission') }}</label>
+                            <label>{{ __('db.sale_commission') }}</label>
                             <input type="number" step="any" name="commission" id="editCommissionAmount"
                                 class="form-control comm-input" data-emp="editEmp" data-percent="0">
                         </div>
@@ -484,14 +489,14 @@
 
                         <!-- Note -->
                         <div class="col-md-12 form-group">
-                            <label>{{ __('db.Note') }}</label>
+                            <label>{{ __('db.note') }}</label>
                             <textarea name="note" id="editNote" rows="3" class="form-control"></textarea>
                         </div>
                     </div>
 
                     <div class="text-end mt-3">
                         <button type="submit" class="btn btn-primary">
-                            <i class="dripicons-checkmark"></i> {{ __('db.Submit') }}
+                            <i class="ti ti-checkmark"></i> {{ __('db.submit') }}
                         </button>
                     </div>
 
@@ -508,7 +513,7 @@
             <div class="modal-content border-0 shadow-sm">
                 <div class="modal-header">
                     <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                        <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                        <span aria-hidden="true"><i class="ti ti-x"></i></span>
                     </button>
                 </div>
 
@@ -516,7 +521,7 @@
                     <!-- Employee Info -->
                     <div class="mb-4 text-center">
                         <h4 id="viewEmployee" class="fw-bold">-----</h4>
-                        <p class="text-muted mb-0">{{ __('db.Payroll & Attendance Overview') }}</p>
+                        <p class="text-muted mb-0">{{ __('db.payroll_attendance_overview') }}</p>
                     </div>
 
                     <div class="row text-center">
@@ -525,7 +530,7 @@
                             <div class="card shadow-sm border-0">
                                 <div class="card-body">
                                     <h6 class="text-muted">{{ __('db.Leaves') }}</h6>
-                                    <h3 class="fw-bold text-danger" id="viewLeaves">0 {{ __('db.days') }}</h3>
+                                    <h3 class="fw-bold text-danger" id="viewLeaves">0 {{ __('db.Days') }}</h3>
                                 </div>
                             </div>
                         </div>
@@ -545,7 +550,7 @@
                             <div class="card shadow-sm border-0">
                                 <div class="card-body">
                                     <h6 class="text-muted">{{ __('db.Attendance') }}</h6>
-                                    <h3 class="fw-bold text-primary" id="viewAttendance">0 {{ __('db.days') }}</h3>
+                                    <h3 class="fw-bold text-primary" id="viewAttendance">0 {{ __('db.Days') }}</h3>
                                 </div>
                             </div>
                         </div>
@@ -559,11 +564,11 @@
                             <p id="viewMonth">--</p>
                         </div>
                         <div class="col-md-6">
-                            <label class="fw-bold">{{ __('db.Salery Amount') }}:</label>
+                            <label class="fw-bold">{{ __('db.salary_amount') }}:</label>
                             <p id="viewSalaryAmount">--</p>
                         </div>
                         <div class="col-md-6">
-                            <label class="fw-bold">{{ __('db.Sale Commission') }}:</label>
+                            <label class="fw-bold">{{ __('db.sale_commission') }}:</label>
                             <p id="viewCommissionAmount">--</p>
                         </div>
                         <div class="col-md-6">
@@ -579,7 +584,7 @@
                             <p id="viewPayingMethod">--</p>
                         </div>
                         <div class="col-md-12">
-                            <label class="fw-bold">{{ __('db.Note') }}:</label>
+                            <label class="fw-bold">{{ __('db.note') }}:</label>
                             <p id="viewNote">--</p>
                         </div>
                     </div>
@@ -591,6 +596,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
     <script type="text/javascript">
 
         // ─── Flatpickr Month Pickers ─────────────────────────────────────────────────
@@ -621,7 +627,7 @@
 
 
         var payroll_id = [];
-        var user_verified = <?php echo json_encode(env('USER_VERIFIED')); ?>;
+        var user_verified = <?php echo json_encode(config('app.user_verified')); ?>;
 
         $.ajaxSetup({
             headers: {
@@ -629,12 +635,7 @@
             }
         });
 
-        function confirmDelete() {
-            if (confirm("Are you sure want to delete?")) {
-                return true;
-            }
-            return false;
-        }
+        function confirmDelete() { return true; }
 
         // ─── DataTable ───────────────────────────────────────────────────────────────
         $('#payroll-table').DataTable({
@@ -644,8 +645,8 @@
                 "info": '<small>{{ __('db.Showing') }} _START_ - _END_ (_TOTAL_)</small>',
                 "search": '{{ __('db.Search') }}',
                 'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
                 }
             },
             'columnDefs': [
@@ -679,7 +680,7 @@
             buttons: [
                 {
                     extend: 'pdf',
-                    text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                    text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                     exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                     action: function(e, dt, button, config) {
                         datatable_sum(dt, true);
@@ -690,7 +691,7 @@
                 },
                 {
                     extend: 'excel',
-                    text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                    text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                     exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                     action: function(e, dt, button, config) {
                         datatable_sum(dt, true);
@@ -701,7 +702,7 @@
                 },
                 {
                     extend: 'csv',
-                    text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                     exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                     action: function(e, dt, button, config) {
                         datatable_sum(dt, true);
@@ -712,7 +713,7 @@
                 },
                 {
                     extend: 'print',
-                    text: '<i title="print" class="fa fa-print"></i>',
+                    text: '<i title="print" class="ti ti-printer"></i>',
                     exportOptions: { columns: ':visible:Not(.not-exported)', rows: ':visible' },
                     action: function(e, dt, button, config) {
                         datatable_sum(dt, true);
@@ -722,7 +723,7 @@
                     footer: true
                 },
                 {
-                    text: '<i title="delete" class="dripicons-cross"></i>',
+                    text: '<i title="delete" class="ti ti-x"></i>',
                     className: 'buttons-delete',
                     action: function(e, dt, node, config) {
                         if (user_verified == '1') {
@@ -732,7 +733,7 @@
                                     payroll_id[i - 1] = $(this).closest('tr').data('id');
                                 }
                             });
-                            if (payroll_id.length && confirm("Are you sure want to delete?")) {
+                            if (payroll_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                                 $.ajax({
                                     type: 'POST',
                                     url: 'payroll/deletebyselection',
@@ -743,20 +744,22 @@
                                                 dt.row($(this).closest('tr')).remove().draw(false);
                                             }
                                         });
-                                        alert(data);
+                                        SaleProToast.show(data);
                                     }
                                 });
+                            }
+                            });
                             } else if (!payroll_id.length) {
-                                alert('No payroll is selected!');
+                                SaleProToast.show('No payroll is selected!');
                             }
                         } else {
-                            alert('This feature is disable for demo!');
+                            SaleProToast.show('This feature is disable for demo!');
                         }
                     }
                 },
                 {
                     extend: 'colvis',
-                    text: '<i title="column visibility" class="fa fa-eye"></i>',
+                    text: '<i title="column visibility" class="ti ti-eye"></i>',
                     columns: ':gt(0)'
                 },
             ],
@@ -770,11 +773,11 @@
             if (dt_selector.rows('.selected').any() && is_calling_first) {
                 var rows = dt_selector.rows('.selected').indexes();
                 $(dt_selector.column(5).footer()).html(
-                    dt_selector.cells(rows, 5, { page: 'current' }).data().sum().toFixed({{ $general_setting->decimal }})
+                    dt_selector.cells(rows, 5, { page: 'current' }).data().sum().toFixed({{ gen_setting()->decimal }})
                 );
             } else {
                 $(dt_selector.column(5).footer()).html(
-                    dt_selector.cells(rows, 5, { page: 'current' }).data().sum().toFixed({{ $general_setting->decimal }})
+                    dt_selector.cells(rows, 5, { page: 'current' }).data().sum().toFixed({{ gen_setting()->decimal }})
                 );
             }
         }
@@ -798,7 +801,7 @@
                         calculateTotal();
                     },
                     error: function() {
-                        alert('Error loading payroll data!');
+                        SaleProToast.show('Error loading payroll data!');
                     }
                 });
             }
@@ -855,11 +858,11 @@
                         $select.selectpicker({
                             liveSearch: true,
                             actionsBox: true,
-                            title: data.length > 0 ? '{{ __('db.Select Employees') }}' : 'No employees available'
+                            title: data.length > 0 ? '{{ __('db.select_employees') }}' : 'No employees available'
                         });
                     },
                     error: function() {
-                        alert('Error loading employees!');
+                        SaleProToast.show('Error loading employees!');
                     }
                 });
             }

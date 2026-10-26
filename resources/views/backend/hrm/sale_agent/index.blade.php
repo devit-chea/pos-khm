@@ -1,4 +1,8 @@
-@extends('backend.layout.main') 
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ 
 @section('content')
 <x-error-message key="name" />
 <x-error-message key="image" />
@@ -9,7 +13,7 @@
 <section>
     @if (in_array('sale-agents', $all_permission))
         <div class="container-fluid">
-            <a href="{{ route('sale-agents.create') }}" class="btn btn-info"><i class="dripicons-plus"></i>
+            <a href="{{ route('sale-agents.create') }}" class="btn btn-info"><i class="ti ti-plus"></i>
                 {{ __('db.Add Sale Agent') }}</a>
         </div>
     @endif
@@ -20,14 +24,14 @@
                     <th class="not-exported"></th>
                     <th>{{ __('db.Image') }}</th>
                     <th>{{ __('db.name') }}</th>
-                    <th>{{ __('db.Email') }}</th>
+                    <th>{{ __('db.email') }}</th>
                     <th>{{ __('db.Phone Number') }}</th>
                     <th>{{ __('db.Department') }}</th>
                     <th>{{ __('db.Address') }}</th>
                     <th>{{ __('db.Staff Id') }}</th>
-                    @if (in_array('project', explode(',', $general_setting->modules)))
-                        <th>{{ __('db.Company') }}</th>
-                    @endif
+                    <th>Assigned Sales</th>
+                    <th>Sales Total</th>
+                    <th>Paid Total</th>
                     <th class="not-exported">{{ __('db.action') }}</th>
                 </tr>
             </thead>
@@ -63,10 +67,9 @@
                             @endif
                         </td>
                         <td>{{ $agent->staff_id }}</td>
-
-                        @if (in_array('project', explode(',', $general_setting->modules)))
-                            <td>{{ $agent->user->company_name }}</td>
-                        @endif
+                        <td>{{ (int) ($agent->assigned_sales_count ?? 0) }}</td>
+                        <td>{{ number_format((float) ($agent->assigned_sales_total ?? 0), config('decimal')) }}</td>
+                        <td>{{ number_format((float) ($agent->assigned_sales_paid ?? 0), config('decimal')) }}</td>
 
                         <td>
                             <div class="btn-group">
@@ -91,7 +94,7 @@
                                                 {{-- data-staff_id="{{ $agent->staff_id }}" --}}
                                                 @if (isset($agent->sales_target)) data-sales_target='@json($agent->sales_target)' @else data-sales_target='[]' @endif
                                                 data-toggle="modal" data-target="#editModal">
-                                                <i class="dripicons-document-edit"></i> {{ __('db.edit') }}
+                                                <i class="ti ti-edit"></i> {{ __('db.edit') }}
                                             </button>
                                         </li>
                                     @endif
@@ -104,8 +107,8 @@
                                             @method('DELETE')
                                             <li>
                                                 <button type="submit" class="btn btn-link"
-                                                    onclick="return confirmDelete()">
-                                                    <i class="dripicons-trash"></i> {{ __('db.delete') }}
+                                                    data-confirm-message="{{ __('db.Are you sure want to delete?') }}">
+                                                    <i class="ti ti-trash"></i> {{ __('db.delete') }}
                                                 </button>
                                             </li>
                                         </form>
@@ -126,9 +129,9 @@
     <div role="document" class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 id="exampleModalLabel" class="modal-title">{{ __('db.Update Sale Agent') }}</h5>
+                <h5 id="exampleModalLabel" class="modal-title">{{ __('db.update_sale_agent') }}</h5>
                 <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                        aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                        aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
                 <p class="italic">
@@ -150,7 +153,7 @@
                             <input type="file" name="image" class="form-control">
                         </div>
                         <div class="col-md-4 form-group">
-                            <label>{{ __('db.Email') }} *</label>
+                            <label>{{ __('db.email') }} *</label>
                             <input type="email" name="email" required class="form-control">
                         </div>
                         <div class="col-md-4 form-group">
@@ -210,7 +213,7 @@
 
                         <div class="col-md-3 user-input" style="display:none;">
                             <div class="form-group">
-                                <label>{{ __('db.UserName') }} *</label>
+                                <label>{{ __('db.username') }} *</label>
                                 <input type="text" name="username" class="form-control">
                             </div>
                         </div>
@@ -246,11 +249,12 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
     <script type="text/javascript">
 
         @if (config('database.connections.saleprosaas_landlord'))
             if (localStorage.getItem("message")) {
-                alert(localStorage.getItem("message"));
+                SaleProToast.show(localStorage.getItem("message"));
                 localStorage.removeItem("message");
             }
 
@@ -258,7 +262,7 @@
             $.ajax({
                 type: 'GET',
                 async: false,
-                url: '{{ route('package.fetchData', $general_setting->package_id) }}',
+                url: '{{ route('package.fetchData', gen_setting()->package_id) }}',
                 success: function(data) {
                     if (data['number_of_employee'] > 0 && data['number_of_product'] <= numberOfEmployee) {
                         $("a.add-employee-btn").addClass('d-none');
@@ -268,7 +272,7 @@
         @endif
 
         var employee_id = [];
-        var user_verified = <?php echo json_encode(env('USER_VERIFIED')); ?>;
+        var user_verified = <?php echo json_encode(config('app.user_verified')); ?>;
 
         $.ajaxSetup({
             headers: {
@@ -276,12 +280,7 @@
             }
         });
 
-        function confirmDelete() {
-            if (confirm("Are you sure want to delete?")) {
-                return true;
-            }
-            return false;
-        }
+        function confirmDelete() { return true; }
 
 
 
@@ -303,13 +302,13 @@
                 "info": '<small>{{ __('db.Showing') }} _START_ - _END_ (_TOTAL_)</small>',
                 "search": '{{ __('db.Search') }}',
                 'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
                 }
             },
             'columnDefs': [{
                     "orderable": false,
-                    'targets': [0, 1, 8]
+                    'targets': [0, 1, 11]
                 },
                 {
                     'render': function(data, type, row, meta) {
@@ -338,7 +337,7 @@
             dom: '<"row"lfB>rtip',
             buttons: [{
                     extend: 'pdf',
-                    text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                    text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
@@ -367,7 +366,7 @@
                 },
                 {
                     extend: 'excel',
-                    text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                    text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
@@ -384,7 +383,7 @@
                 },
                 {
                     extend: 'csv',
-                    text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
@@ -401,7 +400,7 @@
                 },
                 {
                     extend: 'csv',
-                    text: '<i title="export for device" class="fa fa-tablet"></i>',
+                    text: '<i title="export for device" class="ti ti-tablet"></i>',
                     className: 'export-for-device',
                     exportOptions: {
                         columns: [7, 2],
@@ -415,7 +414,7 @@
                 },
                 {
                     extend: 'print',
-                    text: '<i title="print" class="fa fa-print"></i>',
+                    text: '<i title="print" class="ti ti-printer"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible',
@@ -423,7 +422,7 @@
                     },
                 },
                 {
-                    text: '<i title="delete" class="dripicons-cross"></i>',
+                    text: '<i title="delete" class="ti ti-x"></i>',
                     className: 'buttons-delete',
                     action: function(e, dt, node, config) {
                         if (user_verified == '1') {
@@ -433,7 +432,7 @@
                                     employee_id[i - 1] = $(this).closest('tr').data('id');
                                 }
                             });
-                            if (employee_id.length && confirm("Are you sure want to delete?")) {
+                            if (employee_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                                 $.ajax({
                                     type: 'POST',
                                     url: 'employees/deletebyselection',
@@ -447,19 +446,21 @@
                                                     .draw(false);
                                             }
                                         });
-                                        alert(data);
+                                        SaleProToast.show(data);
                                     }
                                 });
                                 // dt.rows({ page: 'current', selected: true }).remove().draw(false);
+                            }
+                            });
                             } else if (!employee_id.length)
-                                alert('No employee is selected!');
+                                SaleProToast.show('No employee is selected!');
                         } else
-                            alert('This feature is disable for demo!');
+                            SaleProToast.show('This feature is disable for demo!');
                     }
                 },
                 {
                     extend: 'colvis',
-                    text: '<i title="column visibility" class="fa fa-eye"></i>',
+                    text: '<i title="column visibility" class="ti ti-eye"></i>',
                     columns: ':gt(0)'
                 },
             ],

@@ -20,7 +20,13 @@ class PermissionMiddleware
         $user = Auth::user();
 
         if (!$user) {
-           return redirect('/')->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('db.Sorry! You are not allowed to access this module'),
+                ], 401);
+            }
+            return redirect('/')->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
         }
 
         $role_has_permissions_list = Cache::remember(
@@ -38,6 +44,12 @@ class PermissionMiddleware
         $permissions = $role_has_permissions_list->pluck('name')->toArray();
 
         if (!in_array($permission, $permissions)) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('db.Sorry! You are not allowed to access this module'),
+                ], 403);
+            }
             return redirect('/')->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
         }
 

@@ -13,7 +13,7 @@ class AuthServiceProvider extends ServiceProvider
      * @var array
      */
     protected $policies = [
-        'App\Model' => 'App\Policies\ModelPolicy',
+        // 'App\Model' => 'App\Policies\ModelPolicy',
     ];
 
     /**
@@ -25,6 +25,20 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        //
+        Gate::before(function ($user, string $ability, array $arguments = []) {
+            if (! $user instanceof \App\Models\User) {
+                return null;
+            }
+
+            $permissionService = app(\App\Services\PermissionService::class);
+
+            if (! $permissionService->permissionExists($ability, 'web')) {
+                return null;
+            }
+
+            return $permissionService->userHasPermission($user, $ability)
+                ? true
+                : null;
+        });
     }
 }

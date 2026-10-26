@@ -49,6 +49,15 @@ class CustomerController extends Controller
     use \App\Traits\CacheForget;
     use \App\Traits\MailInfo;
 
+    public function __construct(
+        public \App\Services\AccountingService $accountingService,
+        public \App\Services\CustomerDepositService $customerDeposits,
+        public \App\Services\PaymentAccountService $paymentAccounts,
+        public \App\Services\WarehouseAccessService $warehouseAccess,
+    )
+    {
+    }
+
     public function index()
     {
         $role = Role::find(Auth::user()->role_id);
@@ -67,16 +76,18 @@ class CustomerController extends Controller
                 $field_name[] = str_replace(" ", "_", strtolower($fieldName));
             }
 
-            $lims_account_list = Account::where('is_active', true)->get();
+            $lims_account_list = app(\App\Services\PaymentAccountService::class)->validOperationalAccounts();
             $lims_gift_card_list = GiftCard::where("is_active", true)->get();
             $lims_reward_point_setting_data = RewardPointSetting::latest()->first();
             $lims_pos_setting_data = PosSetting::latest()->first();
+            $lims_warehouse_list = Warehouse::where('is_active', true)->orderBy('name')->get();
+            $deposit_default_warehouse_id = $this->warehouseAccess->warehouseId();
             if($lims_pos_setting_data)
                 $options = explode(',', $lims_pos_setting_data->payment_options);
             else
                 $options = [];
 
-            return view('backend.customer.index', compact('all_permission', 'custom_fields', 'field_name','options', 'lims_reward_point_setting_data', 'lims_gift_card_list', 'lims_account_list', 'lims_pos_setting_data'));
+            return view('backend.customer.index', compact('all_permission', 'custom_fields', 'field_name','options', 'lims_reward_point_setting_data', 'lims_gift_card_list', 'lims_account_list', 'lims_pos_setting_data', 'lims_warehouse_list', 'deposit_default_warehouse_id'));
         }
         else
             return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
@@ -133,6 +144,9 @@ class CustomerController extends Controller
         $data = array();
         if(!empty($customers))
         {
+            $customerIds = $customers->pluck('id')->all();
+            $customerDues = app(\App\Services\ReceivableReconciliationService::class)->operationalBalances($customerIds);
+
             foreach ($customers as $key=>$customer)
             {
                 $nestedData['id'] = $customer->id;
@@ -158,44 +172,7 @@ class CustomerController extends Controller
                 $nestedData['reward_point'] = $customer->points;
                 $nestedData['deposited_balance'] = number_format($customer->deposit - $customer->expense, 2);
 
-                $opening_balance_amount = $customer->opening_balance ?? 0;
-                $total_sales_amount = 0;
-                $total_paid_amount = 0;
-                $total_returns_amount = 0;
-
-                $total_sales_amount = Sale::where(function ($q) {
-                                        $q->where('sale_type', '!=', 'opening balance')
-                                        ->orWhereNull('sale_type');
-                                    })
-                                    ->where('customer_id', $customer->id)
-                                    ->whereNull('deleted_at')
-                                    ->sum('grand_total');
-
-                if ($total_sales_amount == 0) {
-                    $total_paid_amount = Payment::join('sales', 'sales.id', '=', 'payments.sale_id')
-                                        ->where('sales.customer_id', $customer->id)
-                                        ->whereNull('sales.deleted_at')
-                                        ->sum('payments.amount');
-                    $total_due = $opening_balance_amount - $total_paid_amount;
-                } else {
-                    $total_paid_amount = Payment::join('sales', 'sales.id', '=', 'payments.sale_id')
-                                        ->where('sales.customer_id', $customer->id)
-                                        ->whereNull('return_id') 
-                                        ->whereNull('sales.deleted_at')
-                                        ->sum('payments.amount');
-
-                    $total_refund_amount = Payment::join('returns', 'returns.id', '=', 'payments.return_id')
-                                            ->where('returns.customer_id', $customer->id)
-                                            ->sum('payments.amount');
-
-                    $total_returns_amount = Returns::where('customer_id', $customer->id)   
-                                            ->sum('grand_total');
-
-                    $total_due =  ($opening_balance_amount + $total_sales_amount + $total_refund_amount)
-                                - ($total_paid_amount + $total_returns_amount);
-
-                }
-
+                $total_due = $customerDues[$customer->id] ?? 0.0;
                 $nestedData['total_due'] = number_format($total_due, 2);
 
                 //fetching custom fields data
@@ -213,14 +190,14 @@ class CustomerController extends Controller
                 if($customer->type != 'walkin'){
                     if(in_array("customers-index", $request['all_permission'])){
                         $nestedData['options'] .= '<li>
-                            <a href="'.route('customer.show', $customer->id).'" class="btn btn-link"><i class="dripicons-preview"></i> '.__('db.Customer Details').'</a>
+                            <a href="'.route('customer.show', $customer->id).'" class="btn btn-link"><i class="ti ti-eye"></i> '.__('db.Customer Details').'</a>
                             </li>';
                     }
                 }
 
                 if(in_array("customers-edit", $request['all_permission'])){
                     $nestedData['options'] .= '<li>
-                        <a href="'.route('customer.edit', $customer->id).'" class="btn btn-link"><i class="dripicons-document-edit"></i> '.__('db.edit').'</a>
+                        <a href="'.route('customer.edit', $customer->id).'" class="btn btn-link"><i class="ti ti-edit"></i> '.__('db.edit').'</a>
                         </li>';
                 }
                 if($customer->type != 'walkin'){
@@ -230,25 +207,25 @@ class CustomerController extends Controller
                                 <input type="hidden" name="start_date" value="'.date('Y-m-d', strtotime('-30 year')).'" />
                                 <input type="hidden" name="end_date" value="'.date('Y-m-d').'" />
                                 <input type="hidden" name="customer_id" value="'.$customer->id.'" />
-                                <button type="submit" class="btn btn-link"><i class="dripicons-pulse"></i>'.__('db.Due Report').'</button></form>
+                                <button type="submit" class="btn btn-link"><i class="ti ti-receipt-2"></i>'.__('db.Due Report').'</button></form>
                         </li>';
                     }
 
                     if ($total_due > 0) {
                         $nestedData['options'] .=
                             '<li>
-                                <button type="button" data-id="'.$customer->id.'" class="clear-due btn btn-link" data-toggle="modal" data-target="#clearDueModal" ><i class="dripicons-brush"></i>'.__('db.Clear Due').'</button>
+                                <button type="button" data-id="'.$customer->id.'" class="clear-due btn btn-link" data-toggle="modal" data-target="#clearDueModal" ><i class="ti ti-brush"></i>'.__('db.Clear Due').'</button>
                             </li>';
                     }
 
                     $nestedData['options'] .=
                         '<li>
-                            <button type="button" data-id="'.$customer->id.'" class="deposit btn btn-link" data-toggle="modal" data-target="#depositModal" ><i class="dripicons-plus"></i>'.__('db.Add Deposit').'</button>
+                            <button type="button" data-id="'.$customer->id.'" class="deposit btn btn-link" data-toggle="modal" data-target="#depositModal" ><i class="ti ti-plus"></i>'.__('db.Add Deposit').'</button>
                         </li>';
 
                     $nestedData['options'] .=
                         '<li>
-                            <button type="button" data-id="'.$customer->id.'" class="getDeposit btn btn-link" ><i class="fa fa-money"></i>'.__('db.View Deposit').'</button>
+                            <button type="button" data-id="'.$customer->id.'" class="getDeposit btn btn-link" ><i class="ti ti-cash-banknote"></i>'.__('db.View Deposit').'</button>
                         </li>';
 
                     $settings = WhatsappSetting::first();
@@ -265,7 +242,7 @@ class CustomerController extends Controller
                         $nestedData['options'] .=
                             '<li>
                                 <a href="'.$href.'" class="btn btn-link">
-                                    <i class="fa fa-whatsapp"></i> '.__('db.Whatsapp Notification').'
+                                    <i class="ti ti-brand-whatsapp"></i> '.__('db.Whatsapp Notification').'
                                 </a>
                             </li>';
                     }
@@ -274,12 +251,12 @@ class CustomerController extends Controller
                     if(isset($lims_reward_point_setting_data) && $lims_reward_point_setting_data->is_active == 1){
                         $nestedData['options'] .=
                             '<li>
-                                <button type="button" data-id="'.$customer->id.'" class="point btn btn-link" data-toggle="modal" data-target="#pointModal" ><i class="dripicons-plus"></i>'.__('db.Add Point').'</button>
+                                <button type="button" data-id="'.$customer->id.'" class="point btn btn-link" data-toggle="modal" data-target="#pointModal" ><i class="ti ti-plus"></i>'.__('db.Add Point').'</button>
                             </li>';
 
                         $nestedData['options'] .=
                             '<li>
-                                <button type="button" data-id="'.$customer->id.'" class="getPoints btn btn-link" ><i class="fa fa-money"></i>'.__('db.View Points').'</button>
+                                <button type="button" data-id="'.$customer->id.'" class="getPoints btn btn-link" ><i class="ti ti-cash-banknote"></i>'.__('db.View Points').'</button>
                             </li>';
                     }
 
@@ -288,7 +265,7 @@ class CustomerController extends Controller
                 if(in_array("customers-delete", $request['all_permission']))
                     $nestedData['options'] .= '<form action="'.route("customer.destroy", $customer->id).'" method="POST">'.csrf_field().'' . method_field("DELETE") . '
                             <li>
-                              <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> '.__("db.delete").'</button>
+                              <button type="submit" class="btn btn-link" data-confirm-message="' . __('db.Are you sure want to delete?') . '"><i class="ti ti-trash"></i> '.__("db.delete").'</button>
                             </li></form>
                         </ul>
                     </div>';
@@ -308,179 +285,193 @@ class CustomerController extends Controller
 
     public function clearDue(Request $request)
     {
+        $role = Role::find(Auth::user()->role_id);
+        if (!$role || !$role->hasPermissionTo('customers-edit')) {
+            return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
+        }
+
+        $request->validate([
+            'customer_id' => 'required|integer|exists:customers,id',
+            'amount' => 'required|numeric|min:0.0001',
+        ]);
+
         $data = $request->all();
+        $scale = 4;
+        $submittedAmount = bcadd((string)$request->amount, '0', $scale);
+        if (in_array(strtolower((string) ($data['paid_by_id'] ?? '')), ['7', 'points'], true)) {
+            app(\App\Services\RewardPointService::class)->sweepExpiredPoints((int) $request->customer_id);
+        }
 
-        $lims_due_sale_data = Sale::select('id', 'warehouse_id', 'grand_total', 'paid_amount', 'payment_status', 'customer_id')
-                            ->where([
-                                ['payment_status', '!=', 4],
-                                ['customer_id', $request->customer_id]
-                            ])
-                            ->whereNull('sales.deleted_at')
-                            ->get();
+        return DB::transaction(function () use ($request, $data, $submittedAmount, $scale) {
+            $receivables = app(\App\Services\ReceivableReconciliationService::class);
+            $query = $receivables->receivableSalesQuery((int) $request->customer_id)
+                ->select('sales.id')
+                ->whereRaw($receivables->dueExpression() . ' > 0.0001')
+                ->orderBy('sales.id', 'asc');
 
-        $lims_customer_data = Customer::find($request->customer_id);
+            app(\App\Services\WarehouseAccessService::class)->scope($query, 'sales.warehouse_id');
+            $dueSaleIds = $query->pluck('sales.id');
 
-        $total_paid_amount = $request->amount;
-
-        foreach ($lims_due_sale_data as $key => $sale_data) {
-            if ($total_paid_amount == 0) break;
-
-            if ($data['paid_by_id'] == 1)
-                $paying_method = 'Cash';
-            elseif ($data['paid_by_id'] == 2)
-                $paying_method = 'Gift Card';
-            elseif ($data['paid_by_id'] == 3)
-                $paying_method = 'Credit Card';
-            elseif ($data['paid_by_id'] == 4)
-                $paying_method = 'Cheque';
-            elseif ($data['paid_by_id'] == 5)
-                $paying_method = 'Paypal';
-            elseif ($data['paid_by_id'] == 6)
-                $paying_method = 'Deposit';
-            elseif ($data['paid_by_id'] == 7)
-                $paying_method = 'Points';
-
-            $due_amount = $sale_data->grand_total - $sale_data->paid_amount;
-            
-            $lims_cash_register_data = CashRegister::select('id',)
-                                        ->where([
-                                            ['user_id', Auth::id()],
-                                            ['warehouse_id', $sale_data->warehouse_id],
-                                            ['status', 1]
-                                        ])->first();
-            $account_data = Account::select('id')->where('is_default', 1)->first();
-
-            if ($total_paid_amount >= $due_amount) {
-                $data['amount'] = $due_amount;
-                $payment_status = 4;
-            } else {
-                $data['amount'] = $total_paid_amount;
-                $payment_status = 2;
+            if ($dueSaleIds->isEmpty()) {
+                return redirect()->back()->with('not_permitted', __('db.No due found for this customer'));
             }
 
-            $lims_payment_data = new Payment();
-            $lims_payment_data->user_id = Auth::id();
-            $lims_payment_data->sale_id = $sale_data->id;
-            $lims_payment_data->cash_register_id = $lims_cash_register_data->id ?? null;
-            $lims_payment_data->account_id = $account_data->id;
-            $data['payment_reference'] = 'spr-' . date("Ymd") . '-' . date("his");
-            $lims_payment_data->payment_reference = $data['payment_reference'];
-            $lims_payment_data->amount = $data['amount'];
-            $lims_payment_data->change = 0;
-            $lims_payment_data->paying_method = $paying_method;
-            $lims_payment_data->payment_note = $data['payment_note'];
-            $lims_payment_data->payment_receiver = $data['payment_receiver'];
-            $lims_payment_data->save();
+            // 1. Global Lock Order: Lock Sale rows FIRST in deterministic ID order
+            $dueSales = Sale::whereIn('id', $dueSaleIds)
+                ->orderBy('id', 'asc')
+                ->lockForUpdate()
+                ->get();
 
-            $sale_data->paid_amount  += $data['amount'];
-            $sale_data->payment_status = $payment_status;
-            $sale_data->save();
+            // 2. Global Lock Order: Lock Customer row SECOND
+            $lims_customer_data = Customer::whereKey($request->customer_id)->lockForUpdate()->firstOrFail();
+            if (strtolower((string) $lims_customer_data->type) === 'walkin') {
+                throw new \App\Exceptions\SaleValidationException(__('db.customer_deposit_walkin_unavailable'));
+            }
 
-            $total_paid_amount -= $data['amount'];
+            // 3. Recalculate authoritative due under lock for each sale using centralized return/refund logic
+            $saleDues = [];
+            $totalEligibleDue = '0.0000';
+            foreach ($dueSales as $sale) {
+                $returned = (string) DB::table('returns')->where('sale_id', $sale->id)->sum('grand_total');
+                $refunded = (string) DB::table('payments')
+                    ->join('returns', 'returns.id', '=', 'payments.return_id')
+                    ->where('returns.sale_id', $sale->id)
+                    ->sum('payments.amount');
 
-            $data['payment_id']  = $lims_payment_data->id;
+                $due = bcadd(bcsub(bcsub((string)$sale->grand_total, (string)$sale->paid_amount, $scale), $returned, $scale), $refunded, $scale);
+                if (bccomp($due, '0.0001', $scale) === 1) {
+                    $saleDues[$sale->id] = $due;
+                    $totalEligibleDue = bcadd($totalEligibleDue, $due, $scale);
+                }
+            }
 
-            // ── Payment method specific logic ──
-            if ($paying_method == 'Gift Card') {
-                $lims_gift_card_data = GiftCard::find($data['gift_card_id']);
-                $lims_gift_card_data->expense += $data['amount'];
-                $lims_gift_card_data->save();
-                PaymentWithGiftCard::create($data);
+            if (bccomp($totalEligibleDue, '0.0001', $scale) <= 0) {
+                return redirect()->back()->with('not_permitted', __('db.No due found for this customer'));
+            }
 
-            } elseif ($paying_method == 'Credit Card') {
-                $lims_pos_setting_data = PosSetting::latest()->first();
-                if ($lims_pos_setting_data->stripe_secret_key) {
-                    Stripe::setApiKey($lims_pos_setting_data->stripe_secret_key);
-                    $token  = $data['stripeToken'];
-                    $amount = $data['amount'];
+            // 4. Calculate authoritative allocatable amount = min(submitted, totalDue)
+            $allocatableAmount = bccomp($submittedAmount, $totalEligibleDue, $scale) === 1
+                ? $totalEligibleDue
+                : $submittedAmount;
 
-                    $lims_payment_with_credit_card_data = PaymentWithCreditCard::where('customer_id', $sale_data->customer_id)->first();
+            // 5. Authoritative payment method resolution
+            $methodStr = strtolower((string) ($data['paid_by_id'] ?? '1'));
+            $payingMethod = match ($methodStr) {
+                '1', 'cash' => 'Cash',
+                '2', 'gift_card', 'gift card' => 'Gift Card',
+                '3', 'credit_card', 'credit card', 'card' => 'Credit Card',
+                '4', 'cheque' => 'Cheque',
+                '5', 'paypal' => 'Paypal',
+                '6', 'deposit' => 'Deposit',
+                '7', 'points' => 'Points',
+                default => 'Cash',
+            };
 
-                    if (!$lims_payment_with_credit_card_data) {
-                        $customer = \Stripe\Customer::create(['source' => $token]);
-                        $charge   = \Stripe\Charge::create([
-                            'amount'   => $data['amount'] * 100,
-                            'currency' => 'usd',
-                            'customer' => $customer->id,
-                        ]);
-                        $data['customer_stripe_id'] = $customer->id;
-                    } else {
-                        $customer_id = $lims_payment_with_credit_card_data->customer_stripe_id;
-                        $charge      = \Stripe\Charge::create([
-                            'amount'   => $data['amount'] * 100,
-                            'currency' => 'usd',
-                            'customer' => $customer_id,
-                        ]);
-                        $data['customer_stripe_id'] = $customer_id;
-                    }
+            // 6. Validate available deposit against allocatable amount, NOT raw submitted amount
+            if ($payingMethod === 'Deposit') {
+                $availableDeposit = $this->customerDeposits->available($lims_customer_data);
+                if (bccomp($allocatableAmount, $availableDeposit, $scale) === 1) {
+                    throw new \App\Exceptions\SaleValidationException(__('db.Amount exceeds customer deposit!'));
+                }
+            }
 
-                    $data['customer_id'] = $sale_data->customer_id;
-                    $data['charge_id']   = $charge->id;
-                    PaymentWithCreditCard::create($data);
+            // 7. Pure BCMath scale 4 per-sale allocation and consumption
+            $remainingToAllocate = $allocatableAmount;
+            $totalDepositConsumed = '0.0000';
+            $defaultAccount = Account::where('is_default', 1)->first() ?? Account::first();
+            $lims_payment_data = null;
+            $sale_data = null;
+
+            foreach ($dueSales as $saleItem) {
+                if (bccomp($remainingToAllocate, '0.0001', $scale) <= 0) {
+                    break;
                 }
 
-            } elseif ($paying_method == 'Cheque') {
-                PaymentWithCheque::create($data);
-
-            } elseif ($paying_method == 'Paypal') {
-                $provider = new ExpressCheckout;
-                $paypal_data['items'][] = [
-                    'name'  => 'Paid Amount',
-                    'price' => $data['amount'],
-                    'qty'   => 1
-                ];
-                $paypal_data['invoice_id']          = $lims_payment_data->payment_reference;
-                $paypal_data['invoice_description'] = "Reference: {$paypal_data['invoice_id']}";
-                $paypal_data['return_url']          = url('/sale/paypalPaymentSuccess/' . $lims_payment_data->id);
-                $paypal_data['cancel_url']          = url('/sale');
-
-                $total = 0;
-                foreach ($paypal_data['items'] as $item) {
-                    $total += $item['price'] * $item['qty'];
+                $saleDue = $saleDues[$saleItem->id] ?? '0.0000';
+                if (bccomp($saleDue, '0.0001', $scale) <= 0) {
+                    continue;
                 }
-                $paypal_data['total'] = $total;
-                $response = $provider->setExpressCheckout($paypal_data);
-                return redirect($response['paypal_link']);
 
-            } elseif ($paying_method == 'Deposit') {
-                $lims_customer_data->expense += $data['amount'];
-                $lims_customer_data->save();
+                $allocatedAmount = bccomp($remainingToAllocate, $saleDue, $scale) === 1
+                    ? $saleDue
+                    : $remainingToAllocate;
 
-            } elseif ($paying_method == 'Points') {
-                $lims_reward_point_setting_data = RewardPointSetting::latest()->first();
-                $used_points = ceil($data['amount'] / $lims_reward_point_setting_data->per_point_amount);
+                $newPaid = bcadd((string)$saleItem->paid_amount, $allocatedAmount, $scale);
+                $saleItem->paid_amount = $newPaid;
+                $remainingDueForSale = bcsub($saleDue, $allocatedAmount, $scale);
+                $saleItem->payment_status = (bccomp($remainingDueForSale, '0.0001', $scale) <= 0) ? 4 : 2;
+                $saleItem->save();
 
-                $lims_payment_data->used_points = $used_points;
+                $lims_cash_register_data = CashRegister::select('id')
+                    ->where([
+                        ['user_id', Auth::id()],
+                        ['warehouse_id', $saleItem->warehouse_id],
+                        ['status', 1]
+                    ])->first();
+
+                $lims_payment_data = new Payment();
+                $lims_payment_data->user_id = Auth::id() ?? 1;
+                $lims_payment_data->sale_id = $saleItem->id;
+                $lims_payment_data->cash_register_id = $lims_cash_register_data->id ?? null;
+                $lims_payment_data->account_id = $defaultAccount?->id ?? 1;
+                $lims_payment_data->payment_reference = 'spr-' . date("Ymd") . '-' . date("his") . '-' . $saleItem->id;
+                $lims_payment_data->amount = $allocatedAmount;
+                $lims_payment_data->change = 0;
+                $lims_payment_data->currency_id = $saleItem->currency_id;
+                $lims_payment_data->exchange_rate = $saleItem->exchange_rate;
+                $lims_payment_data->paying_method = $payingMethod;
+                $lims_payment_data->payment_note = $data['payment_note'] ?? null;
+                $lims_payment_data->payment_receiver = $data['payment_receiver'] ?? null;
                 $lims_payment_data->save();
 
-                $lims_customer_data->points -= $used_points;
-                $lims_customer_data->save();
+                if ($payingMethod === 'Deposit') {
+                    $this->customerDeposits->consume((int)$lims_customer_data->id, $allocatedAmount);
+                    $totalDepositConsumed = bcadd($totalDepositConsumed, $allocatedAmount, $scale);
+                } elseif ($payingMethod === 'Points') {
+                    app(\App\Services\RewardPointService::class)->redeemPayment($lims_payment_data, $saleItem);
+                }
+
+                $result = $this->accountingService->recordPayment($lims_payment_data);
+                if (!$result->success) {
+                    \Log::error('Accounting failed for Due Clearance Payment', ['payment_id' => $lims_payment_data->id, 'error' => $result->error]);
+                    throw new \App\Exceptions\SaleValidationException($result->error ?: __('db.customer_deposit_payment_failed'));
+                }
+
+                // Payment::save() refreshes against the gross invoice. Restore
+                // the return-aware status calculated under the same sale lock.
+                $returnAwareStatus = (bccomp($remainingDueForSale, '0.0001', $scale) <= 0) ? 4 : 2;
+                DB::table('sales')->where('id', $saleItem->id)->update(['payment_status' => $returnAwareStatus]);
+                $saleItem->payment_status = $returnAwareStatus;
+
+                $remainingToAllocate = bcsub($remainingToAllocate, $allocatedAmount, $scale);
+                $sale_data = $saleItem;
             }
 
-            $message = 'Payment created successfully';
+            if ($payingMethod === 'Deposit' && bccomp($totalDepositConsumed, $allocatableAmount, $scale) !== 0) {
+                throw new \App\Exceptions\SaleValidationException('Deposit consumed amount does not match total allocated payment.');
+            }
 
-            $last_sale_data = $sale_data;
-        }
+            $message = __('db.Payment created successfully');
 
-        // ── Print Receipt ──
-        if (isset($data['print_receipt']) && $data['print_receipt'] == 1) {
-            $general_setting     = GeneralSetting::latest()->first();
-            $invoice_settings    = InvoiceSetting::latest()->first();
-            $lims_warehouse_data = Warehouse::query()->findOrFail($sale_data->warehouse_id);
-            $cheque_no           = ($data['paid_by_id'] == 'Cheque') ? ($data['cheque_no'] ?? null) : null;
+            if (isset($data['print_receipt']) && $data['print_receipt'] == 1 && $sale_data) {
+                $general_setting = cache()->get('general_setting');
+                $invoice_settings = InvoiceSetting::latest()->first();
+                $lims_warehouse_data = Warehouse::query()->findOrFail($sale_data->warehouse_id);
+                $cheque_no = ($payingMethod === 'Cheque') ? ($data['cheque_no'] ?? null) : null;
 
-            return view('backend.sale.payment_receipt', compact(
-                'lims_payment_data',
-                'lims_customer_data',
-                'general_setting',
-                'invoice_settings',
-                'lims_warehouse_data',
-                'cheque_no',
-                'message'
-            ));
-        }
+                return view('backend.sale.payment_receipt', compact(
+                    'lims_payment_data',
+                    'lims_customer_data',
+                    'general_setting',
+                    'invoice_settings',
+                    'lims_warehouse_data',
+                    'cheque_no',
+                    'message'
+                ));
+            }
 
-        return redirect()->back()->with('message', __('db.Due cleared successfully'));
+            return redirect()->back()->with('message', __('db.Due cleared successfully'));
+        });
     }
 
     public function create()
@@ -505,6 +496,13 @@ class CustomerController extends Controller
                     return $query->where('is_active', 1);
                 }),
             ],
+            'credit_limit' => ['nullable', 'numeric', 'min:0'],
+            'birth_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'zatca_registration_scheme' => ['nullable', Rule::in(['CRN', '700', 'NAT', 'IQA', 'TIN', 'PAS', 'GCC', 'OTH'])],
+            'zatca_registration_number' => ['nullable', 'alpha_num', 'max:20'],
+            'zatca_building_number' => ['nullable', 'digits:4'],
+            'zatca_additional_number' => ['nullable', 'digits:4'],
+            'zatca_district' => ['nullable', 'string', 'max:255'],
         ]);
         //validation for supplier if create both user and supplier
         if(isset($request->both)) {
@@ -543,6 +541,9 @@ class CustomerController extends Controller
         }
         $customer_data = $request->all();
 
+        try {
+        DB::beginTransaction();
+
         $customer_data['is_active'] = true;
         $prefixMessage = 'Customer';
         if(isset($request->user)) {
@@ -554,34 +555,34 @@ class CustomerController extends Controller
             $customer_data['user_id'] = $user->id;
             $prefixMessage .= ', User';
         }
-        $customer_data['name'] = $customer_data['customer_name'];
-        if (empty($customer_data['pay_term_no'])) {
+        $customer_data['name'] = $customer_data['customer_name'] ?? $customer_data['name'] ?? null;
+        $type = $customer_data['type'] ?? 'regular';
+        if ($type === 'walkin' || $type === \App\Enums\CustomerTypeEnum::WALKIN->value) {
+            $customer_data['type'] = 'walkin';
+            $customer_data['credit_limit'] = 0;
             $customer_data['pay_term_no'] = null;
             $customer_data['pay_term_period'] = 'days';
+        } else {
+            if (array_key_exists('credit_limit', $customer_data)) {
+                $val = $customer_data['credit_limit'];
+                if ($val === null || $val === '') {
+                    $customer_data['credit_limit'] = null;
+                } else {
+                    $customer_data['credit_limit'] = (float)$val;
+                }
+            } else {
+                $customer_data['credit_limit'] = null;
+            }
+
+            if (empty($customer_data['pay_term_no'])) {
+                $customer_data['pay_term_no'] = null;
+                $customer_data['pay_term_period'] = 'days';
+            }
         }
         if(isset($request->both)) {
             Supplier::create($customer_data);
             $prefixMessage .= ' and Supplier';
         }
-
-        $fullMessage = $prefixMessage.' created successfully!';
-        $mail_setting = MailSetting::latest()->first();
-        $message = $this->mailAction($customer_data, $mail_setting, $request, $fullMessage);
-
-        // if($customer_data['email'] && $mail_setting) {
-        //     $this->setMailInfo($mail_setting);
-        //     try {
-        //         Mail::to($customer_data['email'])->send(new CustomerCreate($customer_data));
-        //         if(isset($request->both))
-        //             Mail::to($customer_data['email'])->send(new SupplierCreate($customer_data));
-        //         $message .= ' created successfully!';
-        //     }
-        //     catch(\Exception $e){
-        //         $message .= ' created successfully. Please setup your <a href="setting/mail_setting">mail setting</a> to send mail.';
-        //     }
-        // }
-        // else
-        //     $message .= ' created successfully!';
 
         $lims_customer_data = Customer::create($customer_data);
 
@@ -603,6 +604,10 @@ class CustomerController extends Controller
             $lims_sale_data->payment_status = 1; // pending
             $lims_sale_data->sale_type = 'Opening balance';
             $lims_sale_data->save();
+
+            $this->accountingService->recordCustomerOpeningBalance($lims_customer_data);
+        } else {
+            $customer_data['opening_balance'] = 0;
         }
 
         //inserting data for custom fields
@@ -624,6 +629,7 @@ class CustomerController extends Controller
         $customerInfo['name'] = $lims_customer_data->name;
         $customerInfo['phone_number'] = $lims_customer_data->phone_number;
         $customerInfo['type'] = $lims_customer_data->type;
+        $customerInfo['credit_limit'] = $lims_customer_data->credit_limit;
 
         $lims_discount_plan_data = DiscountPlan::where([
             'is_active' => true,
@@ -637,14 +643,37 @@ class CustomerController extends Controller
         }
 
         if ($lims_customer_data->deposit > 0) {
-            Deposit::create([
-                'user_id' => Auth::id(),
+            $deposit = Deposit::create([
+                'user_id' => Auth::id() ?? 1,
                 'customer_id' => $lims_customer_data->id,
                 'amount' => $lims_customer_data->deposit,
+                'deposit_type' => 'opening',
+                'account_id' => null,
+                'note' => 'Initial Deposit',
             ]);
+
+            $result = $this->accountingService->recordCustomerOpeningDeposit($deposit);
+            if (!$result->success) {
+                throw new \App\Exceptions\SaleValidationException($result->error ?: 'Failed to record opening deposit journal');
+            }
         }
 
-        if($customer_data['pos'])
+        DB::commit();
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Customer creation failed: ' . $e->getMessage());
+            if(isset($customer_data['pos']) && $customer_data['pos'])
+                return response()->json(['error' => $e->getMessage()], 500);
+            else
+                return redirect()->back()->with('not_permitted', 'Customer creation failed: ' . $e->getMessage());
+        }
+
+        $fullMessage = $prefixMessage.' created successfully!';
+        $mail_setting = MailSetting::latest()->first();
+        $message = $this->mailAction($customer_data, $mail_setting, $request, $fullMessage);
+
+        if(isset($customer_data['pos']) && $customer_data['pos'])
             return $customerInfo;
         else
             return redirect('customer')->with('create_message', $message);
@@ -652,54 +681,56 @@ class CustomerController extends Controller
 
     public function show($id)
     {
-        // $start_date = Carbon::parse($request->start_date)->startOfDay();
-        // $end_date   = Carbon::parse($request->end_date)->endOfDay();
-
         $customer = Customer::findOrFail($id);
+        $reconciliationService = app(\App\Services\ReceivableReconciliationService::class);
 
-        $opening_balance = $customer->opening_balance ?? 0;
+        $opening_balance = (float) ($customer->opening_balance ?? 0);
 
-        // Total sales (excluding opening balance type if ever used)
-        $total_sales = Sale::where('customer_id', $id)
-            ->whereNull('deleted_at')
+        $salesQuery = $reconciliationService->salesQuery($id);
+        $total_sales = (float) (clone $salesQuery)->sum('sales.grand_total');
+
+        $total_paid = (float) Payment::join('sales', 'sales.id', '=', 'payments.sale_id')
+            ->where('sales.customer_id', $id)
+            ->whereNull('payments.return_id')
+            ->whereNull('sales.deleted_at')
+            ->where('sales.sale_status', '!=', \App\Services\ReceivableReconciliationService::DRAFT_STATUS)
+            ->whereNull('sales.voided_at')
             ->where(function ($q) {
-                $q->where('sale_type', '!=', 'opening balance')
-                ->orWhereNull('sale_type');
+                $q->whereNull('sales.accounting_status')
+                    ->orWhereNotIn('sales.accounting_status', ['reversed', 'voided']);
+            })
+            ->where(function ($q) {
+                $q->whereNull('payments.accounting_status')
+                    ->orWhereNotIn('payments.accounting_status', ['reversed', 'voided']);
+            })
+            ->sum('payments.amount');
+
+        $returnsSum = (float) DB::table('returns')
+            ->where('customer_id', $id)
+            ->where(function ($q) {
+                $q->whereNull('accounting_status')
+                    ->orWhereNotIn('accounting_status', ['reversed', 'voided']);
             })
             ->sum('grand_total');
 
-        if($total_sales == 0) {
-            // Total paid (single query, no N+1)
-            $total_paid = Payment::join('sales', 'sales.id', '=', 'payments.sale_id')
-                ->where('sales.customer_id', $id)
-                ->whereNull('sales.deleted_at')
-                ->sum('payments.amount');
-            $balance_due = $opening_balance - $total_paid;
-            $total_returns = 0;
-        } else {
+        $refundsSum = (float) DB::table('payments')
+            ->join('returns', 'returns.id', '=', 'payments.return_id')
+            ->where('returns.customer_id', $id)
+            ->where(function ($q) {
+                $q->whereNull('payments.accounting_status')
+                    ->orWhereNotIn('payments.accounting_status', ['reversed', 'voided']);
+            })
+            ->sum('payments.amount');
 
-            $total_paid = Payment::join('sales', 'sales.id', '=', 'payments.sale_id')
-                ->where('sales.customer_id', $id)
-                ->whereNull('return_id')
-                ->whereNull('sales.deleted_at')
-                ->sum('payments.amount');
-
-            $total_refund = Payment::join('returns', 'returns.id', '=', 'payments.return_id')
-                ->where('returns.customer_id', $id)
-                ->sum('payments.amount');
-
-            // Total returns
-            $total_returns = Returns::where('customer_id', $id)
-                ->sum('grand_total');
-
-            // Final balance due
-            $balance_due = ($total_sales + $opening_balance + $total_refund) - ( $total_paid + $total_returns);
-        }
+        $total_returns = max(0, $returnsSum - $refundsSum);
+        $net_sales = $total_sales - $total_returns;
+        $balance_due = $reconciliationService->operationalBalance($id);
 
         return view('backend.customer.view', [
             'lims_customer_data' => $customer,
             'opening_balance'   => $opening_balance,
             'total_sales'       => $total_sales,
+            'net_sales'         => $net_sales,
             'total_paid'        => $total_paid,
             'total_returns'     => $total_returns,
             'balance_due'       => $balance_due,
@@ -708,19 +739,72 @@ class CustomerController extends Controller
 
     public function ledger($id)
     {
-        $sales = Sale::where('customer_id', $id)->whereNull('deleted_at')->get()->map(function ($s) {
-            return [
-                'id' => $s->id,
-                'date' => $s->created_at,
-                'type' => $s->sale_type ?? 'Sale',
-                'reference' => $s->reference_no,
-                'debit' => floatval($s->grand_total),
-                'credit' => 0,
-            ];
-        });
+        $customer = Customer::findOrFail($id);
 
-        $payments = Payment::whereIn('sale_id', $sales->pluck('id'))
+        $opening = collect();
+        $openingSale = Sale::where('customer_id', $id)
+            ->whereNull('deleted_at')
+            ->whereNull('voided_at')
+            ->whereRaw("LOWER(COALESCE(sale_type, '')) = ?", ['opening balance'])
+            ->orderBy('id')
+            ->first();
+
+        if ($openingSale) {
+            $opening->push([
+                'id' => $openingSale->id,
+                'date' => $openingSale->created_at,
+                'type' => 'Opening balance',
+                'reference' => $openingSale->reference_no ?: 'Opening Balance',
+                'debit' => floatval($openingSale->grand_total),
+                'credit' => 0,
+            ]);
+        } elseif ((float) ($customer->opening_balance ?? 0) != 0) {
+            // Legacy fallback for customers created before synthetic opening-balance
+            // sales were introduced.
+            $opening->push([
+                'id' => 0,
+                'date' => $customer->created_at,
+                'type' => 'Opening balance',
+                'reference' => 'Opening Balance',
+                'debit' => floatval($customer->opening_balance),
+                'credit' => 0,
+            ]);
+        }
+
+        $sales = Sale::where('customer_id', $id)
+            ->whereNull('deleted_at')
+            ->where('sale_status', '!=', \App\Services\ReceivableReconciliationService::DRAFT_STATUS)
+            ->whereNull('voided_at')
+            ->where(function ($q) {
+                $q->whereNull('accounting_status')
+                    ->orWhereNotIn('accounting_status', ['reversed', 'voided']);
+            })
+            ->where(function ($q) {
+                $q->whereNull('sale_type')
+                    ->orWhereRaw('LOWER(sale_type) <> ?', ['opening balance']);
+            })
+            ->get()->map(function ($s) {
+                return [
+                    'id' => $s->id,
+                    'date' => $s->created_at,
+                    'type' => $s->sale_type ?? 'Sale',
+                    'reference' => $s->reference_no,
+                    'debit' => floatval($s->grand_total),
+                    'credit' => 0,
+                ];
+            });
+
+        $paymentSaleIds = $sales->pluck('id');
+        if ($openingSale) {
+            $paymentSaleIds->push($openingSale->id);
+        }
+
+        $payments = Payment::whereIn('sale_id', $paymentSaleIds->unique()->values())
                     ->whereNull('return_id')
+                    ->where(function ($q) {
+                        $q->whereNull('accounting_status')
+                          ->orWhereNotIn('accounting_status', ['reversed', 'voided']);
+                    })
                     ->get()
                     ->map(function ($p) {
                         return [
@@ -733,58 +817,37 @@ class CustomerController extends Controller
                         ];
                     });
 
-        $returns = Returns::where('customer_id', $id)->get()->map(function($r) {
-            return [
-                'id' => $r->id,
-                'date' => $r->created_at,
-                'type' => 'Sale Return',
-                'reference' => $r->reference_no,
-                'debit' => 0,
-                'credit' => floatval($r->grand_total),
-            ];
-        });
+        $returns = Returns::with('refundPayments')->where('customer_id', $id)
+            ->where(function ($q) {
+                $q->whereNull('accounting_status')
+                    ->orWhereNotIn('accounting_status', ['reversed', 'voided']);
+            })
+            ->get()->map(function($r) {
+                return [
+                    'id' => $r->id,
+                    'date' => $r->created_at,
+                    'type' => 'Sale Return',
+                    'reference' => $r->reference_no,
+                    'debit' => 0,
+                    'credit' => floatval($r->display_grand_total),
+                ];
+            });
 
-        $refunds = Payment::join('returns', 'returns.id', '=', 'payments.return_id')
-                    ->where('returns.customer_id', $id)
-                    ->get()
-                    ->map(function($r) {
-                        return [
-                            'id'        => $r->id,
-                            'date'      => $r->date ?? $r->created_at, // payment date
-                            'type'      => 'Refund',
-                            'reference' => $r->payment_reference ?? '-',
-                            'debit'     => floatval($r->amount),
-                            'credit'    => 0,
-                        ];
-                    });
-
-        $seq = 1;
-
-        $sales = $sales->map(function ($row) use (&$seq) {
-            $row['sequence'] = $seq++;
-            return $row;
-        });
-
-        $payments = $payments->map(function ($row) use (&$seq) {
-            $row['sequence'] = $seq++;
-            return $row;
-        });
-
-        $returns = $returns->map(function ($row) use (&$seq) {
-            $row['sequence'] = $seq++;
-            return $row;
-        });
-
-        $refunds = $refunds->map(function ($row) use (&$seq) {
-            $row['sequence'] = $seq++;
-            return $row;
-        });
-
-        $ledger = $sales
+        $ledger = $opening
+                    ->merge($sales)
                     ->merge($payments)
                     ->merge($returns)
-                    ->merge($refunds)
-                    ->sortBy('sequence')
+                    ->sortBy(function($item) {
+                        $priority = [
+                            'Opening balance' => 1,
+                            'Sale' => 2,
+                            'Sale Return' => 3,
+                            'Payment' => 4,
+                            'Refund' => 5,
+                        ];
+                        $p = $priority[$item['type']] ?? 2;
+                        return \Carbon\Carbon::parse($item['date'])->getTimestamp() . '-' . $p;
+                    })
                     ->values();
 
         $balance = 0;
@@ -861,10 +924,20 @@ class CustomerController extends Controller
                     return $query->where('is_active', 1);
                 }),
             ],
+            'credit_limit' => ['nullable', 'numeric', 'min:0'],
+            'birth_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'zatca_registration_scheme' => ['nullable', Rule::in(['CRN', '700', 'NAT', 'IQA', 'TIN', 'PAS', 'GCC', 'OTH'])],
+            'zatca_registration_number' => ['nullable', 'alpha_num', 'max:20'],
+            'zatca_building_number' => ['nullable', 'digits:4'],
+            'zatca_additional_number' => ['nullable', 'digits:4'],
+            'zatca_district' => ['nullable', 'string', 'max:255'],
         ]);
 
         $input = $request->all();
         $lims_customer_data = Customer::find($id);
+
+        try {
+        DB::beginTransaction();
 
         if(isset($input['user'])) {
             $this->validate($request, [
@@ -890,18 +963,46 @@ class CustomerController extends Controller
             $input['password'] = bcrypt($input['password']);
             $user = User::create($input);
             $input['user_id'] = $user->id;
-            $message = 'Customer updated and user created successfully';
+            $message = __('db.customer_updated_and_user_created');
         }
         else {
-            $message = 'Customer updated successfully';
+            $message = __('db.customer_updated_successfully');
         }
 
         $input['name'] = $input['customer_name'];
-        if (empty($input['pay_term_no'])) {
+        $type = $input['type'] ?? $lims_customer_data->type ?? 'regular';
+        if ($type === 'walkin' || $type === \App\Enums\CustomerTypeEnum::WALKIN->value) {
+            $input['type'] = 'walkin';
+            $input['credit_limit'] = 0;
             $input['pay_term_no'] = null;
             $input['pay_term_period'] = 'days';
+        } else {
+            if (array_key_exists('credit_limit', $input)) {
+                $val = $input['credit_limit'];
+                if ($val === null || $val === '') {
+                    $input['credit_limit'] = null;
+                } else {
+                    $input['credit_limit'] = (float)$val;
+                }
+            }
+
+            if (empty($input['pay_term_no'])) {
+                $input['pay_term_no'] = null;
+                $input['pay_term_period'] = 'days';
+            }
         }
+
+        $old_opening_balance = $lims_customer_data->opening_balance;
+
         $lims_customer_data->update($input);
+
+        if ($old_opening_balance != $lims_customer_data->opening_balance) {
+            $this->accountingService->reverseTransaction(get_class($lims_customer_data), $lims_customer_data->id);
+            if ($lims_customer_data->opening_balance > 0) {
+                $this->accountingService->recordCustomerOpeningBalance($lims_customer_data, 'customer_opening_balance_updated');
+            }
+        }
+
         //update custom field data
         $custom_field_data = [];
         $custom_fields = CustomField::where('belongs_to', 'customer')->select('name', 'type')->get();
@@ -918,22 +1019,47 @@ class CustomerController extends Controller
             DB::table('customers')->where('id', $lims_customer_data->id)->update($custom_field_data);
         $this->cacheForget('customer_list');
 
+        DB::commit();
         return redirect('customer')->with('edit_message', $message);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Customer update failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Customer update failed: ' . $e->getMessage());
+        }
     }
 
     public function importCustomer(Request $request)
     {
         $role = Role::find(Auth::user()->role_id);
-        if($role->hasPermissionTo('customers-add')){
+        if($role && $role->hasPermissionTo('customers-add')){
             $upload=$request->file('file');
             $ext = pathinfo($upload->getClientOriginalName(), PATHINFO_EXTENSION);
             if($ext != 'csv')
                 return redirect()->back()->with('not_permitted', __('db.Please upload a CSV file'));
             $filename =  $upload->getClientOriginalName();
-            $filePath=$upload->getRealPath();
+            $filePath = $upload->getRealPath();
+
+            $content = file_get_contents($filePath);
+            if (str_starts_with($content, "\xEF\xBB\xBF")) {
+                $content = substr($content, 3);
+            }
+            if (!mb_check_encoding($content, 'UTF-8')) {
+                $converted = @iconv('Windows-1252', 'UTF-8//IGNORE', $content);
+                if ($converted !== false && mb_check_encoding($converted, 'UTF-8')) {
+                    $content = $converted;
+                } else {
+                    $content = mb_convert_encoding($content, 'UTF-8', 'Windows-1252, ISO-8859-1, ASCII');
+                }
+            }
+            $content = mb_scrub($content, 'UTF-8');
+
             //open and read
-            $file=fopen($filePath, 'r');
-            $header= fgetcsv($file);
+            $file = fopen('php://memory', 'r+');
+            fwrite($file, $content);
+            rewind($file);
+
+            $header = fgetcsv($file);
             $escapedHeader=[];
             //validate
             foreach ($header as $key => $value) {
@@ -944,64 +1070,105 @@ class CustomerController extends Controller
 
             $mail_setting = MailSetting::latest()->first();
 
-            //looping through othe columns
-            while($columns=fgetcsv($file))
-            {
-                if($columns[0]=="")
-                    continue;
-                foreach ($columns as $key => $value) {
-                    $value=preg_replace('/\D/','',$value);
+            $lims_discount_plan_data = DiscountPlan::where([
+                'is_active' => true,
+                'type' => DiscountPlanTypeEnum::GENERIC->value
+            ])->get();
+
+            $message = __('db.Customer Imported Successfully');
+
+            try {
+                DB::beginTransaction();
+
+                //looping through other columns
+                while($columns=fgetcsv($file))
+                {
+                    if(empty($columns) || empty($columns[0]))
+                        continue;
+                    if(count($escapedHeader) !== count($columns))
+                        continue;
+
+                    $data= array_combine($escapedHeader, $columns);
+                    $customerGroupName = trim($data['customergroup'] ?? '');
+                    $lims_customer_group_data = CustomerGroup::where('name', $customerGroupName)->first() ?? CustomerGroup::first();
+
+                    $customer = Customer::firstOrNew(['name'=>$data['name']]);
+                    $customer->customer_group_id = $lims_customer_group_data ? $lims_customer_group_data->id : null;
+                    $customer->name = $data['name'];
+                    $customer->company_name = $data['companyname'] ?? null;
+                    $customer->email = $data['email'] ?? null;
+                    $customer->phone_number = $data['phonenumber'] ?? null;
+                    $customer->address = $data['address'] ?? null;
+                    $customer->city = $data['city'] ?? null;
+                    $customer->state = $data['state'] ?? null;
+                    $customer->postal_code = $data['postalcode'] ?? null;
+                    $customer->country = $data['country'] ?? null;
+
+                    $depositAmount = 0;
+                    if (isset($data['deposit'])) {
+                        $dVal = trim((string)$data['deposit']);
+                        if ($dVal === '' || strtolower($dVal) === 'null') {
+                            if (!$customer->exists) {
+                                $customer->deposit = null;
+                            }
+                        } else {
+                            $depositAmount = (float)$dVal;
+                            $customer->deposit = $depositAmount;
+                        }
+                    }
+
+                    if (isset($data['creditlimit'])) {
+                        $cVal = trim((string)$data['creditlimit']);
+                        if ($cVal === '' || strtolower($cVal) === 'null') {
+                            $customer->credit_limit = null;
+                        } else {
+                            $customer->credit_limit = (float)$cVal;
+                        }
+                    }
+                    $customer->is_active = true;
+                    $customer->save();
+
+                    foreach ($lims_discount_plan_data as $dp) {
+                        DiscountPlanCustomer::firstOrCreate([
+                            'discount_plan_id' => $dp->id,
+                            'customer_id' => $customer->id
+                        ]);
+                    }
+
+                    if ($depositAmount > 0) {
+                        $deposit = Deposit::create([
+                            'user_id' => Auth::id() ?? 1,
+                            'customer_id' => $customer->id,
+                            'amount' => $depositAmount,
+                            'deposit_type' => 'opening',
+                            'account_id' => null,
+                            'note' => 'Initial Deposit',
+                        ]);
+
+                        $result = $this->accountingService->recordCustomerOpeningDeposit($deposit);
+                        if (!$result->success) {
+                            throw new \App\Exceptions\SaleValidationException($result->error ?: 'Failed to record opening deposit journal');
+                        }
+                    }
+
+                    $message = $this->mailAction($data, $mail_setting, $request, 'Customer Imported Successfully');
                 }
-               $data= array_combine($escapedHeader, $columns);
-               $lims_customer_group_data = CustomerGroup::where('name', $data['customergroup'])->first();
-               $customer = Customer::firstOrNew(['name'=>$data['name']]);
-               $customer->customer_group_id = $lims_customer_group_data->id;
-               $customer->name = $data['name'];
-               $customer->company_name = $data['companyname'];
-               $customer->email = $data['email'];
-               $customer->phone_number = $data['phonenumber'];
-               $customer->address = $data['address'];
-               $customer->city = $data['city'];
-               $customer->state = $data['state'];
-               $customer->postal_code = $data['postalcode'];
-               $customer->country = $data['country'];
-               $customer->deposit = $data['deposit'];
-               $customer->is_active = true;
-               $customer->save();
 
-               $lims_discount_plan_data = DiscountPlan::where([
-                    'is_active' => true,
-                    'type' => DiscountPlanTypeEnum::GENERIC->value
-                ])->get();
-                foreach ($lims_discount_plan_data as $dp) {
-                    DiscountPlanCustomer::create([
-                        'discount_plan_id' => $dp->id,
-                        'customer_id' => $customer->id
-                    ]);
+                DB::commit();
+            } catch (\Exception $e) {
+                DB::rollBack();
+                if (is_resource($file)) {
+                    fclose($file);
                 }
-
-                if ($customer->deposit > 0) {
-                    Deposit::create([
-                        'user_id' => Auth::id(),
-                        'customer_id' => $customer->id,
-                        'amount' => $customer->deposit,
-                    ]);
-                }
-
-               $message = $this->mailAction($data, $mail_setting, $request, 'Customer Imported Successfully');
-
-            //    $mail_setting = MailSetting::latest()->first();
-            //    if($data['email'] && $mail_setting) {
-            //         $this->setMailInfo($mail_setting);
-            //         try {
-            //             Mail::to($data['email'])->send(new CustomerCreate($data));
-            //         }
-            //         catch(\Exception $e){
-            //             $message = 'Customer imported successfully. Please setup your <a href="setting/mail_setting">mail setting</a> to send mail.';
-            //         }
-            //     }
-
+                \Log::error('Customer import failed: ' . $e->getMessage());
+                $cleanMsg = mb_scrub($e->getMessage(), 'UTF-8');
+                return redirect()->back()->with('not_permitted', 'Customer import failed: ' . $cleanMsg);
             }
+
+            if (is_resource($file)) {
+                fclose($file);
+            }
+
             $this->cacheForget('customer_list');
             return redirect('customer')->with('import_message', $message);
         }
@@ -1019,6 +1186,7 @@ class CustomerController extends Controller
             $date[] = $deposit->created_at->toDateString() . ' '. $deposit->created_at->toTimeString();
             $amount[] = $deposit->amount;
             $note[] = $deposit->note;
+            $warehouse_id[] = $deposit->warehouse_id;
             $lims_user_data = User::find($deposit->user_id);
             $name[] = $lims_user_data->name;
             $email[] = $lims_user_data->email;
@@ -1030,60 +1198,213 @@ class CustomerController extends Controller
             $deposits[] = $note;
             $deposits[] = $name;
             $deposits[] = $email;
+            $deposits[] = $warehouse_id;
         }
         return $deposits;
     }
 
     public function addDeposit(Request $request)
     {
-        $data = $request->all();
-        $data['user_id'] = Auth::id();
-        $lims_customer_data = Customer::find($data['customer_id']);
-        $lims_customer_data->deposit += $data['amount'];
-        $lims_customer_data->save();
-        Deposit::create($data);
-        $message = 'Data inserted successfully';
-        $mail_setting = MailSetting::latest()->first();
-
-        if($lims_customer_data->email && $mail_setting) {
-            $data['name'] = $lims_customer_data->name;
-            $data['email'] = $lims_customer_data->email;
-            $data['balance'] = $lims_customer_data->deposit - $lims_customer_data->expense;
-            $data['currency'] = config('currency');
-            $message = $this->mailAction($data, $mail_setting, $request);
-
-            // $this->setMailInfo($mail_setting);
-            // try {
-            //     Mail::to($data['email'])->send(new CustomerDeposit($data));
-            // }
-            // catch(\Exception $e){
-            //     $message = 'Data inserted successfully. Please setup your <a href="setting/mail_setting">mail setting</a> to send mail.';
-            // }
+        $role = Role::find(Auth::user()->role_id);
+        if (!$role || !$role->hasPermissionTo('customers-edit')) {
+            return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
         }
-        return redirect('customer')->with('create_message', $message);
+
+        $originalRequestedWarehouse = $request->attributes->get('requested_warehouse_id');
+        if ((int) $originalRequestedWarehouse > 0) {
+            $this->warehouseAccess->authorizeWarehouse((int) $originalRequestedWarehouse);
+        }
+
+        $request->merge([
+            'warehouse_id' => $request->input('warehouse_id') ?: Auth::user()?->warehouse_id,
+            'request_token' => $request->input('request_token') ?: (string) \Illuminate\Support\Str::uuid(),
+        ]);
+
+        $validated = $request->validate([
+            'customer_id' => 'required|integer|exists:customers,id',
+            'amount' => 'required|numeric|min:0.0001',
+            'account_id' => 'required|integer|exists:accounts,id',
+            'warehouse_id' => ['required', 'integer', Rule::exists('warehouses', 'id')->where('is_active', true)],
+            'request_token' => 'required|uuid',
+            'note' => 'nullable|string',
+        ]);
+
+        $this->warehouseAccess->authorizeWarehouse((int) $validated['warehouse_id']);
+
+        $this->paymentAccounts->assertValidDepositReceivingAccountId((int) $validated['account_id']);
+
+        try {
+            return DB::transaction(function () use ($validated, $request) {
+                $existing = Deposit::where('request_token', $validated['request_token'])->first();
+                if ($existing) {
+                    abort_unless((int) $existing->customer_id === (int) $validated['customer_id'], 409, 'Deposit request token conflict.');
+                    return redirect('customer')->with('create_message', __('db.Data inserted successfully'));
+                }
+
+                $customer = $this->customerDeposits->addGross((int) $validated['customer_id'], $validated['amount']);
+
+                $deposit = Deposit::create([
+                    'user_id' => Auth::id() ?? 1,
+                    'customer_id' => $customer->id,
+                    'amount' => $validated['amount'],
+                    'warehouse_id' => (int) $validated['warehouse_id'],
+                    'request_token' => $validated['request_token'],
+                    'deposit_type' => 'live',
+                    'account_id' => $validated['account_id'],
+                    'note' => $validated['note'] ?? null,
+                ]);
+
+                $result = $this->accountingService->recordDeposit($deposit, 'deposit_created');
+                if (!$result->success) {
+                    \Log::error('Accounting failed for Deposit', ['deposit_id' => $deposit->id, 'error' => $result->error]);
+                    throw new \App\Exceptions\SaleValidationException($result->error ?: __('db.customer_deposit_payment_failed'));
+                }
+
+                $message = __('db.Data inserted successfully');
+                $mail_setting = MailSetting::latest()->first();
+
+                if ($customer->email && $mail_setting) {
+                    $data = $validated;
+                    $data['name'] = $customer->name;
+                    $data['email'] = $customer->email;
+                    $data['balance'] = bcsub((string) $customer->deposit, (string) $customer->expense, 4);
+                    $data['currency'] = config('currency');
+                    $message = $this->mailAction($data, $mail_setting, $request);
+                }
+
+                return redirect('customer')->with('create_message', $message);
+            });
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $exception) {
+            $duplicate = Deposit::where('request_token', $validated['request_token'])
+                ->where('customer_id', $validated['customer_id'])->exists();
+            if ($duplicate) {
+                return redirect('customer')->with('create_message', __('db.Data inserted successfully'));
+            }
+
+            throw $exception;
+        }
     }
 
     public function updateDeposit(Request $request)
     {
-        $data = $request->all();
-        $lims_deposit_data = Deposit::find($data['deposit_id']);
-        $lims_customer_data = Customer::find($lims_deposit_data->customer_id);
-        $amount_dif = $data['amount'] - $lims_deposit_data->amount;
-        $lims_customer_data->deposit += $amount_dif;
-        $lims_customer_data->save();
-        $lims_deposit_data->update($data);
-        return redirect('customer')->with('create_message', __('db.Data updated successfully'));
+        $role = Role::find(Auth::user()->role_id);
+        if (!$role || !$role->hasPermissionTo('customers-edit')) {
+            return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
+        }
+
+        $originalRequestedWarehouse = $request->attributes->get('requested_warehouse_id');
+        if ((int) $originalRequestedWarehouse > 0) {
+            $this->warehouseAccess->authorizeWarehouse((int) $originalRequestedWarehouse);
+        }
+
+        $validated = $request->validate([
+            'deposit_id' => 'required|integer|exists:deposits,id',
+            'amount' => 'required|numeric|min:0.0001',
+            'account_id' => 'nullable|integer',
+            'warehouse_id' => ['nullable', 'integer', Rule::exists('warehouses', 'id')->where('is_active', true)],
+            'note' => 'nullable|string',
+        ]);
+
+        return DB::transaction(function () use ($validated) {
+            $deposit = Deposit::findOrFail($validated['deposit_id']);
+            $isDoubleEntry = app(\App\Services\AccountingModeService::class)->isDoubleEntryAuthoritative();
+
+            if ($isDoubleEntry && $deposit->deposit_type === null) {
+                throw new \App\Exceptions\SaleValidationException(__('db.historical_unclassified_deposit_cannot_be_edited_without_remediation'));
+            }
+
+            $oldAmount = $deposit->amount;
+            $newAmount = $validated['amount'];
+            $customerId = (int) $deposit->customer_id;
+
+            // Enforce gross-versus-consumed invariant under lock
+            $this->customerDeposits->updateGross($customerId, $oldAmount, $newAmount);
+
+            $deposit->amount = $newAmount;
+            $deposit->note = $validated['note'] ?? null;
+
+            if ($deposit->deposit_type === 'live') {
+                if (empty($validated['account_id'])) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'account_id' => __('db.Account is required!'),
+                    ]);
+                }
+                $this->paymentAccounts->assertValidDepositReceivingAccountId((int) $validated['account_id']);
+                $warehouseId = (int) ($validated['warehouse_id'] ?? $deposit->warehouse_id);
+                $this->warehouseAccess->authorizeWarehouse($warehouseId);
+                if (!$warehouseId) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'warehouse_id' => __('db.Warehouse is required!'),
+                    ]);
+                }
+                $deposit->account_id = (int) $validated['account_id'];
+                $deposit->warehouse_id = $warehouseId;
+                $deposit->save();
+
+                $revResult = $this->accountingService->reverseTransaction(get_class($deposit), $deposit->id, '_reversed');
+                if (!$revResult->success) {
+                    throw new \App\Exceptions\SaleValidationException($revResult->error ?: __('db.customer_deposit_payment_failed'));
+                }
+
+                $postResult = $this->accountingService->recordDeposit($deposit, 'deposit_updated');
+                if (!$postResult->success) {
+                    throw new \App\Exceptions\SaleValidationException($postResult->error ?: __('db.customer_deposit_payment_failed'));
+                }
+            } elseif ($deposit->deposit_type === 'opening') {
+                $deposit->account_id = null;
+                $deposit->save();
+
+                $revResult = $this->accountingService->reverseTransaction(get_class($deposit), $deposit->id, '_reversed');
+                if (!$revResult->success) {
+                    throw new \App\Exceptions\SaleValidationException($revResult->error ?: __('db.customer_deposit_payment_failed'));
+                }
+
+                $postResult = $this->accountingService->recordCustomerOpeningDeposit($deposit, 'customer_opening_deposit_updated');
+                if (!$postResult->success) {
+                    throw new \App\Exceptions\SaleValidationException($postResult->error ?: __('db.customer_deposit_payment_failed'));
+                }
+            } else {
+                // Legacy mode with unclassified deposit
+                $deposit->save();
+            }
+
+            return redirect('customer')->with('create_message', __('db.Data updated successfully'));
+        });
     }
 
     public function deleteDeposit(Request $request)
     {
-        $data = $request->all();
-        $lims_deposit_data = Deposit::find($data['id']);
-        $lims_customer_data = Customer::find($lims_deposit_data->customer_id);
-        $lims_customer_data->deposit -= $lims_deposit_data->amount;
-        $lims_customer_data->save();
-        $lims_deposit_data->delete();
-        return redirect('customer')->with('not_permitted', __('db.Data deleted successfully'));
+        $role = Role::find(Auth::user()->role_id);
+        if (!$role || !$role->hasPermissionTo('customers-delete')) {
+            return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
+        }
+
+        $validated = $request->validate([
+            'id' => 'required|integer|exists:deposits,id',
+        ]);
+
+        return DB::transaction(function () use ($validated) {
+            $deposit = Deposit::findOrFail($validated['id']);
+            $isDoubleEntry = app(\App\Services\AccountingModeService::class)->isDoubleEntryAuthoritative();
+
+            if ($isDoubleEntry && $deposit->deposit_type === null) {
+                throw new \App\Exceptions\SaleValidationException(__('db.historical_unclassified_deposit_cannot_be_deleted_without_remediation'));
+            }
+
+            // Enforce gross-versus-consumed invariant under lock
+            $this->customerDeposits->removeGross((int) $deposit->customer_id, $deposit->amount);
+
+            if ($deposit->deposit_type === 'live' || $deposit->deposit_type === 'opening') {
+                $revResult = $this->accountingService->reverseTransaction(get_class($deposit), $deposit->id, '_deleted');
+                if (!$revResult->success) {
+                    throw new \App\Exceptions\SaleValidationException($revResult->error ?: __('db.customer_deposit_payment_failed'));
+                }
+            }
+
+            $deposit->delete();
+
+            return redirect('customer')->with('not_permitted', __('db.Data deleted successfully'));
+        });
     }
 
     public function addPoint(Request $request)
@@ -1100,7 +1421,7 @@ class CustomerController extends Controller
                 $lims_customer_data = Customer::query()->findOrFail($request->customer_id);
                 $lims_customer_data->update(['points' => $point->points + ($lims_customer_data->points ?? 0)]);
             DB::commit();
-            $message = 'Data inserted successfully';
+            $message = __('db.Data inserted successfully');
             return redirect('customer')->with('create_message', $message);
         }catch(\Throwable $e){
             DB::rollBack();
@@ -1156,7 +1477,7 @@ class CustomerController extends Controller
                 }
                 $point->save();
             DB::commit();
-            $message = 'Data inserted successfully';
+            $message = __('db.Data inserted successfully');
             return redirect('customer')->with('create_message', $message);
         }catch(\Throwable $e){
             DB::rollBack();
@@ -1175,8 +1496,8 @@ class CustomerController extends Controller
                 $lims_customer_data->save();
                 $point->delete();
             DB::commit();
-            $message = 'Data inserted successfully';
-            return redirect('customer')->with('not_permitted', __('db.Data deleted successfully'));
+            $message = __('db.Data deleted successfully');
+            return redirect('customer')->with('not_permitted', $message);
         }catch(\Throwable $e){
             DB::rollBack();
             return redirect()->back()->with('error','Error Deleting Points');
@@ -1209,6 +1530,9 @@ class CustomerController extends Controller
 
     public function destroy($id)
     {
+        try {
+        DB::beginTransaction();
+
         $lims_customer_data = Customer::find($id);
 
         $lims_discount_plan_data = DiscountPlan::where([
@@ -1225,14 +1549,22 @@ class CustomerController extends Controller
         $lims_customer_data->is_active = false;
         $lims_customer_data->save();
         $this->cacheForget('customer_list');
+
+        DB::commit();
         return redirect('customer')->with('not_permitted', __('db.Data deleted successfully'));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Customer deletion failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Customer deletion failed: ' . $e->getMessage());
+        }
     }
 
     protected function mailAction($data, $mailSetting, $request, $customMessage=null)
     {
-        $message = $customMessage ?? 'Data inserted successfully';
+        $message = $customMessage ?? __('db.Data inserted successfully');
         if(!$mailSetting) {
-            $message = 'Data inserted successfully. Please setup your <a href="setting/mail_setting">mail setting</a> to send mail.';
+            $message = __('db.Data inserted successfully. Please setup your <a href="setting/mail_setting">mail setting</a> to send mail.');
         }
         else if($data['email'] && $mailSetting) {
             try{
@@ -1268,6 +1600,10 @@ class CustomerController extends Controller
             ->where('sales.customer_id', $customer_id)
             ->whereNull('return_id')
             ->whereNull('sales.deleted_at')
+            ->where(function ($q) {
+                $q->whereNull('payments.accounting_status')
+                  ->orWhereNotIn('payments.accounting_status', ['reversed', 'voided']);
+            })
             ->select(
                 'payments.id',
                 'payments.created_at',
@@ -1276,8 +1612,9 @@ class CustomerController extends Controller
                 'payments.paying_method',
                 'payments.payment_at'
             )
-            ->latest('payments.created_at')
-            ->get()
+            ->latest('payments.created_at');
+        app(\App\Services\WarehouseAccessService::class)->scope($payments, 'sales.warehouse_id');
+        $payments = $payments->get()
             ->map(function ($payment) {
                 return [
                     'id' => $payment->id,
@@ -1294,20 +1631,49 @@ class CustomerController extends Controller
         return response()->json(['data' => $payments]);
     }
 
+    public function customerReturns($id)
+    {
+        $returns = Returns::leftJoin('sales', 'returns.sale_id', '=', 'sales.id')
+            ->leftJoin('warehouses', 'returns.warehouse_id', '=', 'warehouses.id')
+            ->leftJoin(DB::raw('(select return_id, sum(amount) as refunded_amount from payments where return_id is not null and sale_id is not null group by return_id) as sale_return_refunds'), 'sale_return_refunds.return_id', '=', 'returns.id')
+            ->where('returns.customer_id', $id)
+            ->select(
+                'returns.id',
+                'returns.created_at',
+                'returns.reference_no',
+                'returns.item',
+                'returns.total_qty',
+                DB::raw('COALESCE(sale_return_refunds.refunded_amount, returns.grand_total) as grand_total'),
+                'returns.return_note',
+                'returns.staff_note',
+                'sales.reference_no as sale_reference',
+                'warehouses.name as warehouse_name'
+            )
+            ->latest('returns.created_at')
+            ->get()
+            ->map(function ($return) {
+                return [
+                    'id' => $return->id,
+                    'date' => $return->created_at ? date(config('date_format'), strtotime($return->created_at)) : '-',
+                    'reference' => $return->reference_no ?? '-',
+                    'sale_reference' => $return->sale_reference ?? '-',
+                    'warehouse' => $return->warehouse_name ?? '-',
+                    'item' => number_format($return->item ?? 0, 0),
+                    'total_qty' => number_format($return->total_qty ?? 0, cache()->get('general_setting')->decimal),
+                    'grand_total' => number_format($return->grand_total ?? 0, cache()->get('general_setting')->decimal),
+                    'return_note' => $return->return_note ?: '-',
+                    'staff_note' => $return->staff_note ?: '-',
+                ];
+            });
+
+        return response()->json(['data' => $returns]);
+    }
+
     public function getCustomerDue($id)
     {
-        $customer = Customer::findOrFail($id);
+        $creditService = app(\App\Services\CustomerCreditService::class);
+        $due = $creditService->calculateCustomerDue($id);
 
-        $total_sales = Sale::where('customer_id', $id)
-            ->where('payment_status', '!=', 4)
-            ->whereNull('deleted_at')
-            ->sum('grand_total');
-
-        $total_paid = Payment::join('sales', 'sales.id', '=', 'payments.sale_id')
-            ->where('sales.customer_id', $id)
-            ->whereNull('sales.deleted_at')
-            ->sum('payments.amount');
-
-        return response()->json($total_sales - $total_paid);
+        return response()->json($due);
     }
 }

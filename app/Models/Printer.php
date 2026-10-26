@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Printer extends Model
 {
+    use \App\Traits\WarehouseScoped;
+
     /**
      * The attributes that aren't mass assignable.
      *
@@ -57,4 +59,3 @@ class Printer extends Model
     }
 
 }
-

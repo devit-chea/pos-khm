@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <x-success-message key="message" />
 <x-error-message key="not_permitted" />
@@ -6,10 +10,10 @@
 <section>
     <div class="container-fluid">
         @can('suppliers-add')
-            <a href="{{route('supplier.create')}}" class="btn btn-info"><i class="dripicons-plus"></i> {{__('db.Add Supplier')}}</a>
+            <a href="{{route('supplier.create')}}" class="btn btn-info"><i class="ti ti-plus"></i> {{__('db.Add Supplier')}}</a>
         @endcan
         @can('suppliers-import')
-            <a href="#" data-toggle="modal" data-target="#importSupplier" class="btn btn-primary"><i class="dripicons-copy"></i> {{__('db.Import Supplier')}}</a>
+            <a href="#" data-toggle="modal" data-target="#importSupplier" class="btn btn-primary"><i class="ti ti-copy"></i> {{__('db.Import Supplier')}}</a>
         @endcan
     </div>
     <div class="table-responsive">
@@ -25,38 +29,7 @@
             </thead>
             <tbody>
                 @foreach($lims_supplier_all as $key => $supplier)
-                <?php
-                    $opening_balance = $supplier->opening_balance ?? 0;
-                    $total_paid = 0;
-                    $total_purchases = 0;
-                    $total_returns = 0;
-                    $total_purchases = App\Models\Purchase::select('id', 'grand_total')
-                                    ->where('supplier_id', $supplier->id)
-                                    ->where(function ($q) {
-                                        $q->where('purchases.purchase_type', '!=', 'opening balance')
-                                        ->orWhereNull('purchases.purchase_type');
-                                    })
-                                    ->whereNull('deleted_at')
-                                    ->sum('grand_total');
-
-                    if($total_purchases == 0) {
-                        $total_paid = App\Models\Payment::join('purchases', 'purchases.id', '=', 'payments.purchase_id')
-                            ->where('purchases.supplier_id', $supplier->id)
-                            ->whereNull('purchases.deleted_at')
-                            ->sum('payments.amount');
-
-                        $balance_due = $opening_balance - $total_paid;
-                    } else {
-                        $total_paid = App\Models\Payment::join('purchases', 'purchases.id', '=', 'payments.purchase_id')
-                            ->where('purchases.supplier_id', $supplier->id)
-                            ->whereNull('purchases.deleted_at')
-                            ->sum('payments.amount');
-
-                        $total_returns = App\Models\ReturnPurchase::where('supplier_id', $supplier->id)->sum('grand_total');
-
-                        $balance_due = $opening_balance + $total_purchases - $total_returns - $total_paid;
-                    }
-                ?>
+                @php($balance_due = (float) $supplier->authorized_due)
                 <tr data-id="{{$supplier->id}}">
                     <td>{{$key}}</td>
                     @if($supplier->image)
@@ -89,13 +62,13 @@
                                 @if(in_array("suppliers-index", $all_permission))
                                     <li>
                                         <a href="{{ route('supplier.show', $supplier->id) }}" class="btn btn-link">
-                                            <i class="dripicons-preview"></i> {{ __('db.Supplier Details') }}
+                                            <i class="ti ti-eye"></i> {{ __('db.Supplier Details') }}
                                         </a>
                                     </li>
                                 @endif
                                 @if(in_array("suppliers-edit", $all_permission))
                                 <li>
-                                	<a href="{{ route('supplier.edit', $supplier->id) }}" class="btn btn-link"><i class="dripicons-document-edit"></i> {{__('db.edit')}}</a>
+                                	<a href="{{ route('supplier.edit', $supplier->id) }}" class="btn btn-link"><i class="ti ti-edit"></i> {{__('db.edit')}}</a>
                                 </li>
                                 @endif
                                 @if(in_array("supplier-due-report", $all_permission))
@@ -105,31 +78,25 @@
                                         <input type="hidden" name="start_date" value="{{date('Y-m-d', strtotime('-30 year'))}}" />
                                         <input type="hidden" name="end_date" value="{{date('Y-m-d')}}" />
                                         <input type="hidden" name="supplier_id" value="{{$supplier->id}}" />
-                                        <button type="submit" class="btn btn-link"><i class="dripicons-pulse"></i> {{__('db.Supplier Due Report')}}</button>
+                                        <button type="submit" class="btn btn-link"><i class="ti ti-receipt-2"></i> {{__('db.Supplier Due Report')}}</button>
                                     </form>
                                 </li>
                                 @endif
+                                @if(in_array("suppliers-edit", $all_permission))
                                 <li>
-                                    <button type="button" data-id="{{$supplier->id}}" class="clear-due btn btn-link" data-toggle="modal" data-target="#clearDueModal" ><i class="dripicons-brush"></i> {{__('db.Clear Due')}}</button>
+                                    <button type="button" data-id="{{$supplier->id}}" data-due="{{number_format($balance_due, 2, '.', '')}}" class="clear-due btn btn-link" data-toggle="modal" data-target="#clearDueModal" ><i class="ti ti-brush"></i> {{__('db.Clear Due')}}</button>
                                 </li>
+                                @endif
                                 <li class="divider"></li>
-                                @php
-                                    $settings = \App\Models\WhatsappSetting::first();
-                                    $phone = preg_replace('/\D/', '', $supplier->wa_number ?? '');
-
-                                    if (!$settings || empty($settings->phone_number_id) || empty($settings->permanent_access_token)) {
-                                        $href = "https://web.whatsapp.com/send/?phone={$phone}";
-                                    } else {
-                                        $href = route('whatsapp.send.page', [
-                                            'group' => 'Suppliers',
-                                            'phone' => $phone
-                                        ]);
-                                    }
-                                @endphp
+                                @php($settings = \App\Models\WhatsappSetting::first())
+                                @php($phone = preg_replace('/\D/', '', $supplier->wa_number ?? ''))
+                                @php($href = !$settings || empty($settings->phone_number_id) || empty($settings->permanent_access_token)
+                                    ? "https://web.whatsapp.com/send/?phone={$phone}"
+                                    : route('whatsapp.send.page', ['group' => 'Suppliers', 'phone' => $phone]))
                                 @if($phone)
                                 <li>
                                     <a href="{{ $href }}" class="btn btn-link">
-                                        <i class="fa fa-whatsapp"></i> {{ __('db.Whatsapp Notification') }}
+                                        <i class="ti ti-brand-whatsapp"></i> {{ __('db.Whatsapp Notification') }}
                                     </a>
                                 </li>
                                 @endif
@@ -139,7 +106,7 @@
                                     @csrf
                                     @method('DELETE')
                                     <li>
-                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> {{__('db.delete')}}</button>
+                                        <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> {{__('db.delete')}}</button>
                                     </li>
                                 </form>
                                 @endif
@@ -156,24 +123,47 @@
 <div id="clearDueModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" class="modal fade text-left">
     <div role="document" class="modal-dialog">
       <div class="modal-content">
-        <form action="{{ route('supplier.clearDue') }}" method="POST">
+        <form action="{{ route('supplier.clearDue') }}" method="POST" id="supplier-clear-due-form">
           @csrf
           <div class="modal-header">
             <h5 id="exampleModalLabel" class="modal-title">{{__('db.Clear Due')}}</h5>
-            <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+            <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
           </div>
           <div class="modal-body">
           <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
             <div class="form-group">
                 <input type="hidden" name="supplier_id">
                 <label>{{__('db.Amount')}} *</label>
-                <input type="number" name="amount" step="any" class="form-control" required>
+                <input type="number" name="amount" step="any" min="0.01" class="form-control" required>
             </div>
             <div class="form-group">
-                <label>{{__('db.Note')}}</label>
+                <label>{{__('db.Payment Method')}} *</label>
+                <select name="paid_by_id" class="form-control">
+                    <option value="Cash">{{__('db.Cash')}}</option>
+                    <option value="Bank">{{__('db.Bank')}}</option>
+                    <option value="Cheque">{{__('db.Cheque')}}</option>
+                </select>
+            </div>
+            <div class="form-group" id="supplier-cheque-field" style="display:none">
+                <label>{{__('db.Cheque Number')}} *</label>
+                <input type="text" name="cheque_no" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>{{__('db.Pay From Account')}} *</label>
+                <select name="account_id" class="form-control selectpicker" data-live-search="true" title="{{__('db.select_account')}}" required>
+                    @foreach($lims_account_list as $account)
+                        <option value="{{$account->id}}" @if($account->is_default) selected @endif>{{$account->name}} @if($account->account_no)({{$account->account_no}})@endif</option>
+                    @endforeach
+                </select>
+                @if($lims_account_list->isEmpty())
+                    <small class="text-danger">{{ __('db.supplier_payment_account_configuration_required') }}</small>
+                @endif
+            </div>
+            <div class="form-group">
+                <label>{{__('db.note')}}</label>
                 <textarea name="note" rows="4" class="form-control"></textarea>
             </div>
-            <input type="submit" value="{{__('db.submit')}}" class="btn btn-primary" id="submit-button">
+            <input type="submit" value="{{__('db.submit')}}" class="btn btn-primary" id="supplier-clear-due-submit" @disabled($lims_account_list->isEmpty())>
         </div>
         </form>
       </div>
@@ -187,7 +177,7 @@
             @csrf
 	    <div class="modal-header">
 	      <h5 id="exampleModalLabel" class="modal-title">{{__('db.Import Supplier')}}</h5>
-	      <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+	      <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
 	    </div>
 	    <div class="modal-body">
 	      <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -203,7 +193,7 @@
                 <div class="col-md-6">
                     <div class="form-group">
                         <label> {{__('db.Sample File')}}</label>
-                        <a href="sample_file/sample_supplier.csv" class="btn btn-info btn-block btn-md"><i class="dripicons-download"></i> {{__('db.Download')}}</a>
+                        <a href="sample_file/sample_supplier.csv" class="btn btn-info btn-block btn-md"><i class="ti ti-download"></i> {{__('db.Download')}}</a>
                     </div>
                 </div>
             </div>
@@ -217,6 +207,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $("ul#people").siblings('a').attr('aria-expanded','true');
@@ -225,7 +216,7 @@
 
     var all_permission = <?php echo json_encode($all_permission) ?>;
     var supplier_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
     $.ajaxSetup({
         headers: {
@@ -233,17 +224,79 @@
         }
     });
 
-    $(".clear-due").on("click", function() {
+    var supplierPaymentAccountsAvailable = @json($lims_account_list->isNotEmpty());
+
+    $(".clear-due").on("click", function(event) {
+        if (!supplierPaymentAccountsAvailable) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            SaleProToast.error(@json(__('db.supplier_payment_account_configuration_required')));
+            return false;
+        }
+
         var id = $(this).data('id').toString();
+        var due = parseFloat($(this).data('due')) || 0;
         $("#clearDueModal input[name='supplier_id']").val(id);
+        $("#clearDueModal input[name='amount']")
+            .attr('max', due.toFixed({{gen_setting()->decimal}}))
+            .val(due.toFixed({{gen_setting()->decimal}}));
+        $("#clearDueModal select[name='paid_by_id']").val('Cash');
+        $("#supplier-cheque-field").hide();
+        $("#supplier-cheque-field input[name='cheque_no']").prop('required', false).val('');
+
+        $.get(@json(url('supplier-due')) + '/' + id)
+            .done(function(data) {
+                if (data && data.length) {
+                    var latestDue = parseFloat(data[0]) || 0;
+                    $("#clearDueModal input[name='amount']")
+                        .attr('max', latestDue.toFixed({{gen_setting()->decimal}}))
+                        .val(latestDue.toFixed({{gen_setting()->decimal}}));
+                }
+            })
+            .fail(function() {
+                $('#clearDueModal').modal('hide');
+                SaleProToast.error(@json(__('db.supplier_payment_due_refresh_failed')));
+            });
     });
 
-	function confirmDelete() {
-	    if (confirm("Are you sure want to delete?")) {
-	        return true;
-	    }
-	    return false;
-	}
+    $("#clearDueModal select[name='paid_by_id']").on("change", function() {
+        if ($(this).val() === 'Cheque') {
+            $("#supplier-cheque-field").show();
+            $("#supplier-cheque-field input[name='cheque_no']").prop('required', true);
+        } else {
+            $("#supplier-cheque-field").hide();
+            $("#supplier-cheque-field input[name='cheque_no']").prop('required', false).val('');
+        }
+    });
+
+    $('#supplier-clear-due-form').on('submit', function(event) {
+        var amountField = this.elements.amount;
+        var amount = Number(amountField.value);
+        var maximum = Number(amountField.max);
+        var accountId = this.elements.account_id.value;
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+            event.preventDefault();
+            SaleProToast.error(@json(__('db.supplier_payment_amount_positive')));
+            amountField.focus();
+            return;
+        }
+
+        if (Number.isFinite(maximum) && amount > maximum) {
+            event.preventDefault();
+            SaleProToast.error(@json(__('db.supplier_payment_exceeds_due_short')));
+            amountField.focus();
+            return;
+        }
+
+        if (!accountId) {
+            event.preventDefault();
+            SaleProToast.error(@json(__('db.supplier_payment_account_configuration_required')));
+            $(this.elements.account_id).closest('.bootstrap-select').find('button').trigger('focus');
+        }
+    });
+
+	function confirmDelete() { return true; }
 
     $('#supplier-table').DataTable( {
         "order": [],
@@ -252,8 +305,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -274,7 +327,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -303,7 +356,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -320,7 +373,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -337,7 +390,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -345,7 +398,7 @@
                 },
             },
             {
-                text: '<i title="delete" class="dripicons-cross"></i>',
+                text: '<i title="delete" class="ti ti-x"></i>',
                 className: 'buttons-delete',
                 action: function ( e, dt, node, config ) {
                     if(user_verified == '1') {
@@ -355,7 +408,7 @@
                                 supplier_id[i-1] = $(this).closest('tr').data('id');
                             }
                         });
-                        if(supplier_id.length && confirm("Are you sure want to delete?")) {
+                        if (supplier_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                             $.ajax({
                                 type:'POST',
                                 url:'supplier/deletebyselection',
@@ -368,21 +421,23 @@
                                                  dt.row($(this).closest('tr')).remove().draw(false);
                                             }
                                         });
-                                        alert(data);
+                                        SaleProToast.show(data);
                                 }
                             });
                             // dt.rows({ page: 'current', selected: true }).remove().draw(false);
                         }
+                        });
+                        }
                         else if(!supplier_id.length)
-                            alert('No supplier is selected!');
+                            SaleProToast.show('No supplier is selected!');
                     }
                     else
-                        alert('This feature is disable for demo!');
+                        SaleProToast.show('This feature is disable for demo!');
                 }
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],

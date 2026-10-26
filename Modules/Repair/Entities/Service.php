@@ -8,6 +8,8 @@ use App\Models\Warehouse;
 
 class ServiceJob extends Model
 {
+    use \App\Traits\WarehouseScoped;
+
     protected $table = 'service_jobs';
 
     protected $fillable = [

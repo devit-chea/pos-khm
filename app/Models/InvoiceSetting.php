@@ -45,6 +45,7 @@ class InvoiceSetting extends Model
         'secondary_color',
         'size',
         'invoice_date_format',
+        'extra',
         'created_by',
         'updated_by',
     ];
@@ -52,10 +53,14 @@ class InvoiceSetting extends Model
     protected static function boot(){
         parent::boot();
         static::creating(function ($query){
-            $query->created_by = auth()->user()->id;
+            if (auth()->check()) {
+                $query->created_by = auth()->user()->id;
+            }
         });
         static::updating(function ($query){
-            $query->updated_by = auth()->user()->id;
+            if (auth()->check()) {
+                $query->updated_by = auth()->user()->id;
+            }
         });
     }
 
@@ -65,5 +70,59 @@ class InvoiceSetting extends Model
             $settings = self::where('is_default',1)->first();
         }
         return $settings;
+    }
+
+    public function getExtraData(): array
+    {
+        if (empty($this->extra)) {
+            return [];
+        }
+        if (is_array($this->extra)) {
+            return $this->extra;
+        }
+        $decoded = json_decode($this->extra, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    public function hasSignaturesEnabled(): bool
+    {
+        $extra = $this->getExtraData();
+        return !empty($extra['enable_invoice_signatures']);
+    }
+
+    public function showPreparedBy(): bool
+    {
+        $extra = $this->getExtraData();
+        return isset($extra['show_prepared_by']) ? (bool)$extra['show_prepared_by'] : true;
+    }
+
+    public function showAuthorizedBy(): bool
+    {
+        $extra = $this->getExtraData();
+        return isset($extra['show_authorized_by']) ? (bool)$extra['show_authorized_by'] : true;
+    }
+
+    public function showCustomerSignature(): bool
+    {
+        $extra = $this->getExtraData();
+        return isset($extra['show_customer_signature']) ? (bool)$extra['show_customer_signature'] : true;
+    }
+
+    public function getPreparedByLabel(): string
+    {
+        $extra = $this->getExtraData();
+        return !empty($extra['prepared_by_label']) ? (string)$extra['prepared_by_label'] : __('db.Prepared By');
+    }
+
+    public function getAuthorizedByLabel(): string
+    {
+        $extra = $this->getExtraData();
+        return !empty($extra['authorized_by_label']) ? (string)$extra['authorized_by_label'] : __('db.Authorized By');
+    }
+
+    public function getCustomerSignatureLabel(): string
+    {
+        $extra = $this->getExtraData();
+        return !empty($extra['customer_signature_label']) ? (string)$extra['customer_signature_label'] : __('db.Customer Signature');
     }
 }

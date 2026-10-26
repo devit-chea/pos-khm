@@ -13,7 +13,7 @@
                             <p class="italic">
                                 <small>{{ __('db.The field labels marked with are required input fields') }}.</small>
                             </p>
-                            <form action="{{ route('return-sale.update', $lims_return_data->id) }}" method="post" enctype="multipart/form-data" id="payment-form">
+                            <form class="sale-return-form" action="{{ route('return-sale.update', $lims_return_data->id) }}" method="post" enctype="multipart/form-data" id="payment-form">
                                 @csrf
                                 @method('PUT')
                             <div class="row">
@@ -43,41 +43,53 @@
                                                 <table id="myTable" class="table table-hover order-list">
                                                     <thead>
                                                         <tr>
+                                                            <th class="text-center align-middle">
+                                                                <div class="form-check m-0 d-inline-flex align-items-center">
+                                                                    <input type="checkbox" class="form-check-input position-static m-0" id="select-all-return-lines"
+                                                                        aria-label="{{ __('db.Select All') }}" checked>
+                                                                    <label class="sr-only" for="select-all-return-lines">{{ __('db.Select All') }}</label>
+                                                                </div>
+                                                                <span class="ml-1">{{ __('db.Return') }}</span>
+                                                            </th>
                                                             <th>{{ __('db.name') }}</th>
                                                             <th>{{ __('db.Code') }}</th>
                                                             <th>{{ __('db.Batch No') }}</th>
-                                                            <th>{{ __('db.Sale Quantity') }}  <x-info title="Actual Sale Quantity"/> </th>
-                                                            <th>{{ __('db.Return Quantity') }}  <x-info title="Current Return Quantity"/> </th>
+                                                            <th>{{ __('db.sale qty') }}  <x-info title="Actual Sale Quantity"/> </th>
+                                                            <th>{{ __('db.return_quantity') }}  <x-info title="Current Return Quantity"/> </th>
                                                             <th>{{ __('db.Net Unit Price') }}  <x-info title="Product Price - Unit Discount = Unit Price"/> </th>
                                                             <th>{{ __('db.Discount') }} <x-info title="Total unit discount / Total Qty = Unit Dicount"/> </th>
                                                             <th>{{ __('db.Tax') }}</th>
                                                             <th>{{ __('db.Subtotal') }} <x-info title="Qty * Unit Price = SubTotal"/> </th>
-                                                            <th><i class="dripicons-trash"></i></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         @foreach ($lims_product_return_data as $key => $product_return)
-                                                            <tr>
+                                                            <tr class="return-line table-active">
                                                                 <?php
                                                                 $product_data = DB::table('products')->find($product_return->product_id);
 
                                                                 // Handle variant
                                                                 if ($product_return->variant_id) {
                                                                     $product_variant_data = \App\Models\ProductVariant::select('id', 'item_code')->FindExactProduct($product_data->id, $product_return->variant_id)->first();
-                                                                    $product_variant_id = $product_variant_data->id;
-                                                                    $product_data->code = $product_variant_data->item_code;
+                                                                    if ($product_variant_data) {
+                                                                        $product_variant_id = $product_variant_data->id;
+                                                                        $product_data->code = $product_variant_data->item_code;
+                                                                    } else {
+                                                                        $product_variant_id = null;
+                                                                        $product_data->code = $product_data->code ?? 'N/A';
+                                                                    }
                                                                 } else {
                                                                     $product_variant_id = null;
                                                                 }
 
-                                                                // Avoid division by zero
-                                                                $qty = $product_return->qty > 0 ? $product_return->qty : 1; // Use 1 temporarily for safe calculation
+                                                                $qty = (float) $product_return->qty;
+                                                                $hasValidQuantity = $qty > 0;
 
                                                                 // Calculate product price safely
                                                                 if ($product_data->tax_method == 1) {
-                                                                    $product_price = $product_return->net_unit_price + ($qty > 0 ? $product_return->discount / $qty : 0);
+                                                                    $product_price = $product_return->net_unit_price + ($hasValidQuantity ? $product_return->discount / $qty : 0);
                                                                 } elseif ($product_data->tax_method == 2) {
-                                                                    $product_price = ($qty > 0 ? $product_return->total / $qty : $product_return->net_unit_price) + ($qty > 0 ? $product_return->discount / $qty : 0);
+                                                                    $product_price = ($hasValidQuantity ? $product_return->total / $qty : $product_return->net_unit_price) + ($hasValidQuantity ? $product_return->discount / $qty : 0);
                                                                 } else {
                                                                     $product_price = $product_return->net_unit_price;
                                                                 }
@@ -127,12 +139,20 @@
                                                                 $unit = DB::table('units')->where('id', $lims_product_return_data[$key]->sale_unit_id)->first();
                                                                 $sale_unit_name = $unit->unit_name ?? '';
                                                                 ?>
+                                                                <td class="text-center align-middle">
+                                                                    <div class="form-check m-0 d-inline-flex">
+                                                                        <input type="checkbox" class="form-check-input position-static m-0 return-line-selector"
+                                                                            id="return-line-{{ $product_return->id }}" name="selected_items[]"
+                                                                            value="{{ $returnSourceLineIds[$product_return->id] ?? '' }}" checked
+                                                                            aria-label="{{ __('db.Return') }} {{ $product_data->name }}"
+                                                                            @disabled(empty($returnSourceLineIds[$product_return->id]))>
+                                                                        <label class="sr-only" for="return-line-{{ $product_return->id }}">
+                                                                            {{ __('db.Return') }} {{ $product_data->name }}
+                                                                        </label>
+                                                                    </div>
+                                                                </td>
                                                                 <td>
                                                                     {{ $product_data->name }}
-                                                                    <button type="button" class="edit-product btn btn-link"
-                                                                        data-toggle="modal" data-target="#editModal">
-                                                                        <i class="dripicons-document-edit"></i>
-                                                                    </button>
                                                                 </td>
                                                                 <td>{{ $product_data->code }}</td>
                                                                 @if ($product_batch_data)
@@ -150,12 +170,13 @@
                                                                         <input type="hidden" class="product-batch-id"
                                                                             name="product_batch_id[]" value="">
                                                                         <input type="text" class="form-control batch-no"
-                                                                            name="batch_no[]" value="" disabled />
+                                                                            name="batch_no[]" value="" disabled data-return-readonly />
                                                                     </td>
                                                                 @endif
                                                                 <td>
                                                                     <input type="text" name="actual_qty[]"
                                                                         class="form-control actual_qty" disabled
+                                                                        data-return-readonly
                                                                         data-actual_qty="{{ $lims_product_return_data[$key]->qty ?? 0 }}"
                                                                         value="{{ $lims_product_return_data[$key]->qty ?? '' }}">
                                                                 </td>
@@ -163,28 +184,27 @@
                                                                     <input type="number" class="form-control qty sale_qty"
                                                                         name="qty[]" value="{{ $product_return->qty }}"
                                                                         data-sale_qty="{{ $product_return->qty }}" required
-                                                                        step="any" />
+                                                                        step="any" min="0.000001"
+                                                                        max="{{ $lims_product_return_data[$key]->qty ?? 0 }}" />
                                                                 </td>
                                                                 <td class="net_unit_price">
-                                                                    {{ number_format((float) $product_return->net_unit_price, $general_setting->decimal, '.', '') }}
+                                                                    {{ number_format((float) $product_return->net_unit_price, gen_setting()->decimal, '.', '') }}
                                                                 </td>
                                                                 <td class="discount"
-                                                                    data-unit_discount="{{ $lims_product_return_data[$key]->discount / $lims_product_return_data[$key]->qty }}">
-                                                                    {{ number_format((float) $product_return->discount * $product_return->qty, $general_setting->decimal, '.', '') }}
+                                                                    data-unit_discount="{{ $hasValidQuantity ? $product_return->discount / $qty : 0 }}">
+                                                                    {{ number_format((float) $product_return->discount * $product_return->qty, gen_setting()->decimal, '.', '') }}
                                                                 </td>
                                                                 <td class="tax">
-                                                                    {{ number_format((float) $product_return->tax, $general_setting->decimal, '.', '') }}
+                                                                    {{ number_format((float) $product_return->tax, gen_setting()->decimal, '.', '') }}
                                                                 </td>
                                                                 <td class="sub-total">
-                                                                    {{ number_format((float) $product_return->total, $general_setting->decimal, '.', '') }}
+                                                                    {{ number_format((float) $product_return->total, gen_setting()->decimal, '.', '') }}
                                                                 </td>
-                                                                <td><button type="button"
-                                                                        class="ibtnDel btn btn-md btn-danger">{{ __('db.delete') }}</button>
-                                                                </td>
-
                                                                 <input type="hidden" class="product-code"
                                                                     name="product_code[]"
                                                                     value="{{ $product_data->code }}" />
+                                                                <input type="hidden" name="product_sale_id[]"
+                                                                    value="{{ $returnSourceLineIds[$product_return->id] ?? '' }}" />
                                                                 <input type="hidden" name="product_id[]" class="product-id"
                                                                     value="{{ $product_data->id }}" />
                                                                 <input type="hidden" name="product_variant_id[]"
@@ -227,20 +247,19 @@
                                                     </tbody>
 
                                                     <tfoot class="tfoot active">
-                                                        <th colspan="3">{{ __('db.Total') }}</th>
+                                                        <th colspan="4">{{ __('db.Total') }}</th>
                                                         <th></th>
                                                         <th id="total-qty">{{ $lims_return_data->total_qty }}</th>
                                                         <th></th>
                                                         <th id="total-discount">
-                                                            {{ number_format((float) $lims_return_data->total_discount, $general_setting->decimal, '.', '') }}
+                                                            {{ number_format((float) $lims_return_data->total_discount, gen_setting()->decimal, '.', '') }}
                                                         </th>
                                                         <th id="total-tax">
-                                                            {{ number_format((float) $lims_return_data->total_tax, $general_setting->decimal, '.', '') }}
+                                                            {{ number_format((float) $lims_return_data->total_tax, gen_setting()->decimal, '.', '') }}
                                                         </th>
                                                         <th id="total">
-                                                            {{ number_format((float) $lims_return_data->total_price, $general_setting->decimal, '.', '') }}
+                                                            {{ number_format((float) $lims_return_data->total_price, gen_setting()->decimal, '.', '') }}
                                                         </th>
-                                                        <th><i class="dripicons-trash"></i></th>
                                                     </tfoot>
                                                 </table>
                                             </div>
@@ -303,7 +322,7 @@
                                         <div class="col-md-4">
                                             <div class="form-group">
                                                 <label>{{ __('db.Attach Document') }}</label>
-                                                <i class="dripicons-question" data-toggle="tooltip"
+                                                <i class="ti ti-info-circle" data-toggle="tooltip"
                                                     title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
                                                 <input type="file" name="document" class="form-control" />
                                                 @if ($errors->has('extension'))
@@ -358,80 +377,26 @@
             <table class="table table-bordered table-condensed totals">
                 <td><strong>{{ __('db.Items') }}</strong>
                     <span class="pull-right"
-                        id="item">{{ number_format(0, $general_setting->decimal, '.', '') }}</span>
+                        id="item">{{ number_format(0, gen_setting()->decimal, '.', '') }}</span>
                 </td>
                 <td><strong>{{ __('db.Total') }}</strong>
                     <span class="pull-right"
-                        id="subtotal">{{ number_format(0, $general_setting->decimal, '.', '') }}</span>
+                        id="subtotal">{{ number_format(0, gen_setting()->decimal, '.', '') }}</span>
                 </td>
                 <td><strong>{{ __('db.Order Tax') }}</strong>
                     <span class="pull-right"
-                        id="order_tax">{{ number_format(0, $general_setting->decimal, '.', '') }}</span>
+                        id="order_tax">{{ number_format(0, gen_setting()->decimal, '.', '') }}</span>
                 </td>
                 <td><strong>{{ __('db.Discount') }} <x-info title="Current Return Qty"/> </strong>
                     <span class="pull-right"
-                        id="order_discount" data-actual_discount="{{ $lims_return_data->total_discount  ?? 0 }}">{{ number_format($lims_return_data->total_discount ?? '', $general_setting->decimal, '.', '') }}<x-info title="Current Return Qty"/> </span>
+                        id="order_discount" data-actual_discount="{{ $lims_return_data->total_discount  ?? 0 }}">{{ number_format($lims_return_data->total_discount ?? '', gen_setting()->decimal, '.', '') }}<x-info title="Current Return Qty"/> </span>
                 </td>
 
                 <td><strong>{{ __('db.grand total') }} <x-info title="(SubTotal + tax) - (Current Return Dscount + Previws return discount) = Grand Total"/> </strong>
                     <span class="pull-right"
-                        id="grand_total">{{ number_format(0, $general_setting->decimal, '.', '') }}</span>
+                        id="grand_total">{{ number_format(0, gen_setting()->decimal, '.', '') }}</span>
                 </td>
             </table>
-        </div>
-
-        <div id="editModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true"
-            class="modal fade text-left">
-            <div role="document" class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 id="modal_header" class="modal-title"> </h5>
-                        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-                    </div>
-                    <div class="modal-body">
-                        <form>
-                            <div class="row modal-element">
-                                <div class="col-md-4 form-group">
-                                    <label>{{ __('db.Quantity') }}</label>
-                                    <input type="number" name="edit_qty" class="form-control" step="any">
-                                </div>
-                                <div class="col-md-4 form-group">
-                                    <label>{{ __('db.Unit Discount') }}</label>
-                                    <input type="number" name="edit_discount" class="form-control" step="any">
-                                </div>
-                                <div class="col-md-4 form-group">
-                                    <label>{{ __('db.Unit Price') }}</label>
-                                    <input type="number" name="edit_unit_price" class="form-control" step="any">
-                                </div>
-                                <?php
-                                $tax_name_all[] = 'No Tax';
-                                $tax_rate_all[] = 0;
-                                foreach ($lims_tax_list as $tax) {
-                                    $tax_name_all[] = $tax->name;
-                                    $tax_rate_all[] = $tax->rate;
-                                }
-                                ?>
-                                <div class="col-md-4 form-group">
-                                    <label>{{ __('db.Tax Rate') }}</label>
-                                    <select name="edit_tax_rate" class="form-control selectpicker">
-                                        @foreach ($tax_name_all as $key => $name)
-                                            <option value="{{ $key }}">{{ $name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div id="edit_unit" class="col-md-4 form-group">
-                                    <label>{{ __('db.Product Unit') }}</label>
-                                    <select name="edit_unit" class="form-control selectpicker">
-                                    </select>
-                                </div>
-                            </div>
-                            <button type="button" name="update_btn"
-                                class="btn btn-primary">{{ __('db.update') }}</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
         </div>
         <!-- add cash register modal -->
         <div id="cash-register-modal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
@@ -443,7 +408,7 @@
                     <div class="modal-header">
                         <h5 id="exampleModalLabel" class="modal-title">{{ __('db.Add Cash Register') }}</h5>
                         <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                                aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                                aria-hidden="true"><i class="ti ti-x"></i></span></button>
                     </div>
                     <div class="modal-body">
                         <p class="italic">
@@ -477,6 +442,7 @@
 @push('scripts')
 <script type="text/javascript">
 
+    @include('backend.return.partials.quantity_validation')
 
     // Initial setup
     var row_product_price = [];
@@ -511,9 +477,49 @@
         var entered = parseFloat($(this).val()) || 0;
         if (entered > maxDiscount) {
             $(this).val(maxDiscount);
-            alert("Discount cannot be greater than " + maxDiscount);
+            SaleProToast.show("Discount cannot be greater than " + maxDiscount);
         }
         calculateGrandTotal();
+    });
+
+    var selectReturnLineMessage = @json(__('db.sale_return_line_required'));
+
+    function setReturnLineState($row, selected) {
+        var $selector = $row.find('.return-line-selector');
+        selected = Boolean(selected && !$selector.is(':disabled'));
+        $selector.prop('checked', selected);
+        $row.find(':input').not('.return-line-selector, [data-return-readonly]').prop('disabled', !selected);
+        $row.toggleClass('table-light text-muted', !selected).toggleClass('table-active', selected);
+
+        if (!selected) {
+            $row.find('.discount, .tax, .sub-total').text((0).toFixed({{ gen_setting()->decimal }}));
+        } else {
+            $row.find('.qty').trigger('input');
+        }
+    }
+
+    function updateSelectAllState() {
+        var $available = $('.return-line-selector:not(:disabled)');
+        var selectedCount = $available.filter(':checked').length;
+        $('#select-all-return-lines')
+            .prop('checked', $available.length > 0 && selectedCount === $available.length)
+            .prop('indeterminate', selectedCount > 0 && selectedCount < $available.length)
+            .prop('disabled', $available.length === 0);
+    }
+
+    $('#select-all-return-lines').on('change', function() {
+        var selected = this.checked;
+        $('.return-line-selector:not(:disabled)').each(function() {
+            setReturnLineState($(this).closest('tr'), selected);
+        });
+        updateSelectAllState();
+        calculateTotal();
+    });
+
+    $('#myTable').on('change', '.return-line-selector', function() {
+        setReturnLineState($(this).closest('tr'), this.checked);
+        updateSelectAllState();
+        calculateTotal();
     });
 
     // Quantity change
@@ -527,12 +533,12 @@
         if (qty > maxQty) {
             qty = maxQty;
             $(this).val(qty);
-            alert("Quantity can't be greater than " + maxQty);
+            SaleProToast.show("Quantity can't be greater than " + maxQty);
         }
 
         // Discount
         var discount = product_unit_discount[index] * qty;
-        $row.find('.discount').text(discount.toFixed({{ $general_setting->decimal }}));
+        $row.find('.discount').text(discount.toFixed({{ gen_setting()->decimal }}));
 
         // Net unit price after discount
         var net_price = row_product_price[index];
@@ -541,11 +547,11 @@
         var tax = tax_method[index] == 1
             ? net_price * qty * (tax_rate[index] / 100)
             : (net_price * qty * tax_rate[index] / 100);
-        $row.find('.tax').text(tax.toFixed({{ $general_setting->decimal }}));
+        $row.find('.tax').text(tax.toFixed({{ gen_setting()->decimal }}));
 
         // Subtotal
         var subtotal = net_price * qty + tax;
-        $row.find('.sub-total').text(subtotal.toFixed({{ $general_setting->decimal }}));
+        $row.find('.sub-total').text(subtotal.toFixed({{ gen_setting()->decimal }}));
 
         // ✅ Update hidden inputs for this row
         updateRowHiddenInputs($row, index, qty, net_price, discount, tax, subtotal);
@@ -563,18 +569,26 @@
             total = 0;
 
         $("table.order-list tbody tr").each(function(i) {
-            var qty = parseFloat($(this).find('.qty').val()) || 0;
+            var $row = $(this);
+            if (!$row.find('.return-line-selector').is(':checked')) {
+                return;
+            }
+            var qty = parseFloat($row.find('.qty').val()) || 0;
             total_qty += qty;
 
-            total_discount += parseFloat($(this).find('.discount').text()) || 0;
-            total_tax += parseFloat($(this).find('.tax').text()) || 0;
-            total += parseFloat($(this).find('.sub-total').text()) || 0;
+            total_discount += parseFloat($row.find('.discount').text()) || 0;
+            total_tax += parseFloat($row.find('.tax').text()) || 0;
+            total += parseFloat($row.find('.sub-total').text()) || 0;
         });
 
         $("#total-qty").text(total_qty);
-        $("#total-discount").text(total_discount.toFixed({{ $general_setting->decimal }}));
-        $("#total-tax").text(total_tax.toFixed({{ $general_setting->decimal }}));
-        $("#total").text(total.toFixed({{ $general_setting->decimal }}));
+        $("#total-discount").text(total_discount.toFixed({{ gen_setting()->decimal }}));
+        $("#total-tax").text(total_tax.toFixed({{ gen_setting()->decimal }}));
+        $("#total").text(total.toFixed({{ gen_setting()->decimal }}));
+        $('input[name="total_qty"]').val(total_qty);
+        $('input[name="total_tax"]').val(total_tax.toFixed({{ gen_setting()->decimal }}));
+        $('input[name="total_price"]').val(total.toFixed({{ gen_setting()->decimal }}));
+        $('input[name="item"]').val($('.return-line-selector:checked').length);
 
         calculateGrandTotal();
     }
@@ -590,22 +604,22 @@
         var grand_total = (subtotal + order_tax) - (sale_discount + actual_discount);
         var total_qty = $('#total-qty').text() || 0;
 
-        $(".total_discount").val(sale_discount.toFixed({{ $general_setting->decimal }}));
+        $(".total_discount").val(sale_discount.toFixed({{ gen_setting()->decimal }}));
         $('#order_discount').text(sale_discount) || 0;
-        $('#item').text(($('table.order-list tbody tr:last').index() + 1) + '(' + total_qty + ')');
-        $('#subtotal').text(subtotal.toFixed({{ $general_setting->decimal }}));
-        $('#order_tax').text(order_tax.toFixed({{ $general_setting->decimal }}));
-        $('#grand_total').text(grand_total.toFixed({{ $general_setting->decimal }}));
+        $('#item').text($('.return-line-selector:checked').length + '(' + total_qty + ')');
+        $('#subtotal').text(subtotal.toFixed({{ gen_setting()->decimal }}));
+        $('#order_tax').text(order_tax.toFixed({{ gen_setting()->decimal }}));
+        $('#grand_total').text(grand_total.toFixed({{ gen_setting()->decimal }}));
     }
 
     // ✅ Update hidden inputs per row
     function updateRowHiddenInputs($row, index, qty, net_price, discount, tax, subtotal) {
-        $row.find('.product-price').val(row_product_price[index].toFixed({{ $general_setting->decimal }}));
-        $row.find('.net_unit_price').val(net_price.toFixed({{ $general_setting->decimal }}));
-        $row.find('.discount-value').val(discount.toFixed({{ $general_setting->decimal }}));
+        $row.find('.product-price').val(row_product_price[index].toFixed({{ gen_setting()->decimal }}));
+        $row.find('.net_unit_price').val(net_price.toFixed({{ gen_setting()->decimal }}));
+        $row.find('.discount-value').val(discount.toFixed({{ gen_setting()->decimal }}));
         $row.find('.tax-rate').val(tax_rate[index]);
-        $row.find('.tax-value').val(tax.toFixed({{ $general_setting->decimal }}));
-        $row.find('.subtotal-value').val(subtotal.toFixed({{ $general_setting->decimal }}));
+        $row.find('.tax-value').val(tax.toFixed({{ gen_setting()->decimal }}));
+        $row.find('.subtotal-value').val(subtotal.toFixed({{ gen_setting()->decimal }}));
     }
 
     // Trigger recalculation on discount/order tax change
@@ -613,12 +627,22 @@
 
     // Prevent form submission without products
     $('#payment-form').on('submit', function(e) {
-        if ($('table.order-list tbody tr').length === 0) {
-            alert("Please insert product to order table!");
+        if (!$('.return-line-selector:checked').length) {
+            SaleProToast.show(selectReturnLineMessage);
             e.preventDefault();
+            return false;
+        } else if (!validateSaleReturnQuantities($(this))) {
+            e.preventDefault();
+            return false;
         } else {
             $("#submit-button").prop('disabled', true);
         }
     });
+
+    $('.return-line').each(function() {
+        setReturnLineState($(this), !$(this).find('.return-line-selector').is(':disabled'));
+    });
+    updateSelectAllState();
+    calculateTotal();
 </script>
 @endpush

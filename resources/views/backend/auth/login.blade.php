@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{$general_setting->site_title}}</title>
+    <title>{{gen_setting()->site_title}}</title>
     @if(!config('database.connections.saleprosaas_landlord'))
-    <link rel="icon" type="image/png" href="{{url('logo', $general_setting->site_logo)}}" />
+    <link rel="icon" type="image/png" href="{{url('logo', gen_setting()->site_logo)}}" />
     <!-- Bootstrap CSS-->
     <link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
     @else
-    <link rel="icon" type="image/png" href="{{url('../../logo', $general_setting->site_logo)}}" />
+    <link rel="icon" type="image/png" href="{{url('../../logo', gen_setting()->site_logo)}}" />
     <!-- Bootstrap CSS-->
     <link rel="stylesheet" href="<?php echo asset('../../vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
     @endif
 
     <!-- Google fonts -->
-    @if($general_setting->font_css)
-      {!! $general_setting->font_css !!}
+    @if(gen_setting()->font_css)
+      {!! gen_setting()->font_css !!}
     @else
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,7 +24,7 @@
     @endif
 
     <!-- Custom CSS from general settings -->
-    {!! $general_setting->auth_css !!}
+    {!! gen_setting()->auth_css !!}
 
     <style>
         body { font-size: 14px;font-family: 'Inter', sans-serif;}
@@ -135,6 +135,239 @@
         button.dropdown-item {display:flex;}
         
         button svg {margin:0 10px; width:20px}
+
+        /* Demo showcase */
+        .demo-showcase {
+            position: relative;
+            width: 100%;
+            margin-top: 28px;
+            padding: 22px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 22px;
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.07));
+            box-shadow: 0 24px 55px rgba(40, 19, 80, 0.2);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
+
+        .demo-showcase::before {
+            content: '';
+            position: absolute;
+            top: -90px;
+            right: -70px;
+            width: 190px;
+            height: 190px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            pointer-events: none;
+        }
+
+        .demo-showcase-header,
+        .demo-grid,
+        .demo-purchase-row {
+            position: relative;
+            z-index: 1;
+        }
+
+        .demo-showcase-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 16px;
+        }
+
+        .demo-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 7px;
+            color: rgba(255, 255, 255, 0.78);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .demo-live-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #75f3b0;
+            box-shadow: 0 0 0 5px rgba(117, 243, 176, 0.15);
+            animation: demo-pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes demo-pulse {
+            0%, 100% { box-shadow: 0 0 0 4px rgba(117, 243, 176, 0.13); }
+            50% { box-shadow: 0 0 0 7px rgba(117, 243, 176, 0.04); }
+        }
+
+        .demo-showcase-title {
+            margin: 0 0 4px;
+            color: #fff;
+            font-size: 20px;
+            font-weight: 750;
+            letter-spacing: -0.35px;
+        }
+
+        .demo-showcase-copy {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.66);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .demo-count {
+            flex: 0 0 auto;
+            padding: 6px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .demo-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 11px;
+        }
+
+        .demo-card {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            min-width: 0;
+            min-height: 76px;
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.13);
+            border-radius: 15px;
+            background: rgba(24, 14, 53, 0.2);
+            color: #fff;
+            text-align: left;
+            cursor: pointer;
+            transition: transform .22s ease, background-color .22s ease, border-color .22s ease, box-shadow .22s ease;
+        }
+
+        .demo-card:hover,
+        .demo-card:focus {
+            color: #fff;
+            text-decoration: none;
+            transform: translateY(-3px);
+            border-color: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.16);
+            box-shadow: 0 14px 25px rgba(31, 15, 66, 0.22);
+            outline: none;
+        }
+
+        .demo-card:focus-visible {
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.28), 0 14px 25px rgba(31, 15, 66, 0.22);
+        }
+
+        .demo-card-icon {
+            display: inline-flex;
+            flex: 0 0 42px;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            margin-right: 11px;
+            border-radius: 13px;
+            background: linear-gradient(135deg, #ff9a62, #ff646f);
+            box-shadow: 0 9px 18px rgba(59, 25, 91, 0.18);
+        }
+
+        .demo-card--admin .demo-card-icon { background: linear-gradient(135deg, #58c7ff, #5268f5); }
+        .demo-card--woo .demo-card-icon { background: linear-gradient(135deg, #a789ff, #7954d8); }
+        .demo-card--gym .demo-card-icon { background: linear-gradient(135deg, #5ee0bd, #159b8d); }
+
+        .demo-card-icon svg,
+        .demo-card-arrow svg {
+            width: 21px;
+            height: 21px;
+            margin: 0;
+        }
+
+        .demo-card-content {
+            display: block;
+            min-width: 0;
+            line-height: 1.2;
+        }
+
+        .demo-card-content strong,
+        .demo-card-content small {
+            display: block;
+        }
+
+        .demo-card-content strong {
+            overflow: hidden;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 750;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .demo-card-content small {
+            margin-top: 5px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 10px;
+        }
+
+        .demo-card-arrow {
+            display: inline-flex;
+            flex: 0 0 auto;
+            margin-left: auto;
+            padding-left: 7px;
+            color: rgba(255, 255, 255, 0.55);
+            transition: transform .22s ease, color .22s ease;
+        }
+
+        .demo-card:hover .demo-card-arrow,
+        .demo-card:focus .demo-card-arrow {
+            color: #fff;
+            transform: translateX(3px);
+        }
+
+        .demo-purchase-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.12);
+            color: rgba(255, 255, 255, 0.62);
+            font-size: 10px;
+        }
+
+        .demo-purchase-link {
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: center;
+            gap: 7px;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .demo-purchase-link:hover { color: #fff; }
+        .demo-purchase-link svg { width: 15px; height: 15px; }
+
+        @media (max-width: 1199.98px) {
+            .demo-showcase { padding: 18px; }
+            .demo-grid { grid-template-columns: 1fr; }
+            .demo-card { min-height: 66px; }
+            .demo-card-content strong { font-size: 11px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .demo-live-dot { animation: none; }
+            .demo-card, .demo-card-arrow { transition: none; }
+        }
     </style>
 </head>
 <body class="">
@@ -144,10 +377,10 @@
         <div class="col-lg-6 d-flex align-items-center position-relative">
             <div class="login-container w-100">
                 <div class="mb-5" style="margin: auto; text-align: center;">
-                    @if($general_setting->site_logo)
-                    <img src="{{url('logo', $general_setting->site_logo)}}" width="120">
+                    @if(gen_setting()->site_logo)
+                    <img src="{{url('logo', gen_setting()->site_logo)}}" width="120">
                     @else
-                    <span>{{$general_setting->site_title}}</span>
+                    <span>{{gen_setting()->site_title}}</span>
                     @endif
                 </div>
 
@@ -163,8 +396,8 @@
                 <form method="POST" action="{{ route('login') }}" id="login-form">
                 @csrf
                     <div class="form-group">
-                        <label class="font-weight-600">{{__('db.UserName')}}</label>
-                        <input type="name" name="name" class="form-control" placeholder="{{__('db.UserName')}}" @if(!env('USER_VERIFIED')) value="admin" @endif required>
+                        <label class="font-weight-600">{{__('db.username')}}</label>
+                        <input type="name" name="name" class="form-control" placeholder="{{__('db.username')}}" @if(!config('app.user_verified')) value="admin" @endif required>
                         @if(session()->has('error'))
                             <p>
                                 <strong>{{ session()->get('error') }}</strong>
@@ -174,7 +407,7 @@
                     <div class="form-group">
                         <label class="font-weight-600">{{__('db.Password')}}</label>
                         <div class="input-group">
-                            <input type="password" name="password" class="form-control" placeholder="••••••••" @if(!env('USER_VERIFIED')) value="admin" @endif  required>
+                            <input type="password" name="password" class="form-control" placeholder="••••••••" @if(!config('app.user_verified')) value="admin" @endif  required>
                             <div class="input-group-append">
                                 <span id="togglePassword" class="input-group-text bg-white border-left-0" style="cursor: pointer;">
                                     <svg id="icon-hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px;">
@@ -197,14 +430,14 @@
 
                     <div class="d-flex justify-content-between align-items-center mb-4">
 
-                        @if($general_setting->disable_forgot_password == 0)
+                        @if(gen_setting()->disable_forgot_password == 0)
                         <a href="{{ route('password.request') }}" class="small font-weight-bold">{{__('db.Forgot Password?')}}</a>
                         @endif
                     </div>
 
                     <button type="submit" class="btn btn-primary btn-block shadow-sm mb-2">{{__('db.LogIn')}}</button>
 
-                    @if($general_setting->disable_signup == 0)
+                    @if(gen_setting()->disable_signup == 0)
                     <p class="text-center mt-5 text-muted">
                         {{__('db.Do not have an account?')}} <a href="{{url('register')}}" class="font-weight-bold">{{__('db.Register')}}</a>
                     </p>
@@ -212,7 +445,7 @@
                 </form>
 
                 <div class="footer-text w-100 d-flex justify-content-center mt-5">
-                    <p>{{__('db.Developed By')}} <span class="external">{{$general_setting->developed_by}}</span></p>
+                    <p>{{__('db.Developed By')}} <span class="external">{{gen_setting()->developed_by}}</span></p>
                 </div>
             </div>
         </div>
@@ -223,44 +456,81 @@
                     <h1 class="font-weight-bold">Welcome Back</h1>
                     <p>Enter your username and password to access your account.</p>
                     <!-- This section for demo only-->
-                    @if(!env('USER_VERIFIED') && !config('database.connections.saleprosaas_landlord'))
-                        <div class="row no-gutters">
-                            <div class="col-12 mt-3">
-                                <button class="btn btn-light btn-block dropdown-toggle" type="button" id="premiumAddons" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                    Explore Premium Add-ons
-                                </button>
-                                <div class="dropdown-menu w-100 shadow-lg border-0" aria-labelledby="premiumAddons" style="border-radius: 12px; padding: 10px;">
-                                    
-                                    <button data-page="ecom_front" data-env=".env.ecom" class="dropdown-item demo-btn py-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
-                                        </svg>
-                                        eCommerce - Frontend
-                                    </button>
-                                    
-                                    <button data-page="back_admin" data-env=".env.ecom" class="dropdown-item demo-btn py-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
-                                        </svg>
-                                        eCommerce - Backend
-                                    </button>
-                                    
-                                    <button data-page="back_admin" data-env=".env.wcom" class="dropdown-item demo-btn py-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-brand-wordpress"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M9.5 9h3" /><path d="M4 9h2.5" /><path d="M11 9l3 11l4 -9" /><path d="M5.5 9l3.5 11l3 -7" /><path d="M18 11c.177 -.528 1 -1.364 1 -2.5c0 -1.78 -.776 -2.5 -1.875 -2.5c-.898 0 -1.125 .812 -1.125 1.429c0 1.83 2 2.058 2 3.571" /><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /></svg> 
-                                        WooCommerce Connector
-                                    </button>
-
-                                    <button data-page="back_admin" data-env=".env.gym" class="dropdown-item demo-btn py-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-barbell"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M2 12h1" /><path d="M6 8h-2a1 1 0 0 0 -1 1v6a1 1 0 0 0 1 1h2" /><path d="M6 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1" /><path d="M9 12h6" /><path d="M15 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1" /><path d="M18 8h2a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-2" /><path d="M22 12h-1" /></svg>
-                                        Gym Membership Management
-                                    </button>
-                                    
-                                    <div class="dropdown-divider"></div>
-                                    
-                                    <a class="dropdown-item py-2" target="_blank" href="https://lion-coders.com/...">
-                                        <i class="fas fa-external-link-alt mr-2"></i> Purchase SAAS Version
-                                    </a>
+                    @if(!config('app.user_verified') && !config('database.connections.saleprosaas_landlord'))
+                        <div class="demo-showcase" aria-label="Available product demos">
+                            <div class="demo-showcase-header">
+                                <div>
+                                    <span class="demo-eyebrow"><span class="demo-live-dot"></span>Live product demos</span>
+                                    <h2 class="demo-showcase-title">Explore more with SalePro</h2>
+                                    <p class="demo-showcase-copy">Choose an experience and get instant demo access.</p>
                                 </div>
+                                <span class="demo-count">4 demos</span>
+                            </div>
+
+                            <div class="demo-grid">
+                                <button type="button" data-page="ecom_front" data-env=".env.ecom" class="demo-card demo-card--store demo-btn" aria-label="Open eCommerce storefront demo">
+                                    <span class="demo-card-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007Z" />
+                                        </svg>
+                                    </span>
+                                    <span class="demo-card-content">
+                                        <strong>eCommerce Store</strong>
+                                        <small>Customer storefront</small>
+                                    </span>
+                                    <span class="demo-card-arrow">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
+                                    </span>
+                                </button>
+
+                                <button type="button" data-page="back_admin" data-env=".env.ecom" class="demo-card demo-card--admin demo-btn" aria-label="Open eCommerce admin demo">
+                                    <span class="demo-card-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25m-4.5-13.5h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0L6.75 21m3.75-10.5 2.25 2.25L16.5 9" />
+                                        </svg>
+                                    </span>
+                                    <span class="demo-card-content">
+                                        <strong>eCommerce Admin</strong>
+                                        <small>Backend operations</small>
+                                    </span>
+                                    <span class="demo-card-arrow">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
+                                    </span>
+                                </button>
+
+                                <button type="button" data-page="back_admin" data-env=".env.wcom" class="demo-card demo-card--woo demo-btn" aria-label="Open WooCommerce connector demo">
+                                    <span class="demo-card-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 9h3M4 9h2.5M11 9l3 11 4-9M5.5 9 9 20l3-7M18 11c.177-.528 1-1.364 1-2.5C19 6.72 18.224 6 17.125 6 16.227 6 16 6.812 16 7.429c0 1.83 2 2.058 2 3.571"/><path d="M3 12a9 9 0 1 0 18 0 9 9 0 1 0-18 0"/></svg>
+                                    </span>
+                                    <span class="demo-card-content">
+                                        <strong>WooCommerce</strong>
+                                        <small>Store connector</small>
+                                    </span>
+                                    <span class="demo-card-arrow">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
+                                    </span>
+                                </button>
+
+                                <button type="button" data-page="back_admin" data-env=".env.gym" class="demo-card demo-card--gym demo-btn" aria-label="Open gym management demo">
+                                    <span class="demo-card-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h1M6 8H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2M6 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1ZM9 12h6M15 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1a1 1 0 0 0-1 1ZM18 8h2a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2M22 12h-1"/></svg>
+                                    </span>
+                                    <span class="demo-card-content">
+                                        <strong>Gym Management</strong>
+                                        <small>Membership suite</small>
+                                    </span>
+                                    <span class="demo-card-arrow">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
+                                    </span>
+                                </button>
+                            </div>
+
+                            <div class="demo-purchase-row">
+                                <span>Ready to launch your own workspace?</span>
+                                <a class="demo-purchase-link" target="_blank" rel="noopener noreferrer" href="https://lion-coders.com/software/salepro-saas-pos-inventory-saas-php-script">
+                                    Explore SaaS
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
+                                </a>
                             </div>
                         </div>
                     @endif
@@ -277,14 +547,14 @@
         @if(config('database.connections.saleprosaas_landlord'))
             const storedMessage = localStorage.getItem("message");
             if(storedMessage) {
-                alert(storedMessage);
+                SaleProToast.show(storedMessage);
                 localStorage.removeItem("message");
             }
 
             const numberOfUserAccount = @json($numberOfUserAccount);
             
             // Replaces $.ajax
-            fetch('{{route("package.fetchData", $general_setting->package_id)}}')
+            fetch('{{route("package.fetchData", gen_setting()->package_id)}}')
                 .then(response => response.json())
                 .then(data => {
                     if(data['number_of_user_account'] > 0 && data['number_of_user_account'] <= numberOfUserAccount) {
@@ -335,10 +605,10 @@
 
         if(theme === 'dark') {
             body.classList.add('dark-mode');
-            if(themeIcon) themeIcon.classList.add('dripicons-brightness-low');
+            if(themeIcon) themeIcon.classList.add('ti ti-brightness-down');
         } else {
             body.classList.remove('dark-mode');
-            if(themeIcon) themeIcon.classList.add('dripicons-brightness-max');
+            if(themeIcon) themeIcon.classList.add('ti ti-brightness-up');
         }
 
         // 5. Cookie Helper

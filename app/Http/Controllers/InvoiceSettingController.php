@@ -44,7 +44,7 @@ class InvoiceSettingController extends Controller
      */
     public function store(Request $request)
     {
-        if(!env('USER_VERIFIED')) {
+        if(!config('app.user_verified')) {
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
         }
 
@@ -94,7 +94,7 @@ class InvoiceSettingController extends Controller
             return true;
         }
 
-        if(!env('USER_VERIFIED')) {
+        if(!config('app.user_verified')) {
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
         }
 
@@ -106,9 +106,10 @@ class InvoiceSettingController extends Controller
         try{
             DB::beginTransaction();
 
-            $data = $this->getRequestData($request);
+            $existing = InvoiceSetting::query()->findOrFail($id);
+            $data = $this->getRequestData($request, $existing);
 
-            InvoiceSetting::query()->findOrFail($id)->update($data);
+            $existing->update($data);
             DB::commit();
             return redirect()->back()->with('customMessage', 'Invoice setting stored successfully');
         }catch(\Throwable $e){
@@ -122,7 +123,7 @@ class InvoiceSettingController extends Controller
      */
     public function destroy($id)
     {
-        if(!env('USER_VERIFIED')) {
+        if(!config('app.user_verified')) {
             return response()->json(['not_permitted' => __('db.This feature is disable for demo!')]);
         }
 
@@ -141,7 +142,7 @@ class InvoiceSettingController extends Controller
     }
 
 
-    public function getRequestData($request){
+    public function getRequestData($request, ?InvoiceSetting $existing = null){
             $data = $request->all();
             if($request->hasFile('company_logo')){
                 $data['company_logo'] = $this->uploadInvoiceTemplate($request->company_logo);
@@ -190,6 +191,23 @@ class InvoiceSettingController extends Controller
             }
             // Store JSON data
             $data['show_column'] = json_encode($showColumn);
+
+            // Signature configuration inside extra JSON
+            $extra = $existing ? $existing->getExtraData() : [];
+            if ($request->has('extra') && is_array($request->extra)) {
+                $extra = array_merge($extra, $request->extra);
+            }
+
+            $extra['enable_invoice_signatures'] = !empty($request->input('enable_invoice_signatures', $request->input('extra.enable_invoice_signatures', 0))) ? 1 : 0;
+            $extra['show_prepared_by'] = !empty($request->input('show_prepared_by', $request->input('extra.show_prepared_by', 0))) ? 1 : 0;
+            $extra['show_authorized_by'] = !empty($request->input('show_authorized_by', $request->input('extra.show_authorized_by', 0))) ? 1 : 0;
+            $extra['show_customer_signature'] = !empty($request->input('show_customer_signature', $request->input('extra.show_customer_signature', 0))) ? 1 : 0;
+
+            $extra['prepared_by_label'] = trim(strip_tags((string) ($request->input('prepared_by_label', $request->input('extra.prepared_by_label', '')))));
+            $extra['authorized_by_label'] = trim(strip_tags((string) ($request->input('authorized_by_label', $request->input('extra.authorized_by_label', '')))));
+            $extra['customer_signature_label'] = trim(strip_tags((string) ($request->input('customer_signature_label', $request->input('extra.customer_signature_label', '')))));
+
+            $data['extra'] = json_encode($extra);
             return $data;
     }
 

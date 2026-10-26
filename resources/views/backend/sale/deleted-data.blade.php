@@ -12,9 +12,9 @@
 
                     <div class="card shadow-sm mb-4">
                         <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0">Deleted Sales</h5>
+                            <h5 class="mb-0">Deleted and Voided Sales</h5>
                             <div>
-                                <button type="submit" class="btn btn-sm btn-danger ms-3" id="deleteSelectedBtn" disabled onclick="return confirm('Are you sure you want to permanently delete the selected records? This action cannot be undone!');">
+                                <button type="submit" class="btn btn-sm btn-danger ms-3" id="deleteSelectedBtn" disabled data-confirm-message="{{ __('db.Are you sure you want to permanently delete the selected records? This action cannot be undone!') }}">
                                     <i class="fas fa-trash-alt"></i> Delete Permanently
                                 </button>
                             </div>
@@ -31,17 +31,23 @@
                                             <th>Customer</th>
                                             <th>Warehouse</th>
                                             <th>Payment Status</th>
+                                            <th>Record Type</th>
                                             <th>Amount</th>
                                             <th>Due</th>
                                             <th>Deleted By</th>
                                             <th>Deleted At</th>
+                                            <th>Void Reason</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @forelse($lims_deleted_data as $sale)
                                         <tr>
                                             <td>
-                                                <input type="checkbox" name="ids[]" value="{{ $sale->id }}" class="rowCheckbox">
+                                                @if(!$sale->voided_at)
+                                                    <input type="checkbox" name="ids[]" value="{{ $sale->id }}" class="rowCheckbox">
+                                                @else
+                                                    <span title="Voided sales are permanent audit records">—</span>
+                                                @endif
                                             </td>
                                             <td>{{ $sale->created_at->format(config('date_format') . ' h:i:s') }}</td>
                                             <td>{{ $sale->reference_no }}</td>
@@ -59,14 +65,22 @@
                                                     Paid
                                                 @endif
                                             </td>
+                                            <td>
+                                                @if($sale->voided_at)
+                                                    <span class="badge badge-warning">Voided</span>
+                                                @else
+                                                    <span class="badge badge-secondary">Deleted</span>
+                                                @endif
+                                            </td>
                                             <td>{{ $sale->grand_total }}</td>
                                             <td>{{ $sale->grand_total - $sale->paid_amount }}</td>
                                             <td>{{ $sale->deleter->name ?? 'System' }}</td>
                                             <td>{{ $sale->deleted_at->format(config('date_format') . ' h:i:s') }}</td>
+                                            <td>{{ $sale->void_reason ?: '—' }}</td>
                                         </tr>
                                         @empty
                                         <tr>
-                                            <td colspan="11" class="text-center py-4 text-muted align-middle">
+                                            <td colspan="13" class="text-center py-4 text-muted align-middle">
                                                 <i class="fas fa-trash-alt fa-2x mb-3"></i><br>
                                                 No deleted sales found
                                             </td>

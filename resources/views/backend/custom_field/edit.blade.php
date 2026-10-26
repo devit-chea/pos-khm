@@ -54,7 +54,7 @@
                                     <textarea name="default_value_2" rows="5" class="form-control">@if($custom_field_data->type=='textarea'){{$custom_field_data->default_value}}@endif</textarea>
                                 </div>
                                 <div class="col-md-4 form-group option-value d-none">
-                                    <label>{{__('db.Options')}} *</label> <i class="dripicons-question" data-toggle="tooltip" title="{{__('db.Only use for Select, Multi Select, Checkbox, Radio Button types Populate the field by separating the options by coma eq apple,orange,banana')}}"></i>
+                                    <label>{{__('db.Options')}} *</label> <i class="ti ti-info-circle" data-toggle="tooltip" title="{{__('db.Only use for Select, Multi Select, Checkbox, Radio Button types Populate the field by separating the options by coma eq apple,orange,banana')}}"></i>
                                     <textarea name="option_value" rows="5" class="form-control">{{$custom_field_data->option_value}}</textarea>
                                 </div>
                                 <div class="col-md-4 form-group">

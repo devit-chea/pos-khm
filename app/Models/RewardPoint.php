@@ -12,6 +12,8 @@ class RewardPoint extends Model
      protected $fillable = [
         'customer_id',
         'reward_point_type',
+        'event_type',
+        'event_key',
         'points',
         'deducted_points',
         'note',
@@ -19,6 +21,21 @@ class RewardPoint extends Model
         'created_by',
         'updated_by',
         'sale_id',
+        'payment_id',
+        'return_id',
+        'source_amount',
+        'conversion_rate',
+        'balance_after',
+        'reward_point_setting_id',
+    ];
+
+    protected $casts = [
+        'points' => 'decimal:2',
+        'deducted_points' => 'decimal:2',
+        'source_amount' => 'decimal:4',
+        'conversion_rate' => 'decimal:8',
+        'balance_after' => 'decimal:4',
+        'expired_at' => 'datetime',
     ];
 
     public function customer(){

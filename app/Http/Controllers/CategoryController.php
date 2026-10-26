@@ -17,6 +17,7 @@ use App\Traits\TenantInfo;
 use App\Traits\CacheForget;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver as GdDriver;
+use Modules\Ecommerce\Services\StorefrontCacheKey;
 
 class CategoryController extends Controller
 {
@@ -36,10 +37,11 @@ class CategoryController extends Controller
     public function categoryData(Request $request)
     {
         $columns = array(
-            0 =>'id',
-            2 =>'name',
-            3=> 'parent_id',
-            4=> 'is_active',
+            0 => 'id',
+            1 => 'name',
+            2 => 'name',
+            3 => 'parent_id',
+            4 => 'is_active',
         );
 
         $totalData = DB::table('categories')->where('is_active', true)->count();
@@ -50,7 +52,7 @@ class CategoryController extends Controller
         else
             $limit = $totalData;
         $start = $request->input('start');
-        $order = $columns[$request->input('order.0.column')];
+        $order = $columns[$request->input('order.0.column')] ?? 'id';
         $dir = $request->input('order.0.dir');
         if(empty($request->input('search.value')))
             $categories = Category::offset($start)
@@ -82,9 +84,12 @@ class CategoryController extends Controller
                 $nestedData['key'] = $key;
 
                 if($category->image)
-                    $nestedData['name'] = '<img src="'.url('images/category', $category->image).'" height="80" width="80">'.$category->name;
+                    $image = '<img src="'.url('images/category', $category->image).'" height="80" width="80" style="object-fit: cover; border-radius: 4px;">';
                 else
-                    $nestedData['name'] = '<img src="'.url('images/zummXD2dvAtI.png').'" height="80" width="80">'.$category->name;
+                    $image = '<img src="'.url('images/zummXD2dvAtI.png').'" height="80" width="80" style="object-fit: cover; border-radius: 4px;">';
+
+                $nestedData['name'] = '<div class="d-flex align-items-center">' . $image . '<span style="margin:0 15px;font-weight: 500;">' . $category->name . '</span></div>';
+
 
                 if($category->parent_id)
                     $nestedData['parent_id'] = Category::find($category->parent_id)->name;
@@ -106,12 +111,12 @@ class CategoryController extends Controller
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                                 <li>
-                                    <button type="button" data-id="'.$category->id.'" class="open-EditCategoryDialog btn btn-link" data-toggle="modal" data-target="#editModal" ><i class="dripicons-document-edit"></i> '.__("db.edit").'</button>
+                                    <button type="button" data-id="'.$category->id.'" class="open-EditCategoryDialog btn btn-link" data-toggle="modal" data-target="#editModal" ><i class="ti ti-edit"></i> '.__("db.edit").'</button>
                                 </li>
                                 <li class="divider"></li>
                                 <form action="' . route("category.destroy", $category->id) . '" method="POST">'.csrf_field().'' . method_field("DELETE") . '
                                 <li>
-                                  <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> '.__("db.delete").'</button>
+                                  <button type="submit" class="btn btn-link" data-confirm-message="' . __('db.Are you sure want to delete?') . '"><i class="ti ti-trash"></i> '.__("db.delete").'</button>
                                 </li></form>
                             </ul>
                         </div>';
@@ -198,6 +203,7 @@ class CategoryController extends Controller
         $category = Category::create($lims_category_data);
 
         $this->cacheForget('category_list');
+        cache()->forget(StorefrontCacheKey::for('categories'));
         if($lims_category_data['ajax'])
             return $category;
         else
@@ -216,7 +222,7 @@ class CategoryController extends Controller
 
     public function update(UpdateCategoryRequest $request)
     {
-        if(!env('USER_VERIFIED'))
+        if(!config('app.user_verified'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
 
         $lims_category_data = DB::table('categories')->where('id', $request->category_id)->first();
@@ -342,6 +348,7 @@ class CategoryController extends Controller
             $category->save();
         }
         $this->cacheForget('category_list');
+        cache()->forget(StorefrontCacheKey::for('categories'));
         return redirect('category')->with('message', __('db.Category imported successfully'));
     }
 
@@ -362,6 +369,7 @@ class CategoryController extends Controller
             $this->fileDelete(public_path('images/category/icons/'),$lims_category_data->icon);
         }
         $this->cacheForget('category_list');
+        cache()->forget(StorefrontCacheKey::for('categories'));
         return 'Category deleted successfully!';
     }
 
@@ -380,6 +388,7 @@ class CategoryController extends Controller
 
         $lims_category_data->save();
         $this->cacheForget('category_list');
+        cache()->forget(StorefrontCacheKey::for('categories'));
         return redirect('category')->with('not_permitted', __('db.Category deleted successfully'));
     }
 }

@@ -1,23 +1,36 @@
-@extends('backend.layout.main')
+@extends('backend.layout.main') @section('content')
+
 @push('css')
-    <style>
-        #table-loader {
-            background-color: #f9f9f9;
-        }
-        .table {
-            background-color: #fff;
-            border-collapse: collapse !important;
-            border-radius: 10px;
-        }
-    </style>
+<style>
+#table-loader {
+    background-color: #f9f9f9;
+}
+.table {
+    background-color: #fff;
+    border-collapse: collapse !important;
+    border-radius: 10px;
+}
+
+/* Switch track */
+.custom-switch .custom-control-input:disabled:checked ~ .custom-control-label::before,
+.custom-control-input:checked ~ .custom-control-label::before {
+    background-color: #7c5cc4; /* Green when active */
+    border-color: #7c5cc4;
+}
+
+.custom-control-input:not(:checked) ~ .custom-control-label::before {
+    background-color: #ddd; /* Red when inactive */
+    border-color: #ddd;
+}
+</style>
 @endpush
-@section('content')
+
     @include('includes.session_message')
     <section>
         <div class="container-fluid mt-5">
 
             <div class=" mb-3 ">
-                <a class="btn btn-primary float-end" href="{{ route('settings.invoice.create') }}"> <i class="dripicons-plus"></i>
+                <a class="btn btn-primary float-end" href="{{ route('settings.invoice.create') }}"> <i class="ti ti-plus"></i>
                     {{ __('db.Add New Invoice Setting') }}</a>
             </div>
 
@@ -44,14 +57,28 @@
                             <tr>
                                 <td>{{ $invoice->template_name }}</td>
                                 <td>{{ $invoice->size }}</td>
-                                <td class="text-center align-middle">
+                                <td class="text-center">
                                     @if ($invoice->is_default)
-                                        <span class="badge bg-success">{{ __('db.Default')}}</span>
+                                        <div class="custom-control custom-switch">
+                                            <input type="checkbox" 
+                                                class="custom-control-input set-default" 
+                                                id="switchDefault{{ $invoice->id }}" 
+                                                checked 
+                                                disabled>
+                                            <label class="custom-control-label" for="switchDefault{{ $invoice->id }}">
+                                            </label>
+                                        </div>
                                     @else
-                                        <button class="btn btn-sm btn-outline-secondary change-status" data-id="{{ $invoice->id }}"
-                                            data-column="is_default" data-url="{{ route('settings.invoice.update', $invoice->id) }}">
-                                            {{ __('db.Set Default')}}
-                                        </button>
+                                        <div class="custom-control custom-switch">
+                                            <input type="checkbox" 
+                                                class="custom-control-input set-default change-status" 
+                                                id="switchDefault{{ $invoice->id }}"
+                                                data-id="{{ $invoice->id }}"
+                                                data-column="is_default" 
+                                                data-url="{{ route('settings.invoice.update', $invoice->id) }}">
+                                            <label class="custom-control-label" style="cursor: pointer;" for="switchDefault{{ $invoice->id }}">
+                                            </label>
+                                        </div>
                                     @endif
                                 </td>
 
@@ -85,7 +112,7 @@
                 var url = button.data('url');
                 var row = button.closest('tr');
 
-                if (confirm('Are you sure you want to delete this invoice setting?')) {
+                SaleProConfirm.open({ message: 'Are you sure you want to delete this invoice setting?' }).then(function(confirmed) { if (confirmed) {
                     $('#table-loader').show(); // Show loader row
 
                     $.ajax({
@@ -100,48 +127,51 @@
                                 row.fadeOut(400, function() {
                                     $(this).remove();
                                 });
-                            }else if (response.success == false){
-                                alert('Default invoice cannot be deleted');
+                            } else if (response.success == false){
+                                SaleProToast.show('Default invoice cannot be deleted');
                             } else {
-                                alert(response.not_permitted);
+                                SaleProToast.show(response.not_permitted);
                             }
 
                         },
                         error: function() {
-                            alert('Error deleting invoice.');
+                            SaleProToast.show('Error deleting invoice.');
                         },
                         complete: function() {
                             $('#table-loader').hide();
                         }
                     });
                 }
+                });
             });
 
-            $('.change-status').on('click', function() {
+            $(document).on('click', '.change-status', function() {
+                $('.set-default').prop('checked', false);
+                $(this).prop('checked', true);
+
                 var button = $(this);
                 var id = button.data('id');
                 var url = button.data('url');
                 var column = button.data('column');
-                console.log(id, url, column)
-                if (confirm('Are you sure you want to change the status?')) {
-                    $.ajax({
-                        url: url,
-                        method: 'POST',
-                        data: {
-                            _token: '{{ csrf_token() }}',
-                            _method: 'PUT', // important if you're using Laravel's resourceful routes
-                            id: id,
-                            column: column
-                        },
-                        success: function() {
-                            location.reload();
-                        },
-                        error: function() {
-                            alert("Failed to update status.");
-                        }
-                    });
-                }
-            })
+
+                $.ajax({
+                    url: url,
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        _method: 'PUT',
+                        id: id,
+                        column: column
+                    },
+                    success: function() {
+                        button.prop('checked', true);
+                    },
+                    error: function() {
+                        SaleProToast.show("Failed to update status.");
+                        button.prop('checked', false);
+                    }
+                });
+            });
 
         });
     </script>

@@ -8,15 +8,20 @@ use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use Auth;
+use App\Http\Controllers\Concerns\AuthorizesHrmWarehouse;
 
 class DepartmentController extends Controller
 {
-    public function index()
+    use AuthorizesHrmWarehouse;
+
+    public function index(Request $request)
     {
         $role = Role::find(Auth::user()->role_id);
         if($role->hasPermissionTo('department')) {
-            $lims_department_all = Department::where('is_active', true)->get();
-            return view('backend.department.index', compact('lims_department_all'));
+            $query = Department::where('is_active', true)->with('warehouse');
+            $lims_department_all = $this->applyWarehouseFilter($query, $request)->get();
+            $lims_warehouse_list = $this->authorizedWarehouses();
+            return view('backend.department.index', compact('lims_department_all', 'lims_warehouse_list'));
         }
         else
             return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
@@ -25,15 +30,17 @@ class DepartmentController extends Controller
     public function store(Request $request)
     {
         $this->validate($request, [
+            'warehouse_id' => 'required|integer',
             'name' => [
                 'max:255',
-                    Rule::unique('departments')->where(function ($query) {
-                    return $query->where('is_active', 1);
+                    Rule::unique('departments')->where(function ($query) use ($request) {
+                    return $query->where('is_active', 1)->where('warehouse_id', $request->warehouse_id);
                 }),
             ],
         ]);
 
         $data = $request->all();
+        $data['warehouse_id'] = $this->authorizedWarehouseId($request);
         $data['is_active'] = true;
         $department = Department::create($data);
 
@@ -45,35 +52,33 @@ class DepartmentController extends Controller
 
     public function update(Request $request, $id)
     {
+        $department = Department::findOrFail($request->department_id ?: $id);
         $this->validate($request,[
+            'warehouse_id' => 'required|integer',
             'name' => [
                 'max:255',
-                Rule::unique('departments')->ignore($request->department_id)->where(function ($query) {
-                    return $query->where('is_active', 1);
+                Rule::unique('departments')->ignore($department->id)->where(function ($query) use ($request) {
+                    return $query->where('is_active', 1)->where('warehouse_id', $request->warehouse_id);
                 }),
             ],
         ]);
 
         $data = $request->all();
-        $lims_department_data = Department::find($data['department_id']);
-        $lims_department_data->update($data);
+        $data['warehouse_id'] = $this->authorizedWarehouseId($request);
+        $department->update($data);
         return redirect('departments')->with('message', __('db.Department updated successfully'));
     }
 
     public function deleteBySelection(Request $request)
     {
         $department_id = $request['departmentIdArray'];
-        foreach ($department_id as $id) {
-            $lims_department_data = Department::find($id);
-            $lims_department_data->is_active = false;
-            $lims_department_data->save();
-        }
+        Department::whereIn('id', $department_id)->update(['is_active' => false]);
         return 'Department deleted successfully!';
     }
 
     public function destroy($id)
     {
-        $lims_department_data = Department::find($id);
+        $lims_department_data = Department::findOrFail($id);
         $lims_department_data->is_active = false;
         $lims_department_data->save();
         return redirect('departments')->with('message', __('db.Department deleted successfully'));

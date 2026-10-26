@@ -1,23 +1,21 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 <?php $general_setting = DB::table('general_settings')->find(1); ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{$general_setting->site_title}}</title>
-    @if(!config('database.connections.saleprosaas_landlord'))
-    <link rel="icon" type="image/png" href="{{url('logo', $general_setting->site_logo)}}" />
+    <title>{{gen_setting()->site_title}}</title>
+
+    <link rel="icon" type="image/png" href="{{url($asset_prefix . 'logo', gen_setting()->site_logo)}}" />
     <!-- Bootstrap CSS-->
-    <link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
-    @else
-    <link rel="icon" type="image/png" href="{{url('../../logo', $general_setting->site_logo)}}" />
-    <!-- Bootstrap CSS-->
-    <link rel="stylesheet" href="<?php echo asset('../../vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css">
-    @endif
+    <link rel="stylesheet" href="{{ asset($asset_prefix . 'vendor/bootstrap/css/bootstrap.min.css') }}" type="text/css">
 
     <!-- Google fonts -->
-    @if($general_setting->font_css)
-      {!! $general_setting->font_css !!}
+    @if(gen_setting()->font_css)
+      {!! gen_setting()->font_css !!}
     @else
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,7 +23,7 @@
     @endif
 
     <!-- Custom CSS from general settings -->
-    {!! $general_setting->auth_css !!}
+    {!! gen_setting()->auth_css !!}
 
     <style>
         body { font-size: 14px;font-family: 'Inter', sans-serif;}
@@ -140,10 +138,10 @@
         <div class="col-lg-6 d-flex align-items-center position-relative py-5">
             <div class="login-container w-100 px-lg-5 px-3">
                 <div class="mb-5" style="margin: auto; text-align: center;">
-                    @if($general_setting->site_logo)
-                    <img src="{{url('logo', $general_setting->site_logo)}}" width="120">
+                    @if(gen_setting()->site_logo)
+                    <img src="{{url('logo', gen_setting()->site_logo)}}" width="120">
                     @else
-                    <span>{{$general_setting->site_title}}</span>
+                    <span>{{gen_setting()->site_title}}</span>
                     @endif
                 </div>
 
@@ -152,13 +150,13 @@
                     
                     <div class="row">
                         <div class="col-md-6 form-group">
-                            <label class="font-weight-bold small">{{__('db.UserName')}} *</label>
+                            <label class="font-weight-bold small">{{__('db.username')}} *</label>
                             <input type="text" name="name" required class="form-control" value="{{old('name')}}">
                             @if ($errors->has('name')) <small class="text-danger">{{ $errors->first('name') }}</small> @endif
                         </div>
 
                         <div class="col-md-6 form-group">
-                            <label class="font-weight-bold small">{{__('db.Email')}} *</label>
+                            <label class="font-weight-bold small">{{__('db.email')}} *</label>
                             <input type="email" name="email" required class="form-control" value="{{old('email')}}">
                             @if ($errors->has('email')) <small class="text-danger">{{ $errors->first('email') }}</small> @endif
                         </div>
@@ -274,7 +272,7 @@ document.addEventListener("DOMContentLoaded", function() {
     // 1. Landlord Limit Check (Fetch API replacement for $.ajax)
     @if(config('database.connections.saleprosaas_landlord'))
         const numberOfUserAccount = @json($numberOfUserAccount);
-        fetch('{{route("package.fetchData", $general_setting->package_id)}}')
+        fetch('{{route("package.fetchData", gen_setting()->package_id)}}')
             .then(response => response.json())
             .then(data => {
                 if(data['number_of_user_account'] > 0 && data['number_of_user_account'] <= numberOfUserAccount) {

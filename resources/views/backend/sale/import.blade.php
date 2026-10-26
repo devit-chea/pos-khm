@@ -1,7 +1,28 @@
 @extends('backend.layout.main') @section('content')
 
+@push('css')
+    <style>
+        .sale-section {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            padding: 20px 20px 10px 20px;
+            margin-bottom: 20px;
+            background: #fff;
+        }
+        body.dark-mode .sale-section {
+            background: #283046;
+            border-color: #3b4253;
+            box-shadow: none;
+        }
+    </style>
+@endpush
+
 <x-error-message key="message" />
 <x-error-message key="not_permitted" />
+@php
+    $phase2ImportBlocked = app(\App\Services\ZatcaIntegrationService::class)->isPhase2Active();
+@endphp
 
 <section class="forms">
     <div class="container-fluid">
@@ -12,12 +33,17 @@
                         <h4>{{__('db.Import Sale')}}</h4>
                     </div>
                     <div class="card-body">
+                        @if($phase2ImportBlocked)
+                            <div class="alert alert-warning" role="alert">
+                                CSV sale import is unavailable in ZATCA Phase 2 until fiscal-aware import validation is complete.
+                                No imported sale will be saved. Use Add Sale or POS for a new sale.
+                            </div>
+                        @endif
                         <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
                         <form action="{{ route('sale.import') }}" method="POST" enctype="multipart/form-data" class="payment-form">
                             @csrf
 
-                        <div class="row">
-                            <div class="col-md-12">
+                            <div class="sale-section">
                                 <div class="row">
                                     <div class="col-md-4">
                                         <div class="form-group">
@@ -49,19 +75,37 @@
                                             </select>
                                         </div>
                                     </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label>{{__('db.Currency')}} *</label>
+                                            <select name="currency_id" id="currency" class="form-control selectpicker" data-toggle="tooltip" title="" data-original-title="Sale currency">
+                                                @foreach($currency_list as $currency_data)
+                                                <option value="{{$currency_data->id}}" data-rate="{{$currency_data->exchange_rate}}">{{$currency_data->code}}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label>{{__('db.Exchange Rate')}} *</label>
+                                            <input class="form-control" type="text" id="exchange_rate" name="exchange_rate" value="{{$currency->exchange_rate}}">
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="row mt-3">
+                            </div>
+                            <div class="sale-section">
+                                <div class="row">
                                     <div class="col-md-6">
                                         <div class="form-group">
                                             <label>{{__('db.Upload CSV File')}} *</label>
                                             <input type="file" name="file" class="form-control" required />
-                                            <p>{{__('db.The correct column order is')}} (product_code, quantity, sale_unit_code, price, discount_per_unit, tax_name) {{__('db.and you must follow this')}}. {{__('db.For Digital product sale_unit will be n/a')}}. {{__('db.All columns are required')}}</p>
+                                            <p>{{__('db.The correct column order is')}} (product_code, quantity, sale_unit_code, price, discount_per_unit, tax_name) {{__('db.and you must follow this')}}. {{__('db.digital_product_unit_not_applicable')}}. {{__('db.All columns are required')}}</p>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="form-group">
                                             <label></label><br>
-                                            <a download href="../sample_file/sample_sale_products.csv" class="btn btn-primary btn-block btn-lg"><i class="dripicons-download"></i> {{__('db.Download Sample File')}}</a>
+                                            <a download href="../sample_file/sample_sale_products.csv" class="btn btn-primary btn-block btn-lg"><i class="ti ti-download"></i> {{__('db.Download Sample File')}}</a>
                                         </div>
                                     </div>
                                 </div>
@@ -95,12 +139,14 @@
                                     <div class="col-md-2">
                                         <div class="form-group">
                                             <input type="hidden" name="grand_total" value="0" />
-                                            <input type="hidden" name="paid_amount" value="{{number_format(0, $general_setting->decimal, '.', '')}}" />
+                                            <input type="hidden" name="paid_amount" value="{{number_format(0, gen_setting()->decimal, '.', '')}}" />
                                             <input type="hidden" name="payment_status" value="2" />
                                         </div>
                                     </div>
                                 </div>
-                                <div class="row mt-3">
+                            </div>
+                            <div class="sale-section">
+                                <div class="row">
                                     <div class="col-md-4">
                                         <div class="form-group">
                                             <label>{{__('db.Order Tax')}}</label>
@@ -128,16 +174,14 @@
                                             <input type="number" name="shipping_cost" class="form-control" step="any" />
                                         </div>
                                     </div>
-                                </div>
-                                <div class="row">
                                     <div class="col-md-4">
                                         <div class="form-group">
                                             <label>{{__('db.Attach Document')}}</label>
-                                            <i class="dripicons-question" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
+                                            <i class="ti ti-info-circle" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
                                             <input type="file" name="document" class="form-control" />
                                             @if($errors->has('extension'))
                                                 <span>
-                                                   <strong>{{ $errors->first('extension') }}</strong>
+                                                    <strong>{{ $errors->first('extension') }}</strong>
                                                 </span>
                                             @endif
                                         </div>
@@ -152,6 +196,8 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                            <div class="sale-section">
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="form-group">
@@ -166,11 +212,10 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="form-group">
-                                    <input type="submit" value="{{__('db.submit')}}" class="btn btn-primary" id="submit-button">
-                                </div>
                             </div>
-                        </div>
+                            <div class="form-group">
+                                <input type="submit" value="{{__('db.submit')}}" class="btn btn-primary" id="submit-button" @if($phase2ImportBlocked) disabled aria-disabled="true" @endif>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -182,32 +227,36 @@
 @endsection
 
 @push('scripts')
-<script type="text/javascript">
+    <script type="text/javascript">
 
-    $("ul#sale").siblings('a').attr('aria-expanded','true');
-    $("ul#sale").addClass("show");
-    $("ul#sale #sale-import-menu").addClass("active");
+        $("ul#sale").siblings('a').attr('aria-expanded','true');
+        $("ul#sale").addClass("show");
+        $("ul#sale #sale-import-menu").addClass("active");
 
-    @if(config('database.connections.saleprosaas_landlord'))
-        numberOfInvoice = <?php echo json_encode($numberOfInvoice)?>;
-        $.ajax({
-            type: 'GET',
-            async: false,
-            url: '{{route("package.fetchData", $general_setting->package_id)}}',
-            success: function(data) {
-                if(data['number_of_invoice'] > 0 && data['number_of_invoice'] <= numberOfInvoice) {
-                    localStorage.setItem("message", "You don't have permission to create another invoice as you already exceed the limit! Subscribe to another package if you wants more!");
-                    location.href = "{{route('sales.index')}}";
+        @if(config('database.connections.saleprosaas_landlord'))
+            numberOfInvoice = <?php echo json_encode($numberOfInvoice)?>;
+            $.ajax({
+                type: 'GET',
+                async: false,
+                url: '{{route("package.fetchData", gen_setting()->package_id)}}',
+                success: function(data) {
+                    if(data['number_of_invoice'] > 0 && data['number_of_invoice'] <= numberOfInvoice) {
+                        localStorage.setItem("message", "You don't have permission to create another invoice as you already exceed the limit! Subscribe to another package if you wants more!");
+                        location.href = "{{route('sales.index')}}";
+                    }
                 }
-            }
+            });
+        @endif
+
+        $('.selectpicker').selectpicker({
+            style: 'btn-link',
         });
-    @endif
 
-$('.selectpicker').selectpicker({
-    style: 'btn-link',
-});
+        $('[data-toggle="tooltip"]').tooltip();
 
-$('[data-toggle="tooltip"]').tooltip();
-
-</script>
+        $('#currency').on('change', function() {
+            var rate = $(this).find(':selected').data('rate');
+            $('#exchange_rate').val(rate);
+        });
+    </script>
 @endpush

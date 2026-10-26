@@ -8,6 +8,7 @@ use App\Models\PosSetting;
 use Illuminate\Http\Request;
 use App\Models\InstallmentPlan;
 use App\Models\RewardPointSetting;
+use App\Models\Sale;
 
 class InstallmentPlanController extends Controller
 {
@@ -35,17 +36,21 @@ class InstallmentPlanController extends Controller
     public function show($id)
     {
         $plan = InstallmentPlan::with('installments')->findOrFail($id);
-        
+
+        // Check if the parent sale is already fully paid so we can disable the Add Payment button
+        $parentSale = Sale::find($plan->reference_id);
+        $saleFullyPaid = $parentSale && $parentSale->payment_status == 4;
+
         $lims_gift_card_list = GiftCard::where("is_active", true)->get();
         $lims_pos_setting_data = PosSetting::latest()->first();
         $lims_reward_point_setting_data = RewardPointSetting::latest()->first();
-        $lims_account_list = Account::where('is_active', true)->get();
+        $lims_account_list = app(\App\Services\PaymentAccountService::class)->validOperationalAccounts();
 
         if($lims_pos_setting_data)
             $options = explode(',', $lims_pos_setting_data->payment_options);
         else
             $options = [];
-        return view('backend.installment_plans.show', compact('plan', 'lims_pos_setting_data', 'options', 'lims_reward_point_setting_data', 'lims_account_list', 'lims_gift_card_list'));
+        return view('backend.installment_plans.show', compact('plan', 'saleFullyPaid', 'lims_pos_setting_data', 'options', 'lims_reward_point_setting_data', 'lims_account_list', 'lims_gift_card_list'));
     }
 
     public function index()

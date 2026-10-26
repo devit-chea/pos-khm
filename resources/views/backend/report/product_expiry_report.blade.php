@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <section class="forms">
     <div class="container-fluid">
@@ -33,14 +37,14 @@
                     <td>{{$product->batch_no}}</td>
                     @if(date('Y-m-d') >= $product->expired_date)
                     <td>
-                        <div class="badge badge-danger">{{date($general_setting->date_format, strtotime($product->expired_date))}}</div>
+                        <div class="badge badge-danger">{{date(gen_setting()->date_format, strtotime($product->expired_date))}}</div>
                     </td>
                     @else
                     <td>
-                        <div class="badge badge-warning">{{date($general_setting->date_format, strtotime($product->expired_date))}}</div>
+                        <div class="badge badge-warning">{{date(gen_setting()->date_format, strtotime($product->expired_date))}}</div>
                     </td>
                     @endif
-                    <td>{{number_format((float)($product->qty), $general_setting->decimal, '.', '')}}</td>
+                    <td>{{number_format((float)($product->qty), gen_setting()->decimal, '.', '')}}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -51,6 +55,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
     $("ul#report").siblings('a').attr('aria-expanded','true');
     $("ul#report").addClass("show");
@@ -63,8 +68,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -93,7 +98,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -101,7 +106,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -109,7 +114,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -117,7 +122,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -125,7 +130,7 @@
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             }
         ],

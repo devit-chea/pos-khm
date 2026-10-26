@@ -1,19 +1,16 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 @extends('backend.layout.main')
 @section('content')
 
 @push('css')
-    @if (!config('database.connections.saleprosaas_landlord'))
-        <link rel="preload" href="<?php echo asset('vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" as="style" onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" rel="stylesheet">
-        </noscript>
-    @else
-        <link rel="preload" href="<?php echo asset('../../vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" as="style"
+    @include('backend.layout.partials.datatable_css')
+    <link rel="preload" href="{{ asset($asset_prefix . 'vendor/jquery-timepicker/jquery.timepicker.min.css') }}" as="style"
             onload="this.onload=null;this.rel='stylesheet'">
-        <noscript>
-            <link href="<?php echo asset('../../vendor/jquery-timepicker/jquery.timepicker.min.css'); ?>" rel="stylesheet">
-        </noscript>
-    @endif
+    <noscript>
+        <link href="{{ asset($asset_prefix . 'vendor/jquery-timepicker/jquery.timepicker.min.css') }}" rel="stylesheet">
+    </noscript>
 @endpush
 
 
@@ -23,7 +20,7 @@
 
 <section>
     <div class="container-fluid">
-        <button type="button" class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="dripicons-plus"></i> {{__('db.Add Shift')}}</button>
+        <button type="button" class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="ti ti-plus"></i> {{__('db.Add Shift')}}</button>
     </div>
     <div class="table-responsive">
         <table id="shift-table" class="table">
@@ -31,8 +28,8 @@
                 <tr>
                     <th class="not-exported"></th>
                     <th>{{__('db.Shift')}}</th>
-                    <th>{{__('db.Start Time')}}</th>
-                    <th>{{__('db.End Time')}}</th>
+                    <th>{{__('db.start_time')}}</th>
+                    <th>{{__('db.end_time')}}</th>
                     <th>{{__('db.Grace In (min)')}}</th>
                     <th>{{__('db.Grace Out (min)')}}</th>
                     <th class="not-exported">{{__('db.action')}}</th>
@@ -64,7 +61,7 @@
                                         data-grace-out="{{$shift->grace_out}}"
                                         class="edit-btn btn btn-link"
                                         data-toggle="modal" data-target="#editModal" >
-                                        <i class="dripicons-document-edit"></i>  {{__('db.edit')}}
+                                        <i class="ti ti-edit"></i>  {{__('db.edit')}}
                                     </button>
                                 </li>
                                 <li class="divider"></li>
@@ -72,7 +69,7 @@
                                     @csrf
                                     @method('DELETE')
                                     <li>
-                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> {{__('db.delete')}}</button>
+                                        <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> {{__('db.delete')}}</button>
                                     </li>
                                 </form>
                             </ul>
@@ -93,7 +90,7 @@
           @csrf
         <div class="modal-header">
           <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Shift')}}</h5>
-          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
         </div>
         <div class="modal-body">
           <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -104,12 +101,12 @@
           </div>
 
           <div class="form-group">
-              <label>{{__('db.Start Time')}} * <x-info title="Enter the shift start time, e.g., 09:00 AM" /></label>
+              <label>{{__('db.start_time')}} * <x-info title="Enter the shift start time, e.g., 09:00 AM" /></label>
               <input type="text" id="start_time" name="start_time" class="form-control" value="@if($lims_hrm_setting_data){{$lims_hrm_setting_data->start_time}}@endif" required>
           </div>
 
           <div class="form-group">
-              <label>{{__('db.End Time')}} * <x-info title="Enter the shift end time, e.g., 05:00 PM" /></label>
+              <label>{{__('db.end_time')}} * <x-info title="Enter the shift end time, e.g., 05:00 PM" /></label>
               <input type="text" id="end_time" name="end_time" class="form-control" value="@if($lims_hrm_setting_data){{$lims_hrm_setting_data->start_time}}@endif" required>
           </div>
 
@@ -141,8 +138,8 @@
             @csrf
             @method('PUT')
       <div class="modal-header">
-        <h5 id="exampleModalLabel" class="modal-title">{{__('db.Update Shift')}}</h5>
-        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+        <h5 id="exampleModalLabel" class="modal-title">{{__('db.update_shift')}}</h5>
+        <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
       </div>
       <div class="modal-body">
         <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -153,12 +150,12 @@
         </div>
 
         <div class="form-group">
-            <label>{{__('db.Start Time')}} * <x-info title="Edit the shift start time" /></label>
+            <label>{{__('db.start_time')}} * <x-info title="Edit the shift start time" /></label>
             <input type="text" id="start_time" name="start_time" class="form-control" value="@if($lims_hrm_setting_data){{$lims_hrm_setting_data->start_time}}@endif" required>
         </div>
 
         <div class="form-group">
-            <label>{{__('db.End Time')}} * <x-info title="Edit the shift end time" /></label>
+            <label>{{__('db.end_time')}} * <x-info title="Edit the shift end time" /></label>
             <input type="text" id="end_time" name="end_time" class="form-control" value="@if($lims_hrm_setting_data){{$lims_hrm_setting_data->start_time}}@endif" required>
         </div>
 
@@ -187,18 +184,15 @@
 @endsection
 
 @push('scripts')
-    @if (!config('database.connections.saleprosaas_landlord'))
-        <script type="text/javascript" src="<?php echo asset('vendor/jquery/jquery.timepicker.min.js'); ?>"></script>
-    @else
-        <script type="text/javascript" src="<?php echo asset('../../vendor/jquery/jquery.timepicker.min.js'); ?>"></script>
-    @endif
+    @include('backend.layout.partials.datatable_js')
+    <script type="text/javascript" src="{{ asset($asset_prefix . 'vendor/jquery/jquery.timepicker.min.js') }}"></script>
     <script type="text/javascript">
         $("ul#hrm").siblings('a').attr('aria-expanded','true');
         $("ul#hrm").addClass("show");
         $("ul#hrm #shift-menu").addClass("active");
 
         var shift_id = [];
-        var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+        var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
         $.ajaxSetup({
             headers: {
@@ -206,12 +200,7 @@
             }
         });
 
-        function confirmDelete() {
-        if (confirm("Are you sure want to delete?")) {
-            return true;
-        }
-        return false;
-        }
+        function confirmDelete() { return true; }
 
         $(document).ready(function() {
             $('.edit-btn').on('click', function(){
@@ -231,8 +220,8 @@
                 "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
                 "search":  '{{__("db.Search")}}',
                 'paginate': {
-                        'previous': '<i class="dripicons-chevron-left"></i>',
-                        'next': '<i class="dripicons-chevron-right"></i>'
+                        'previous': '<i class="ti ti-chevron-left"></i>',
+                        'next': '<i class="ti ti-chevron-right"></i>'
                 }
             },
             'columnDefs': [
@@ -261,7 +250,7 @@
             buttons: [
                 {
                     extend: 'pdf',
-                    text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                    text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -270,7 +259,7 @@
                 },
                 {
                     extend: 'excel',
-                    text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                    text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -279,7 +268,7 @@
                 },
                 {
                     extend: 'csv',
-                    text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -288,7 +277,7 @@
                 },
                 {
                     extend: 'print',
-                    text: '<i title="print" class="fa fa-print"></i>',
+                    text: '<i title="print" class="ti ti-printer"></i>',
                     exportOptions: {
                         columns: ':visible:Not(.not-exported)',
                         rows: ':visible'
@@ -296,7 +285,7 @@
                     footer:true
                 },
                 {
-                    text: '<i title="delete" class="dripicons-cross"></i>',
+                    text: '<i title="delete" class="ti ti-x"></i>',
                     className: 'buttons-delete',
                     action: function ( e, dt, node, config ) {
                         if(user_verified == '1') {
@@ -306,7 +295,7 @@
                                     shift_id[i-1] = $(this).closest('tr').data('id');
                                 }
                             });
-                            if(shift_id.length && confirm("Are you sure want to delete?")) {
+                            if (shift_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                                 $.ajax({
                                     type:'POST',
                                     url:'shift/deletebyselection',
@@ -314,21 +303,23 @@
                                         shiftIdArray: shift_id
                                     },
                                     success:function(data){
-                                        alert(data);
+                                        SaleProToast.show(data);
                                     }
                                 });
                                 dt.rows({ page: 'current', selected: true }).remove().draw(false);
                             }
+                            });
+                            }
                             else if(!shift_id.length)
-                                alert('No shift is selected!');
+                                SaleProToast.show('No shift is selected!');
                         }
                         else
-                            alert('This feature is disable for demo!');
+                            SaleProToast.show('This feature is disable for demo!');
                     }
                 },
                 {
                     extend: 'colvis',
-                    text: '<i title="column visibility" class="fa fa-eye"></i>',
+                    text: '<i title="column visibility" class="ti ti-eye"></i>',
                     columns: ':gt(0)'
                 },
             ],

@@ -41,7 +41,7 @@
                                 </div>
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label>{{__('db.Email')}} *</label>
+                                        <label>{{__('db.email')}} *</label>
                                         <input type="email" name="email" value="{{$lims_biller_data->email}}" required class="form-control">
                                         <x-validation-error fieldName="email" />
                                     </div>

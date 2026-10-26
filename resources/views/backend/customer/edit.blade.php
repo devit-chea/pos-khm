@@ -50,8 +50,17 @@
                             </div>
                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label>{{__('db.Email')}}</label>
+                                    <label>{{__('db.email')}}</label>
                                     <input type="email" name="email" value="{{$lims_customer_data->email}}" class="form-control">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label>Birth Date</label>
+                                    <input type="text" name="birth_date" value="{{ old('birth_date', optional($lims_customer_data->birth_date)->format('Y-m-d')) }}" class="form-control birth-date" autocomplete="off" placeholder="YYYY-MM-DD">
+                                    @error('birth_date')
+                                        <span><strong>{{ $message }}</strong></span>
+                                    @enderror
                                 </div>
                             </div>
                             <div class="col-md-4">
@@ -143,13 +152,21 @@
                                     <input type="text" name="country" value="{{$lims_customer_data->country}}" class="form-control">
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            @if(\Illuminate\Support\Facades\Schema::hasColumn('customers', 'zatca_registration_scheme'))
+                            <div class="col-12"><hr><h5 class="mb-1">ZATCA Phase 2 buyer details</h5><p class="text-muted">Complete these fields for Saudi business customers (standard B2B invoices). Leave them empty for retail customers.</p></div>
+                            <div class="col-md-4"><div class="form-group"><label>Buyer ID type</label><select name="zatca_registration_scheme" class="form-control"><option value="">Select</option>@foreach(['CRN' => 'Commercial Registration', '700' => 'Unified 700 Number', 'NAT' => 'National ID', 'IQA' => 'Iqama', 'TIN' => 'Tax ID', 'PAS' => 'Passport', 'GCC' => 'GCC ID', 'OTH' => 'Other'] as $code => $label)<option value="{{ $code }}" {{ old('zatca_registration_scheme', $lims_customer_data->zatca_registration_scheme) === $code ? 'selected' : '' }}>{{ $label }} ({{ $code }})</option>@endforeach</select></div></div>
+                            <div class="col-md-4"><div class="form-group"><label>Buyer ID number</label><input type="text" name="zatca_registration_number" value="{{ old('zatca_registration_number', $lims_customer_data->zatca_registration_number) }}" maxlength="20" class="form-control"></div></div>
+                            <div class="col-md-4"><div class="form-group"><label>Building number</label><input type="text" name="zatca_building_number" value="{{ old('zatca_building_number', $lims_customer_data->zatca_building_number) }}" pattern="[0-9]{4}" maxlength="4" class="form-control" placeholder="4 digits"></div></div>
+                            <div class="col-md-4"><div class="form-group"><label>Additional number</label><input type="text" name="zatca_additional_number" value="{{ old('zatca_additional_number', $lims_customer_data->zatca_additional_number) }}" pattern="[0-9]{4}" maxlength="4" class="form-control" placeholder="4 digits"></div></div>
+                            <div class="col-md-4"><div class="form-group"><label>District</label><input type="text" name="zatca_district" value="{{ old('zatca_district', $lims_customer_data->zatca_district) }}" class="form-control"></div></div>
+                            @endif
+                            <div class="col-md-4 customer-credit-field">
                                 <div class="form-group">
-                                    <label>{{__('db.Credit Limit')}} <x-info title="Leave it blank for unlimited credit" type="info" /></label>
-                                    <input type="number" name="credit_limit" class="form-control" value="{{$lims_customer_data->credit_limit}}" step="any" min="0">
+                                    <label>{{__('db.Credit Limit')}} <x-info title="Leave it blank for unlimited credit. Enter 0 to disable credit sales, or enter an amount to set a limit." type="info" /></label>
+                                    <input type="number" name="credit_limit" class="form-control" value="{{$lims_customer_data->credit_limit}}" step="any" min="0" placeholder="e.g. 1000">
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-4 customer-credit-field">
                                 <div class="form-group">
                                     <label>{{ __('db.payment_term') }}</label>
                                     <div class="d-flex">
@@ -222,7 +239,7 @@
                             @endforeach
                             <div class="col-md-4 user-input">
                                 <div class="form-group">
-                                    <label>{{__('db.UserName')}} *</label>
+                                    <label>{{__('db.username')}} *</label>
                                     <input type="text" name="name" class="form-control">
                                     @if($errors->has('name'))
                                    <span>
@@ -300,5 +317,30 @@
 
     var customer_group = $("input[name='customer_group']").val();
     $('select[name=customer_group_id]').val(customer_group);
+
+    function toggleCreditFields() {
+        var customerType = $('select[name="type"]').val();
+        if (customerType === 'walkin') {
+            $('.customer-credit-field').hide();
+            $('input[name="credit_limit"]').val('0');
+            $('input[name="pay_term_no"]').val('');
+            $('select[name="pay_term_period"]').val('days');
+        } else {
+            $('.customer-credit-field').show();
+        }
+    }
+
+    $('select[name="type"]').on('change', function() {
+        toggleCreditFields();
+    });
+
+    toggleCreditFields();
+
+    $('.birth-date').datepicker({
+        format: 'yyyy-mm-dd',
+        endDate: new Date(),
+        autoclose: true,
+        todayHighlight: true
+    });
 </script>
 @endpush

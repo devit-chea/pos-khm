@@ -9,6 +9,10 @@ if (config('database.connections.saleprosaas_landlord') && !tenant()) {
 @endphp
 
 @extends($layout)
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 
 @section('content')
 
@@ -18,7 +22,7 @@ if (config('database.connections.saleprosaas_landlord') && !tenant()) {
 
 <section>
     <div class="container-fluid">
-        <a href="{{ route($routePrefix . 'themeSettings.create') }}" class="btn btn-info"><i class="dripicons-plus"></i> Add Theme Setting</a>
+        <a href="{{ route($routePrefix . 'themeSettings.create') }}" class="btn btn-info"><i class="ti ti-plus"></i> Add Theme Setting</a>
     </div>
 
     <div class="table-responsive">
@@ -80,18 +84,18 @@ if (config('database.connections.saleprosaas_landlord') && !tenant()) {
                                             data-url="{{ route($routePrefix . 'themeSettings.activeFor', $themeSetting) }}"
                                             data-toggle="modal"
                                             data-target="#activeForModal">
-                                        <i class="dripicons-checkmark"></i> Active
+                                        <i class="ti ti-checkmark"></i> Active
                                     </button>
                                 </li>
                                 <li>
-                                    <a class="btn btn-link" href="{{ route($routePrefix . 'themeSettings.edit', $themeSetting) }}"><i class="dripicons-document-edit"></i> Edit</a>
+                                    <a class="btn btn-link" href="{{ route($routePrefix . 'themeSettings.edit', $themeSetting) }}"><i class="ti ti-edit"></i> Edit</a>
                                 </li>
                                 <li class="divider"></li>
                                 <form action="{{ route($routePrefix . 'themeSettings.destroy', $themeSetting->id) }}" method="POST">
                                     @csrf
                                     @method('DELETE')
                                     <li>
-                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> Delete</button>
+                                        <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> Delete</button>
                                     </li>
                                 </form>
                             </ul>
@@ -109,7 +113,7 @@ if (config('database.connections.saleprosaas_landlord') && !tenant()) {
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Set Active For</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
 
             <div class="modal-body">
@@ -147,6 +151,7 @@ if (config('database.connections.saleprosaas_landlord') && !tenant()) {
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script>
     (function ($) {
         "use strict";
@@ -292,7 +297,7 @@ if (config('database.connections.saleprosaas_landlord') && !tenant()) {
                     lengthMenu: '_MENU_ records per page',
                     info: '<small>Showing _START_ - _END_ (_TOTAL_)</small>',
                     search: 'Search',
-                    paginate: { previous: '<i class="dripicons-chevron-left"></i>', next: '<i class="dripicons-chevron-right"></i>' }
+                    paginate: { previous: '<i class="ti ti-chevron-left"></i>', next: '<i class="ti ti-chevron-right"></i>' }
                 },
                 columnDefs: [
                     {

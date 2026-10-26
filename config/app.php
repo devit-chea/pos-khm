@@ -41,6 +41,8 @@ return [
 
     'debug' => (bool) env('APP_DEBUG', false),
 
+    'user_verified' => env('USER_VERIFIED', false),
+
     /*
     |--------------------------------------------------------------------------
     | Application URL
@@ -175,6 +177,19 @@ return [
         // App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
+        ...(
+            class_exists(\Stancl\Tenancy\TenancyServiceProvider::class)
+            && class_exists(App\Providers\TenancyServiceProvider::class)
+                ? [
+                    // Register the package provider explicitly before the app's
+                    // tenancy provider. Tenant IDs are strings, and the package
+                    // provider binds the ID generator that makes Eloquent treat
+                    // them as non-incrementing string keys.
+                    \Stancl\Tenancy\TenancyServiceProvider::class,
+                    App\Providers\TenancyServiceProvider::class,
+                ]
+                : []
+        ),
 
 
     ],

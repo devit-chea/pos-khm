@@ -1,8 +1,12 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
 <section>
     <div class="container-fluid">
-        <a href="{{route('barcodes.create')}}" class="btn btn-info add-sale-btn"><i class="dripicons-plus"></i> {{__('db.Add New Setting')}}</a>&nbsp;
+        <a href="{{route('barcodes.create')}}" class="btn btn-info add-sale-btn"><i class="ti ti-plus"></i> {{__('db.Add New Setting')}}</a>&nbsp;
     </div>
     <div class="table-responsive">
         <table id="barcode-table" class="table" style="width: 100%">
@@ -20,6 +24,7 @@
 
 @endsection
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script>
     $.ajaxSetup({
         headers: {
@@ -49,8 +54,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         order:[['2', 'asc']],
@@ -81,7 +86,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -90,7 +95,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -99,7 +104,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -108,7 +113,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -116,7 +121,7 @@
                 footer:true
             },
             {
-                text: '<i title="delete" class="dripicons-cross"></i>',
+                text: '<i title="delete" class="ti ti-x"></i>',
                 className: 'buttons-delete',
                 action: function ( e, dt, node, config ) {
                     if(user_verified == '1') {
@@ -126,7 +131,7 @@
                                 category_id[i-1] = $(this).closest('tr').data('id');
                             }
                         });
-                        if(category_id.length && confirm("If you delete category all products under this category will also be deleted. Are you sure want to delete?")) {
+                        if (category_id.length) { SaleProConfirm.open({ message: "If you delete category all products under this category will also be deleted. Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                             $.ajax({
                                 type:'POST',
                                 url:'category/deletebyselection',
@@ -139,16 +144,18 @@
                                 }
                             });
                         }
+                        });
+                        }
                         else if(!category_id.length)
-                            alert('No category is selected!');
+                            SaleProToast.show('No category is selected!');
                     }
                     else
-                        alert('This feature is disable for demo!');
+                        SaleProToast.show('This feature is disable for demo!');
                 }
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],

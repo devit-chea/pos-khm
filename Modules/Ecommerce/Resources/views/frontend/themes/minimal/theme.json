@@ -1,0 +1,11 @@
+{
+    "name": "Minimal Theme",
+    "version": "1.0",
+    "supported_widgets": [
+        "text-widget",
+        "one-c-banner-widget",
+        "image-slider-widget",
+        "product-category-widget",
+        "product-collection-widget"
+    ]
+}

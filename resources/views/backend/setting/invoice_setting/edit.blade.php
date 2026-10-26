@@ -34,12 +34,16 @@
                                         <select name="size" disabled class="form-control">
                                             <option value="a4" {{ $invoice->size == 'a4' ? 'selected' : '' }}>A4
                                             </option>
+                                            <option value="a4_bilingual" {{ $invoice->size == 'a4_bilingual' ? 'selected' : '' }}>A4 (Bilingual / ثنائي اللغة)
+                                            </option>
                                             <option value="58mm" {{ $invoice->size == '58mm' ? 'selected' : '' }}>58mm
                                                 (Thermal
                                                 receipt)</option>
                                             <option value="80mm" {{ $invoice->size == '80mm' ? 'selected' : '' }}>80mm
                                                 (Thermal
                                                 receipt)</option>
+                                            <option value="80mm_bilingual" {{ $invoice->size == '80mm_bilingual' ? 'selected' : '' }}>80mm (Bilingual / ثنائي اللغة)
+                                            </option>
                                         </select>
                                     </div>
                                     <div class="col-md-4 form-group">
@@ -129,7 +133,7 @@
                                     </div>
 
                                     <div class="col-md-4 form-group digit_number">
-                                        <label>{{ __('db.Number Of Digit') }} *</label>
+                                        <label>{{ __('db.number_of_digits') }} *</label>
                                         <input type="number" name="number_of_digit"
                                             value="{{ old('number_of_digit', $invoice->number_of_digit) }}" required
                                             class="form-control">
@@ -145,16 +149,16 @@
                                             value="{{ old('start_number', $invoice->start_number) }}" class="form-control">
                                     </div>
 
-                                    <!-- <div class="col-md-4 form-group">
+                                    <div class="col-md-4 form-group">
                                         <label>{{ __('db.Header Text') }}</label>
                                         <textarea class="form-control validate-input" name="header_text"
                                                 id="header_text" data-min="2"
                                                 data-target="#header-text-message"
                                                 rows="3">{{ old('header_text', $invoice->header_text) }}</textarea>
                                         <small id="header-text-message" style="display: block; margin-top: 5px;"></small>
-                                    </div> -->
+                                    </div>
 
-                                    @if($invoice->size == 'a4')
+                                    @if($invoice->size == 'a4' || $invoice->size == 'a4_bilingual')
                                     <div class="col-md-4 form-group">
                                         <label>{{ __('db.Primary Color') }}</label>
                                         <input type="color" name="primary_color" id="colorPicker"
@@ -177,7 +181,7 @@
                                 <div class="row">
                                     @php
 
-                                        if($invoice->size == '58mm' || $invoice->size == '80mm'){;
+                                        if($invoice->size == '58mm' || $invoice->size == '80mm' || $invoice->size == '80mm_bilingual'){;
                                             $checkboxes = [
                                                 'active_logo_height_width' => 'db.Active Logo Height Width',
                                                 'show_ref_number' => 'db.Show Reference No',
@@ -248,6 +252,57 @@
 
                                 </div>
 
+                                @php
+                                    $extraData = $invoice->getExtraData();
+                                    $enableSignatures = !empty($extraData['enable_invoice_signatures']);
+                                    $showPrepared = isset($extraData['show_prepared_by']) ? (bool)$extraData['show_prepared_by'] : true;
+                                    $showAuthorized = isset($extraData['show_authorized_by']) ? (bool)$extraData['show_authorized_by'] : true;
+                                    $showCustomer = isset($extraData['show_customer_signature']) ? (bool)$extraData['show_customer_signature'] : true;
+                                    $preparedLabel = $extraData['prepared_by_label'] ?? '';
+                                    $authorizedLabel = $extraData['authorized_by_label'] ?? '';
+                                    $customerLabel = $extraData['customer_signature_label'] ?? '';
+                                @endphp
+                                <hr>
+                                <div class="row">
+                                    <div class="col-md-12 mb-2">
+                                        <h4>{{ __('db.Invoice Signatures') }}</h4>
+                                    </div>
+                                    <div class="col-md-12 mb-3">
+                                        <label class="custom-checkbox">
+                                            <input type="checkbox" name="enable_invoice_signatures" value="1" id="enable_invoice_signatures" {{ $enableSignatures ? 'checked' : '' }}>
+                                            <strong>{{ __('db.Enable Invoice Signatures') }}</strong>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="row" id="signature_options_section" style="{{ $enableSignatures ? '' : 'display:none;' }}">
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label class="custom-checkbox">
+                                                <input type="checkbox" name="show_prepared_by" value="1" {{ $showPrepared ? 'checked' : '' }}>
+                                                {{ __('db.Show Prepared By') }}
+                                            </label>
+                                            <input type="text" name="prepared_by_label" class="form-control" placeholder="{{ __('db.Prepared By') }}" value="{{ $preparedLabel }}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label class="custom-checkbox">
+                                                <input type="checkbox" name="show_authorized_by" value="1" {{ $showAuthorized ? 'checked' : '' }}>
+                                                {{ __('db.Show Authorized By') }}
+                                            </label>
+                                            <input type="text" name="authorized_by_label" class="form-control" placeholder="{{ __('db.Authorized By') }}" value="{{ $authorizedLabel }}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label class="custom-checkbox">
+                                                <input type="checkbox" name="show_customer_signature" value="1" {{ $showCustomer ? 'checked' : '' }}>
+                                                {{ __('db.Show Customer Signature') }}
+                                            </label>
+                                            <input type="text" name="customer_signature_label" class="form-control" placeholder="{{ __('db.Customer Signature') }}" value="{{ $customerLabel }}">
+                                        </div>
+                                    </div>
+                                </div>
 
                                 <div class="form-group mt-3">
                                     <button type="submit" class="btn btn-primary">{{ __('db.update') }}</button>
@@ -341,6 +396,14 @@
             }
 
             $(target).text(message).css('color', color);
+        });
+
+        $('#enable_invoice_signatures').on('change', function() {
+            if ($(this).is(':checked')) {
+                $('#signature_options_section').slideDown();
+            } else {
+                $('#signature_options_section').slideUp();
+            }
         });
     </script>
 @endpush

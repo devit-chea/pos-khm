@@ -11,24 +11,28 @@ use Spatie\Permission\Models\Permission;
 use Mail;
 use App\Mail\HolidayApprove;
 use App\Models\MailSetting;
+use App\Http\Controllers\Concerns\AuthorizesHrmWarehouse;
 
 class HolidayController extends Controller
 {
-    use \App\Traits\MailInfo;
+    use \App\Traits\MailInfo, AuthorizesHrmWarehouse;
 
-    public function index()
+    public function index(Request $request)
     {
         $role = Role::find(Auth::user()->role_id);
         if($role->hasPermissionTo('holiday')) {
             $approve_permission = true;
-            $lims_holiday_list = Holiday::orderBy('id', 'desc')->get();
+            $holidayQuery = Holiday::with('warehouse')->orderBy('id', 'desc');
+            $lims_holiday_list = $this->applyHolidayFilter($holidayQuery, $request)->get();
         }
         else {
             $approve_permission = false;
-            $lims_holiday_list = Holiday::where('user_id', Auth::id())->orderBy('id', 'desc')->get();
+            $lims_holiday_list = Holiday::with('warehouse')->where('user_id', Auth::id())->orderBy('id', 'desc')->get();
         }
 
-        return view('backend.hrm.holiday.index', compact('lims_holiday_list', 'approve_permission'));
+        $lims_warehouse_list = $this->authorizedWarehouses();
+        $supports_global_warehouse_filter = true;
+        return view('backend.hrm.holiday.index', compact('lims_holiday_list', 'approve_permission', 'lims_warehouse_list', 'supports_global_warehouse_filter'));
     }
 
     public function create()
@@ -38,10 +42,12 @@ class HolidayController extends Controller
 
     public function store(Request $request)
     {
+        $warehouseId = $this->authorizedHolidayWarehouseId($request);
         $data = [
             'from_date'   => date("Y-m-d", strtotime(str_replace("/", "-", $request->input('from_date')))),
             'to_date'     => date("Y-m-d", strtotime(str_replace("/", "-", $request->input('to_date')))),
             'user_id'     => Auth::id(),
+            'warehouse_id' => $warehouseId,
             'note'        => $request->input('note'),
             'recurring' => $request->input('recurring') ?? 0,
             'region' => $request->input('region') ?? null
@@ -65,7 +71,7 @@ class HolidayController extends Controller
 
     public function approveHoliday($id)
     {
-        $holiday = Holiday::find($id);
+        $holiday = Holiday::findOrFail($id);
         $holiday->is_approved = true;
         $holiday->save();
         //collecting mail data
@@ -96,10 +102,8 @@ class HolidayController extends Controller
                 $date = $year.'-'.$month.'-'.$start;
             $holiday_found = Holiday::whereDate('from_date','<=', $date)
                 ->whereDate('to_date','>=', $date)
-                ->where([
-                    ['is_approved', true],
-                    ['user_id', Auth::id()]
-                ])->first();
+                ->where('is_approved', true)
+                ->first();
             if($holiday_found) {
                 $general_setting = \App\Models\GeneralSetting::select('date_format')->latest()->first();
                 $holidays[$start] = date($general_setting->date_format, strtotime($holiday_found->from_date)).' '.__("db.To").' '.date($general_setting->date_format, strtotime($holiday_found->to_date));
@@ -120,11 +124,13 @@ class HolidayController extends Controller
 
     public function update(Request $request, $id)
     {
-        $holiday_data = Holiday::find($request->input('id'));
+        $holiday_data = Holiday::findOrFail($request->input('id') ?: $id);
+        $warehouseId = $this->authorizedHolidayWarehouseId($request);
         $data = [
             'from_date'   => date("Y-m-d", strtotime(str_replace("/", "-", $request->input('from_date')))),
             'to_date'     => date("Y-m-d", strtotime(str_replace("/", "-", $request->input('to_date')))),
             'note'        => $request->input('note'),
+            'warehouse_id' => $warehouseId,
             'recurring' => $request->input('recurring') ?? 0,
             'region' => $request->input('region') ?? null
         ];
@@ -135,16 +141,40 @@ class HolidayController extends Controller
     public function deleteBySelection(Request $request)
     {
         $holiday_id = $request['holidayIdArray'];
-        foreach ($holiday_id as $id) {
-            $lims_holiday_data = Holiday::find($id);
-            $lims_holiday_data->delete();
+        $holidays = Holiday::whereIn('id', $holiday_id)->get();
+        foreach ($holidays as $holiday) {
+            $holiday->delete();
         }
         return 'Holiday deleted successfully!';
     }
 
     public function destroy($id)
     {
-        Holiday::find($id)->delete();
+        Holiday::findOrFail($id)->delete();
         return redirect()->back()->with('not_prmitted', __("db.Holiday deleted successfully"));
+    }
+
+    private function authorizedHolidayWarehouseId(Request $request): ?int
+    {
+        if (!$request->filled('warehouse_id')) {
+            abort_unless($this->warehouseAccess()->isGlobal(), 403, 'Only a global administrator may manage global holidays.');
+            return null;
+        }
+
+        return $this->authorizedWarehouseId($request);
+    }
+
+    private function applyHolidayFilter($query, Request $request)
+    {
+        if (!$request->filled('warehouse_id')) {
+            return $query;
+        }
+
+        if ($request->input('warehouse_id') === 'global') {
+            abort_unless($this->warehouseAccess()->isGlobal(), 403, 'Warehouse access denied.');
+            return $query->whereNull('warehouse_id');
+        }
+
+        return $query->where('warehouse_id', $this->authorizedWarehouseId($request));
     }
 }

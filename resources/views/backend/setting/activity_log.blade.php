@@ -1,4 +1,8 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
 @if($errors->has('name'))
 <div class="alert alert-danger alert-dismissible text-center">
@@ -32,12 +36,12 @@
                 @foreach($activity_log_data as $key => $activity_log)
                 <tr data-id="{{$activity_log->id}}">
                     <td>{{$key}}</td>
-                    <td>{{ Carbon\Carbon::parse($activity_log->date)->format($general_setting->date_format) }}</td>
+                    <td>{{ Carbon\Carbon::parse($activity_log->date)->format(gen_setting()->date_format) }}</td>
                     <td>{{ $activity_log->user_name}}</td>
                     <td>{{ $activity_log->action}}</td>
                     <td>{{ $activity_log->reference_no}}</td>
                     <td>{!! $activity_log->item_description !!}</td>
-                    <td>{{ Carbon\Carbon::parse($activity_log->created_at)->format($general_setting->date_format. ' h:i a') }}</td>
+                    <td>{{ Carbon\Carbon::parse($activity_log->created_at)->format(gen_setting()->date_format. ' h:i a') }}</td>
                 </tr>
                 @endforeach
             </tbody>
@@ -48,6 +52,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $("ul#setting").siblings('a').attr('aria-expanded','true');
@@ -62,8 +67,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [

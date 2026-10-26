@@ -1,4 +1,8 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
 <x-error-message key="name" />
 <x-success-message key="message" />
@@ -7,7 +11,7 @@
 <section>
     <div class="container-fluid">
         <button type="button" class="btn btn-info" data-toggle="modal" data-target="#createModal">
-            <i class="dripicons-plus"></i> {{__('db.Add Leave Type')}}
+            <i class="ti ti-plus"></i> {{__('db.Add Leave Type')}}
         </button>
     </div>
     <div class="table-responsive">
@@ -45,7 +49,7 @@
                                         data-carry_forward_limit="{{$type->carry_forward_limit}}"
                                         class="edit-btn btn btn-link"
                                         data-toggle="modal" data-target="#editModal" >
-                                        <i class="dripicons-document-edit"></i> {{__('db.edit')}}
+                                        <i class="ti ti-edit"></i> {{__('db.edit')}}
                                     </button>
                                 </li>
                                 <li class="divider"></li>
@@ -53,8 +57,8 @@
                                     @csrf
                                     @method('DELETE')
                                     <li>
-                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()">
-                                            <i class="dripicons-trash"></i> {{__('db.delete')}}
+                                        <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}">
+                                            <i class="ti ti-trash"></i> {{__('db.delete')}}
                                         </button>
                                     </li>
                                 </form>
@@ -153,7 +157,7 @@
 
                 <input type="hidden" name="leave_types" id="edit_id">
                 <div class="form-group">
-                    <input type="submit" value="{{__('db.Update')}}" class="btn btn-primary">
+                    <input type="submit" value="{{__('db.update')}}" class="btn btn-primary">
                 </div>
             </div>
         </form>
@@ -164,13 +168,14 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
     $("ul#hrm").siblings('a').attr('aria-expanded','true');
     $("ul#hrm").addClass("show");
     $("ul#hrm #leave-type-menu").addClass("active");
 
     var leave_types = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
     $.ajaxSetup({
         headers: {
@@ -178,9 +183,7 @@
         }
     });
 
-    function confirmDelete() {
-      return confirm("Are you sure want to delete?");
-    }
+    function confirmDelete() { return true; }
 
     $(document).ready(function() {
         $('.edit-btn').on('click', function(){
@@ -200,8 +203,8 @@
             "info": '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search": '{{__("db.Search")}}',
             'paginate': {
-                'previous': '<i class="dripicons-chevron-left"></i>',
-                'next': '<i class="dripicons-chevron-right"></i>'
+                'previous': '<i class="ti ti-chevron-left"></i>',
+                'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -224,12 +227,12 @@
         'lengthMenu': [[10,25,50,-1],[10,25,50,"All"]],
         dom: '<"row"lfB>rtip',
         buttons:[
-            { extend:'pdf', text:'<i class="fa fa-file-pdf-o"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
-            { extend:'excel', text:'<i class="dripicons-document-new"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
-            { extend:'csv', text:'<i class="fa fa-file-text-o"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
-            { extend:'print', text:'<i class="fa fa-print"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
+            { extend:'pdf', text:'<i class="ti ti-file-type-pdf"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
+            { extend:'excel', text:'<i class="ti ti-file-type-xls"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
+            { extend:'csv', text:'<i class="ti ti-file-type-csv"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
+            { extend:'print', text:'<i class="ti ti-printer"></i>', exportOptions:{columns:':visible:Not(.not-exported)',rows:':visible'}, footer:true },
             {
-                text:'<i class="dripicons-cross"></i>',
+                text:'<i class="ti ti-x"></i>',
                 className:'buttons-delete',
                 action: function(e, dt, node, config){
                     if(user_verified=='1'){
@@ -237,19 +240,21 @@
                         $(':checkbox:checked').each(function(i){
                             if(i) leave_types[i-1]=$(this).closest('tr').data('id');
                         });
-                        if(leave_types.length && confirm("Are you sure want to delete?")){
+                        if (leave_types.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                             $.ajax({
                                 type:'POST',
                                 url:'leave-type/deletebyselection',
                                 data:{leaveTypeIdArray:leave_types},
-                                success:function(data){ alert(data); }
+                                success:function(data){ SaleProToast.show(data); }
                             });
                             dt.rows({ page:'current', selected:true }).remove().draw(false);
-                        } else if(!leave_types.length) alert('No Leave Type selected!');
-                    } else alert('This feature is disabled for demo!');
+                        }
+                        });
+                        } else if(!leave_types.length) SaleProToast.show('No Leave Type selected!');
+                    } else SaleProToast.show('This feature is disabled for demo!');
                 }
             },
-            { extend:'colvis', text:'<i class="fa fa-eye"></i>', columns:':gt(0)'}
+            { extend:'colvis', text:'<i class="ti ti-eye"></i>', columns:':gt(0)'}
         ]
     });
 </script>

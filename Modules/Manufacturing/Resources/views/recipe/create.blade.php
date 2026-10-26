@@ -1,7 +1,11 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 @extends('backend.layout.main')
 
 @if(in_array('ecommerce',explode(',',$general_setting->modules)) || in_array('restaurant',explode(',',$general_setting->modules)))
 @push('css')
+<link rel="stylesheet" href="{{ asset($asset_prefix . 'css/dropzone.css') }}">
 <style>
 .search_result, .search_result_addon {border:1px solid #e4e6fc;border-radius:5px;overflow-y: scroll;}
 .search_result > div, .search_result_addon > div, .selected_items > div, .selected_addons > div {border-top:1px solid #e4e6fc;cursor:pointer;display:flex;align-items:center;padding: 10px;position: relative;}
@@ -25,7 +29,7 @@
                         <h4>{{__('db.add_recipe')}}</h4>
                     </div>
                     <div class="card-body">
-                        <p class="italic"><small>{{__('db.The field labels marked with * are required input fields')}}.</small></p>
+                        <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
                         <form id="product-form" method="post" action="{{ route('manufacturing.recipes.store') }}" enctype="multipart/form-data">
                             @csrf
                             <div class="row">
@@ -55,7 +59,7 @@
                                 <div id="combo" class="col-md-12 mb-1">
                                     <label>{{__('db.add_Ingredient')}}</label>
                                     <div class="search-box input-group mb-3">
-                                        <button class="btn btn-secondary"><i class="fa fa-barcode"></i></button>
+                                        <button class="btn btn-secondary"><i class="ti ti-barcode"></i></button>
                                         <input type="text" name="product_code_name" id="lims_productcodeSearch" placeholder="{{ __('db.Please type product code and select') }}" class="form-control" />
                                     </div>
                                     <label>{{__('db.Ingredient List')}}</label>
@@ -69,7 +73,7 @@
                                                     <th>{{__('db.Unit Cost')}}</th>
                                                     <th>{{__('db.Unit Price')}}</th>
                                                     <th>{{__('db.Sub total')}}</th>
-                                                    <th><i class="dripicons-trash"></i></th>
+                                                    <th><i class="ti ti-trash"></i></th>
                                                 </tr>
 
                                             </thead>
@@ -79,29 +83,31 @@
                                         </table>
                                     </div>
                                 </div>
-                                <div class="container-fluid">
+                                <div class="col-md-12">
                                     <table class="table table-bordered table-condensed totals">
-                                        <td><strong>{{__('db.Wastage percent')}}</strong>
-                                            <span class="pull-right" id="wastage_percent">{{number_format(0, $general_setting->decimal, '.', '')}} %</span>
-                                        </td>
+                                        <tr>
+                                            <td><strong>{{__('db.Wastage percent')}}</strong>
+                                                <span class="pull-right" id="wastage_percent">{{number_format(0, $general_setting->decimal, '.', '')}} %</span>
+                                            </td>
 
 
-                                        <td><strong>{{__('db.Total')}}</strong>
-                                            <span class="pull-right" id="total">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
-                                        </td>
+                                            <td><strong>{{__('db.Total')}}</strong>
+                                                <span class="pull-right" id="total">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                                            </td>
 
-                                        <td><strong>{{__('db.grand total')}}</strong>
-                                            <span class="pull-right" id="grand_total">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
-                                        </td>
+                                            <td><strong>{{__('db.grand total')}}</strong>
+                                                <span class="pull-right" id="grand_total">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                                            </td>
+                                        </tr>
                                     </table>
                                 </div>
                                 <div class="col-md-12">
                                     <div class="form-group">
-                                        <label>{{__('db.Note')}}</label>
+                                        <label>{{__('db.note')}}</label>
                                         <textarea rows="5" class="form-control" name="note"></textarea>
                                     </div>
                                 </div>
-                                <div class="col-12">
+                                <div class="col-md-12">
                                     <div class="form-group mt-3">
                                         <button type="submit" id="submit-btn" class="btn btn-primary">{{__('db.add_recipe')}}</button>
                                     </div>
@@ -119,6 +125,7 @@
 </section>
 @endsection
 @push('scripts')
+<script type="text/javascript" src="{{ asset($asset_prefix . 'js/dropzone.js') }}"></script>
 <script type="text/javascript">
 
     $.ajaxSetup({
@@ -148,7 +155,7 @@
                     $('.search_result').html('').css('height','200px');
                     $.each(data,function(key, value){
                         var image = value.image.split(',');
-                        $('.search_result').append('<div data-id="'+value.id+'"><img src="{{asset("images/product/small/")}}/'+image[0]+'"><h4>'+value.name+'</h4><i class="dripicons-checkmark d-none"></i></div>')
+                        $('.search_result').append('<div data-id="'+value.id+'"><img src="{{asset("images/product/small/")}}/'+image[0]+'"><h4>'+value.name+'</h4><i class="ti ti-checkmark d-none"></i></div>')
                     })
                 }
             })
@@ -159,11 +166,11 @@
 
     $(document).on('click','.search_result div',function(){
         $(this).find('i').removeClass('d-none');
-        var selected_item = '<div data-id="'+$(this).data('id')+'">'+$(this).html()+'<span class="remove_item"><i class="dripicons-cross"></i></span></div>';
+        var selected_item = '<div data-id="'+$(this).data('id')+'">'+$(this).html()+'<span class="remove_item"><i class="ti ti-x"></i></span></div>';
         if ($('.selected_ids').html().indexOf($(this).data('id')) === -1){
             $('.selected_items').prepend(selected_item);
             $('.selected_ids').append($(this).data('id')+',');
-            $('.selected_items .dripicons-checkmark').addClass('d-none');
+            $('.selected_items .ti ti-checkmark').addClass('d-none');
         }
     });
 
@@ -189,7 +196,7 @@
                     $('.search_result_addon').html('').css('height','200px');
                     $.each(data,function(key, value){
                         var image = value.image.split(',');
-                        $('.search_result_addon').append('<div data-id="'+value.id+'"><img src="{{asset("images/product/small/")}}/'+image[0]+'"><h4>'+value.name+'</h4><i class="dripicons-checkmark d-none"></i></div>')
+                        $('.search_result_addon').append('<div data-id="'+value.id+'"><img src="{{asset("images/product/small/")}}/'+image[0]+'"><h4>'+value.name+'</h4><i class="ti ti-checkmark d-none"></i></div>')
                     })
                 }
             })
@@ -200,11 +207,11 @@
 
     $(document).on('click','.search_result_addon div',function(){
         $(this).find('i').removeClass('d-none');
-        var selected_addon = '<div data-id="'+$(this).data('id')+'">'+$(this).html()+'<span class="remove_item"><i class="dripicons-cross"></i></span></div>';
+        var selected_addon = '<div data-id="'+$(this).data('id')+'">'+$(this).html()+'<span class="remove_item"><i class="ti ti-x"></i></span></div>';
         if ($('.selected_addon_ids').html().indexOf($(this).data('id')) === -1){
             $('.selected_addons').prepend(selected_addon);
             $('.selected_addon_ids').append($(this).data('id')+',');
-            $('.selected_addons .dripicons-checkmark').addClass('d-none');
+            $('.selected_addons .ti ti-checkmark').addClass('d-none');
         }
     });
 
@@ -260,7 +267,7 @@
         });
 
     $('.add-more-variant').on("click", function() {
-        var htmlText = '<div class="row"><div class="col-md-4 form-group mt-2"><label>Option *</label><input type="text" name="variant_option[]" class="form-control variant-field" placeholder="Size, Color etc..."></div><div class="col-md-7 form-group mt-2"><label>Value *</label><input type="text" name="variant_value[]" class="type-variant form-control variant-field"></div><div class="col-sm-1 form-group mt-2" style="display:flex;flex-direction:column;align-items:center;justify-content:end;"><button type="button" class="delVarOption btn btn-danger btn-sm mr-3"><i class="dripicons-cross"></i></button></div></div>';
+        var htmlText = '<div class="row"><div class="col-md-4 form-group mt-2"><label>Option *</label><input type="text" name="variant_option[]" class="form-control variant-field" placeholder="Size, Color etc..."></div><div class="col-md-7 form-group mt-2"><label>Value *</label><input type="text" name="variant_value[]" class="type-variant form-control variant-field"></div><div class="col-sm-1 form-group mt-2" style="display:flex;flex-direction:column;align-items:center;justify-content:end;"><button type="button" class="delVarOption btn btn-danger btn-sm mr-3"><i class="ti ti-x"></i></button></div></div>';
         $("#variant-input-section").append(htmlText);
         $('.type-variant').tagsInput();
     });
@@ -766,8 +773,7 @@
                     var flag = 1;
                     // $(".product-id").each(function() {
                     //     if ($(this).val() == data[8]) {
-                    //         alert('Duplicate input is not allowed!')
-                    //         flag = 0;
+                    //         SaleProToast.show('Duplicate input is not allowed!');//         flag = 0;
                     //     }
                     // });
                     $("input[name='product_code_name']").val('');
@@ -787,7 +793,7 @@
                                     <div class="input-group" style="max-width: unset">
                                         <input type="number"
                                             class="form-control qty"
-                                            min="1"
+                                            min="0"
                                             name="product_qty[]"
                                             value="1"
                                             step="any"

@@ -9,6 +9,8 @@ use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use App\Traits\TenantInfo;
+use App\Services\ModuleAccessService;
+use App\Services\ModuleRegistry;
 
 class RoleController extends Controller
 {
@@ -84,25 +86,70 @@ class RoleController extends Controller
 
     public function setPermission(Request $request)
     {
-        if(!env('USER_VERIFIED'))
+        abort_unless(Auth::check() && (int) Auth::user()->role_id <= 2, 403);
+        if(!config('app.user_verified'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
+
+        $moduleAccess = app(ModuleAccessService::class);
+        $availableModules = array_values(array_filter(
+            array_keys(ModuleRegistry::all()),
+            fn (string $module): bool => $moduleAccess->isInstalled($module)
+                && $moduleAccess->isCodeEnabled($module)
+                && $moduleAccess->tenantCanAccess($module)
+                && $moduleAccess->businessEnabled($module)
+        ));
+
+        $validatedModules = $request->validate([
+            'role_id' => ['required', 'integer', 'exists:roles,id'],
+            'modules' => ['sometimes', 'array'],
+            'modules.*' => ['string', 'distinct', Rule::in($availableModules)],
+        ])['modules'] ?? [];
+
+        $targetRoleId = (int) $request->input('role_id');
+        if (in_array($targetRoleId, [1, 2], true)) {
+            $validatedModules = $availableModules;
+        } elseif ($targetRoleId === 5) {
+            $validatedModules = [];
+        }
 
         $lims_permissions = Permission::pluck('name')->toArray();
 
+        $selected_permissions = array_keys($request->except('_token', 'role_id', 'permissions', 'modules'));
+        $selected_permissions = array_merge($selected_permissions, (array) $request->input('permissions', []));
+        $selected_permissions = array_unique($selected_permissions);
+        $selected_permissions = array_values(array_diff($selected_permissions, array_values(ModuleRegistry::accessPermissions())));
+        foreach ($validatedModules as $module) {
+            $selected_permissions[] = ModuleRegistry::get($module)['access_permission'];
+            if (in_array($targetRoleId, [1, 2], true)) {
+                $selected_permissions = array_merge($selected_permissions, ModuleRegistry::permissionNames($module, false));
+            }
+        }
+
+        // A business-level OFF switch hides role controls but must never erase the
+        // role's previously selected granular permissions. They are restored when
+        // the module is enabled again.
+        $existingRolePermissionNames = Role::findOrFail($targetRoleId)->permissions->pluck('name')->all();
+        foreach (ModuleRegistry::all() as $slug => $definition) {
+            if ($moduleAccess->isInstalled($slug) && $moduleAccess->tenantCanAccess($slug) && !$moduleAccess->businessEnabled($slug)) {
+                $preserve = array_intersect($existingRolePermissionNames, ModuleRegistry::permissionNames($slug));
+                $selected_permissions = array_merge($selected_permissions, $preserve);
+            }
+        }
+        $selected_permissions = array_values(array_unique($selected_permissions));
+
         $lims_new_request_permissions = array_diff(
-            array_keys($request->except('_token', 'role_id')),
+            $selected_permissions,
             $lims_permissions
         );
 
-        $lims_permissions = array_merge($lims_permissions, $lims_new_request_permissions);
-        $lims_permissions = array_unique($lims_permissions);
+        abort_if($lims_new_request_permissions !== [], 422, __('db.Unknown permission submitted'));
 
-        $role = Role::firstOrCreate(['id' => $request['role_id']]);
+        $role = Role::findOrFail($targetRoleId);
 
         foreach ($lims_permissions as $permission_name) {
             $permission = Permission::firstOrCreate(['name' => $permission_name]);
 
-            if($request->has($permission_name)) {
+            if(in_array($permission_name, $selected_permissions)) {
                 if(!$role->hasPermissionTo($permission_name)) {
                     $role->givePermissionTo($permission);
                 }
@@ -113,13 +160,15 @@ class RoleController extends Controller
         }
 
         cache()->forget('permissions');
+        cache()->forget('role_has_permissions_list' . $request['role_id']);
+        app(\App\Services\PermissionService::class)->clearRolePermissionsCache($request['role_id']);
 
         return redirect('role')->with('message', __('db.Permission updated successfully'));
     }
 
     public function destroy($id)
     {
-        if(!env('USER_VERIFIED'))
+        if(!config('app.user_verified'))
             return redirect()->back()->with('not_permitted', __('db.This feature is disable for demo!'));
         $lims_role_data = Roles::find($id);
         $lims_role_data->is_active = false;

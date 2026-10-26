@@ -7,12 +7,25 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Purchase extends Model
 {
-    use SoftDeletes;
+    use \App\Models\Concerns\ValidatesTransactionExchangeRate;
+    use \App\Models\Concerns\ProtectsAccountingCutover;
+    use SoftDeletes, \App\Traits\WarehouseScoped;
+
+    public const NON_SUPPLIER_OPENING_TYPES = [
+        'opening balance',
+        'Opening balance',
+        'initial_stock',
+    ];
 
     protected $fillable =[
 
-        "reference_no", "user_id", "warehouse_id", "supplier_id", "currency_id", "exchange_rate", "item", "total_qty", "total_discount", "total_tax", "total_cost", "order_tax_rate", "order_tax", "order_discount", "shipping_cost", "grand_total","paid_amount", "status", "payment_status", "document", "note", "purchase_type", "created_at", "deleted_by",'pay_term_no','pay_term_period','due_date',
+        "reference_no", "user_id", "warehouse_id", "supplier_id", "currency_id", "exchange_rate", "item", "total_qty", "total_discount", "total_tax", "total_cost", "order_tax_rate", "order_tax", "order_discount", "shipping_cost", "grand_total","paid_amount", "status", "payment_status", "accounting_status", "document", "note", "purchase_type", "created_at", "deleted_by",'pay_term_no','pay_term_period','due_date', "import_batch_id",
     ];
+
+    public function importBatch()
+    {
+        return $this->belongsTo(ImportBatch::class, 'import_batch_id');
+    }
 
     public function user()
     {
@@ -60,5 +73,18 @@ class Purchase extends Model
     public function installmentPlan()
     {
         return $this->morphOne(InstallmentPlan::class, 'reference');
+    }
+
+    public function scopeExcludeNonSupplierOpening($query, string $column = 'purchase_type')
+    {
+        return $query->where(function ($q) use ($column) {
+            $q->whereNull($column)
+                ->orWhereNotIn($column, self::NON_SUPPLIER_OPENING_TYPES);
+        });
+    }
+
+    public function indiaGstSnapshot()
+    {
+        return $this->hasOne(\Modules\IndiaGST\Entities\IndiaGstPurchaseSnapshot::class, 'purchase_id');
     }
 }

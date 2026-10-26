@@ -19,7 +19,7 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label>{{__('db.UserName')}} *</label>
+                                        <label>{{__('db.username')}} *</label>
                                         <input type="text" name="name" required class="form-control" value="{{$lims_user_data->name}}">
                                         @if($errors->has('name'))
                                        <span>
@@ -37,7 +37,7 @@
                                         </div>
                                     </div>
                                     <div class="form-group mt-3">
-                                        <label>{{__('db.Email')}} *</strong></label>
+                                        <label>{{__('db.email')}} *</strong></label>
                                         <input type="email" name="email" placeholder="example@example.com" required class="form-control" value="{{$lims_user_data->email}}">
                                         @if($errors->has('email'))
                                        <span>
@@ -57,16 +57,14 @@
                                         @endif
                                         <label class="mt-2"><strong>{{__('db.Active')}}</strong></label>
                                     </div>
-                                    @if(in_array('restaurant',explode(',',$general_setting->modules)))
                                     <div class="form-group d-inline-block ml-2">
-                                        @if($lims_user_data->is_active)
+                                        @if($lims_user_data->is_active) 
                                         <input class="mt-2" type="checkbox" name="service_staff" value="1" checked>
                                         @else
                                         <input class="mt-2" type="checkbox" name="service_staff" value="1">
                                         @endif
                                         <label class="mt-2"><strong>{{__('db.Waiter')}}</strong></label>
                                     </div>
-                                    @endif
                                     <div class="form-group">
                                         <input type="submit" value="{{__('db.submit')}}" class="btn btn-primary">
                                     </div>

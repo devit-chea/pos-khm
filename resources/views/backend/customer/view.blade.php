@@ -1,6 +1,7 @@
 ﻿@extends('backend.layout.main')
 
 @push('css')
+    @include('backend.layout.partials.datatable_css')
 <style>
     .dataTables_wrapper.container-fluid {
         padding: 0;
@@ -13,13 +14,16 @@
 @endpush
 
 @section('content')
+@php
+    $tr = fn ($key, $fallback) => __($key) === $key ? $fallback : __($key);
+@endphp
 <div class="container-fluid">
 
     <x-success-message key="message" />
     <x-error-message key="not_permitted" />
 
     <button id="full-page-print-btn" type="button" class="btn btn-default btn-sm">
-        <i class="dripicons-print"></i> {{__('db.Print')}}
+        <i class="ti ti-printer"></i> {{__('db.print')}}
     </button>
     <!-- Customer Header -->
     <div class="card mt-5" id="customer-info">
@@ -27,19 +31,19 @@
 
             <!-- Left: name, phone, email -->
             <div>
-                <span><h4 class="mb-1">{{ $lims_customer_data->name ?? '-' }}</h4>Customer</span>
-                <p class="mb-0"><strong>Email:</strong> {{ $lims_customer_data->email ?? '-' }}</p>
-                <p class="mb-0"><strong>Phone:</strong> {{ $lims_customer_data->phone_number ?? '-' }}</p>
+                <span><h4 class="mb-1">{{ $lims_customer_data->name ?? '-' }}</h4>{{__('db.customer')}}</span>
+                <p class="mb-0"><strong>{{ $tr('db.email', 'Email') }}:</strong> {{ $lims_customer_data->email ?? '-' }}</p>
+                <p class="mb-0"><strong>{{ $tr('db.Phone Number', 'Phone') }}:</strong> {{ $lims_customer_data->phone_number ?? '-' }}</p>
             </div>
 
             <!-- Right: address -->
             <div class="text-end">
                 <p class="mb-0">
-                    <strong>Address:</strong> {{ $lims_customer_data->address ?? '-' }}<br>
-                    <strong>City:</strong> {{ $lims_customer_data->city ?? '-' }}<br>
-                    <strong>Country:</strong> {{ $lims_customer_data->country ?? '-' }}
+                    <strong>{{ $tr('db.Address', 'Address') }}:</strong> {{ $lims_customer_data->address ?? '-' }}<br>
+                    <strong>{{ $tr('db.City', 'City') }}:</strong> {{ $lims_customer_data->city ?? '-' }}<br>
+                    <strong>{{ $tr('db.Country', 'Country') }}:</strong> {{ $lims_customer_data->country ?? '-' }}
                     @if($lims_customer_data->map_link)
-                        <br><strong>{{__('db.Map')}}:</strong> <a href="{{ $lims_customer_data->map_link }}" target="_blank" rel="noopener noreferrer"><i class="dripicons-location"></i> {{__('db.Open in Google Maps')}}</a>
+                        <br><strong>{{ $tr('db.Map', 'Map') }}:</strong> <a href="{{ $lims_customer_data->map_link }}" target="_blank" rel="noopener noreferrer"><i class="dripicons-location"></i> {{ $tr('db.Open in Google Maps', 'Open in Google Maps') }}</a>
                     @endif
                 </p>
             </div>
@@ -51,7 +55,7 @@
     <ul class="nav nav-tabs mt-4" id="lpp-tabs" role="tablist">
         <li class="nav-item">
             <a class="nav-link active" href="#ledger-latest" role="tab" data-toggle="tab">
-                Ledger
+                {{ $tr('db.Ledger', 'Ledger') }}
             </a>
         </li>
         <li class="nav-item">
@@ -65,38 +69,46 @@
             </a>
         </li>
         <li class="nav-item">
+            <a class="nav-link" href="#returns-latest" role="tab" data-toggle="tab">
+                {{ $tr('db.Returns', 'Returns') }}
+            </a>
+        </li>
+        <li class="nav-item">
             <a class="nav-link" href="#installments-latest" role="tab" data-toggle="tab">
-                {{ __('db.Instalments') }}
+                {{ __('db.Instalment') }}
             </a>
         </li>
     </ul>
 
-    <div id="ledger-summery"
-     class="d-flex mt-3 text-center d-none"
-     style="gap: 0.75rem;">
+    <div id="ledger-summery" class="d-flex mt-3 text-center d-none" style="gap: 0.75rem;">
 
         <div class="flex-fill p-4">
-            <strong>Opening Balance</strong><br>
+            <strong>{{ $tr('db.Opening Balance', 'Opening Balance') }}</strong><br>
             <h5>{{ number_format($opening_balance, 2) }}</h5>
         </div>
 
         <div class="flex-fill p-4">
-            <strong>Total Sales</strong><br>
+            <strong>{{ $tr('db.Gross Sales', 'Gross Sales') }}</strong><br>
             <h5>{{ number_format($total_sales, 2) }}</h5>
         </div>
 
         <div class="flex-fill p-4">
-            <strong>Total Paid</strong><br>
-            <h5>{{ number_format($total_paid, 2) }}</h5>
-        </div>
-
-        <div class="flex-fill p-4">
-            <strong>Total Returns</strong><br>
+            <strong>{{ $tr('db.Total Returns', 'Total Returns') }}</strong><br>
             <h5>{{ number_format($total_returns, 2) }}</h5>
         </div>
 
         <div class="flex-fill p-4">
-            <strong>Balance Due</strong><br>
+            <strong>{{ $tr('db.Net Sales', 'Net Sales') }}</strong><br>
+            <h5>{{ number_format($net_sales, 2) }}</h5>
+        </div>
+
+        <div class="flex-fill p-4">
+            <strong>{{ $tr('db.Total Paid', 'Total Paid') }}</strong><br>
+            <h5>{{ number_format($total_paid, 2) }}</h5>
+        </div>
+
+        <div class="flex-fill p-4">
+            <strong>{{ $tr('db.Balance Due', 'Balance Due') }}</strong><br>
             <h5 class="text-danger">{{ number_format($balance_due, 2) }}</h5>
         </div>
 
@@ -120,11 +132,11 @@
                     <thead>
                     <tr>
                         <th>{{ __('db.date') }}</th>
-                        <th>Type</th>
+                        <th>{{ $tr('db.Type', 'Type') }}</th>
                         <th>{{ __('db.reference') }}</th>
-                        <th>Debit</th>
-                        <th>Credit</th>
-                        <th>Balance</th>
+                        <th>{{ $tr('db.Debit', 'Debit') }}</th>
+                        <th>{{ $tr('db.Credit', 'Credit') }}</th>
+                        <th>{{ $tr('db.Balance', 'Balance') }}</th>
                     </tr>
                     </thead>
                     <tbody></tbody>
@@ -172,19 +184,41 @@
             </div>
         </div>
 
+        <!-- RETURNS TAB -->
+        <div role="tabpanel" class="tab-pane fade" id="returns-latest">
+            <div class="table-responsive">
+                <table id="recent-returns" class="table w-100">
+                    <thead>
+                        <tr>
+                            <th>{{ __('db.date') }}</th>
+                            <th>{{ __('db.reference') }}</th>
+                            <th>{{ $tr('db.Sale Reference', 'Sale Reference') }}</th>
+                            <th>{{ __('db.Warehouse') }}</th>
+                            <th>{{ $tr('db.Items', 'Items') }}</th>
+                            <th>{{ $tr('db.Quantity', 'Quantity') }}</th>
+                            <th>{{ __('db.grand total') }}</th>
+                            <th>{{ $tr('db.Return Note', 'Return Note') }}</th>
+                            <th>{{ $tr('db.Staff Note', 'Staff Note') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- INSTALMENT TAB -->
         <div role="tabpanel" class="tab-pane fade" id="installments-latest">
             <div class="table-responsive">
                 <table id="recent-installments" class="table w-100">
                     <thead>
                         <tr>
-                            <th>Date</th>
-                            <th>Sale Reference</th>
-                            <th>Purchase Reference</th>
-                            <th>Instalment No</th>
-                            <th>Amount</th>
-                            <th>Status</th>
-                            <th>Payment Date</th>
+                            <th>{{ __('db.date') }}</th>
+                            <th>{{ $tr('db.Sale Reference', 'Sale Reference') }}</th>
+                            <th>{{ $tr('db.Purchase Reference', 'Purchase Reference') }}</th>
+                            <th>{{ $tr('db.Instalment No', 'Instalment No') }}</th>
+                            <th>{{ __('db.Amount') }}</th>
+                            <th>{{ $tr('db.Status', 'Status') }}</th>
+                            <th>{{ $tr('db.Payment Date', 'Payment Date') }}</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -195,60 +229,24 @@
     </div>
 
     <!-- SALE DETAILS MODAL -->
-    <div id="sale-details" class="modal fade text-left" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-
-                <div class="container mt-3 pb-2 border-bottom">
-                    <div class="row">
-                        <div class="col-md-6 d-print-none">
-                            <button id="print-btn" type="button" class="btn btn-default btn-sm">
-                                <i class="dripicons-print"></i> {{__('db.Print')}}
-                            </button>
-                        </div>
-
-                        <div class="col-md-6 d-print-none">
-                            <button type="button" class="close" data-dismiss="modal">
-                                <span aria-hidden="true"><i class="dripicons-cross"></i></span>
-                            </button>
-                        </div>
-
-                        <div class="col-md-12 text-center">
-                            <h3 class="modal-title">{{ $general_setting->site_title }}</h3>
-                            <i style="font-size: 15px;">{{ __('db.Sale Details') }}</i>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="sale-content" class="modal-body"></div>
-
-                <table class="table table-bordered product-sale-list">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>{{ __('db.Product') }}</th>
-                            <th>{{ __('db.qty') }}</th>
-                            <th>{{ __('db.Price') }}</th>
-                            <th>{{ __('db.Tax') }}</th>
-                            <th>{{ __('db.Discount') }}</th>
-                            <th>{{ __('db.Subtotal') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-
-                <div id="sale-footer" class="modal-body"></div>
-            </div>
-        </div>
-    </div>
+    @include('backend.sale.sale_details_modal')
 
 </div>
 @endsection
 
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script>
 $(function () {
+    const exportTitles = {
+        ledger: @json($tr('db.Customer Ledger', 'Customer Ledger')),
+        sales: @json($tr('db.Customer Sales', 'Customer Sales')),
+        payments: @json($tr('db.Customer Payments', 'Customer Payments')),
+        returns: @json($tr('db.Customer Returns', 'Customer Returns')),
+        installments: @json($tr('db.Customer Instalments', 'Customer Instalments')),
+        print: @json($tr('db.Customer Details', 'Customer Details'))
+    };
 
     // LEDGER TABLE
     $('#recent-ledger').DataTable({
@@ -267,9 +265,9 @@ $(function () {
         buttons: [
             {
                 extend: "pdfHtml5",
-                text: '<i class="fa fa-file-pdf-o"></i>',
+                text: '<i class="ti ti-file-type-pdf"></i>',
                 className: 'btn btn-sm btn-danger me-1',
-                title: 'Customer Ledger',
+                title: exportTitles.ledger,
                 footer: true,
                 exportOptions: {
                     columns: ':visible:not(.not-exported)'
@@ -282,7 +280,7 @@ $(function () {
             },
             {
                 extend: "csvHtml5",
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 className: 'btn btn-sm btn-primary',
                 footer: true,
                 exportOptions: {
@@ -310,10 +308,10 @@ $(function () {
                 render: function(data){
                     return `
                         <a href="javascript:void(0)" class="btn btn-sm btn-info view-sale" data-id="${data}">
-                            <i class="dripicons-preview"></i>
+                            <i class="ti ti-eye"></i>
                         </a>
-                        <a href="/sales/${data}/edit" class="btn btn-sm btn-warning">
-                            <i class="dripicons-document-edit"></i>
+                        <a href="{{url('/sales')}}/${data}/edit" class="btn btn-sm btn-warning">
+                            <i class="ti ti-edit"></i>
                         </a>
                     `;
                 },
@@ -327,9 +325,9 @@ $(function () {
         buttons: [
             {
                 extend: "pdfHtml5",
-                text: '<i class="fa fa-file-pdf-o"></i>',
+                text: '<i class="ti ti-file-type-pdf"></i>',
                 className: 'btn btn-sm btn-danger me-1',
-                title: 'Customer Sales',
+                title: exportTitles.sales,
                 footer: true,
                 exportOptions: {
                     columns: ':visible:not(.not-exported)'
@@ -342,7 +340,7 @@ $(function () {
             },
             {
                 extend: "csvHtml5",
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 className: 'btn btn-sm btn-primary',
                 footer: true,
                 exportOptions: {
@@ -369,9 +367,9 @@ $(function () {
         buttons: [
             {
                 extend: "pdfHtml5",
-                text: '<i class="fa fa-file-pdf-o"></i>',
+                text: '<i class="ti ti-file-type-pdf"></i>',
                 className: 'btn btn-sm btn-danger me-1',
-                title: 'Customer Sales',
+                title: exportTitles.payments,
                 footer: true,
                 exportOptions: {
                     columns: ':visible:not(.not-exported)'
@@ -384,7 +382,7 @@ $(function () {
             },
             {
                 extend: "csvHtml5",
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 className: 'btn btn-sm btn-primary',
                 footer: true,
                 exportOptions: {
@@ -392,6 +390,47 @@ $(function () {
                     rows: ':visible'
                 }
             },
+        ]
+    });
+
+    // RETURNS TABLE
+    $('#recent-returns').DataTable({
+        ajax: "{{ route('customers.returns', $lims_customer_data->id) }}",
+        columns: [
+            { data: 'date' },
+            { data: 'reference' },
+            { data: 'sale_reference' },
+            { data: 'warehouse' },
+            { data: 'item' },
+            { data: 'total_qty' },
+            { data: 'grand_total' },
+            { data: 'return_note' },
+            { data: 'staff_note' }
+        ],
+        order: [[0, 'desc']],
+        responsive: true,
+        dom: '<"row"lfB>rtip',
+        buttons: [
+            {
+                extend: "pdfHtml5",
+                text: '<i class="ti ti-file-type-pdf"></i>',
+                className: 'btn btn-sm btn-danger me-1',
+                title: exportTitles.returns,
+                footer: true,
+                exportOptions: {
+                    columns: ':visible:not(.not-exported)'
+                }
+            },
+            {
+                extend: "csvHtml5",
+                text: '<i class="ti ti-file-type-csv"></i>',
+                className: 'btn btn-sm btn-primary',
+                footer: true,
+                exportOptions: {
+                    columns: ':visible:not(.not-exported)',
+                    rows: ':visible'
+                }
+            }
         ]
     });
 
@@ -413,9 +452,9 @@ $(function () {
         buttons: [
             {
                 extend: "pdfHtml5",
-                text: '<i class="fa fa-file-pdf-o"></i>',
+                text: '<i class="ti ti-file-type-pdf"></i>',
                 className: 'btn btn-sm btn-danger me-1',
-                title: 'Customer Instalments',
+                title: exportTitles.installments,
                 footer: true,
                 exportOptions: {
                     columns: ':visible:not(.not-exported)'
@@ -423,7 +462,7 @@ $(function () {
             },
             {
                 extend: "csvHtml5",
-                text: '<i class="fa fa-file-text-o"></i>',
+                text: '<i class="ti ti-file-type-csv"></i>',
                 className: 'btn btn-sm btn-primary',
                 footer: true,
                 exportOptions: {
@@ -470,7 +509,7 @@ $(function () {
 
         var printWindow = window.open('', '', 'height=900,width=1400');
 
-        printWindow.document.write('<html><head><title>Customer Ledger</title>');
+        printWindow.document.write('<html><head><title>' + exportTitles.print + '</title>');
 
         printWindow.document.write(`
             <style>
@@ -562,64 +601,7 @@ $(function () {
 
 });
 
-// SALE DETAILS MODAL FUNCTION
-function saleDetails(sale) {
-    let html = `
-        {{__('db.date')}}: ${sale.date}<br>
-        {{__('db.reference')}}: ${sale.reference}<br>
-        {{__('db.Sale Status')}}: ${sale.sale_status}<br><br>
-
-        <div style="display:flex; justify-content:space-between; gap:20px; width:100%">
-            <div style="flex:1">
-                <strong>{{__('db.customer')}}</strong><br>
-                ${sale.customer_name}<br>
-                ${sale.customer_phone}<br>
-                ${sale.customer_address}<br><br>
-            </div>
-
-            <div style="flex:1; text-align:right;">
-                <strong>{{__('db.Warehouse')}}</strong><br>
-                ${sale.warehouse}
-            </div>
-        </div>
-    `;
-
-    $("#sale-content").html(html);
-
-    let $table = $("table.product-sale-list");
-    $table.find("tbody").remove();
-
-    // sales/product_sale/
-    $.get("{{url('sales/product_sale')}}/" + sale.id, function(data){
-        console.log(data);
-        var $newBody = $("<tbody>");
-
-        if (data && data[0] && data[0].length > 0) {
-            for (var i = 0; i < data[0].length; i++) {
-                var $newRow = $(`
-                    <tr>
-                        <td>${i + 1}</td>
-                        <td>${data[0][i]}</td> <!-- name + code -->
-                        <td>${data[1][i]} ${data[2][i]}</td> <!-- qty + unit -->
-                        <td>${data[6][i]}</td> <!-- price -->
-                        <td>${data[3][i]} (${data[4][i]}%)</td> <!-- tax -->
-                        <td>${data[5][i]}</td> <!-- discount -->
-                        <td>${data[6][i]}</td> <!-- sub total -->
-                    </tr>
-                `);
-                $newBody.append($newRow);
-            }
-        } else {
-            $newBody.append('<tr><td colspan="9" class="text-center">No products found</td></tr>');
-        }
-
-        $table.append($newBody);
-    });
-
-    $("#sale-footer").html(`<p>{{__('db.Note')}}: ${sale.note ?? ''}</p>`);
-
-    $("#sale-details").modal('show');
-}
+@include('backend.sale.sale_details_function');
 
 </script>
 @endpush

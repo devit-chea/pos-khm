@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <x-success-message key="create_message" />
 <x-success-message key="edit_message" />
@@ -8,10 +12,10 @@
 <section>
     <div class="container-fluid">
         @can('customers-add')
-            <a href="{{route('customer.create')}}" class="btn btn-info"><i class="dripicons-plus"></i> {{__('db.Add Customer')}}</a>&nbsp;
+            <a href="{{route('customer.create')}}" class="btn btn-info"><i class="ti ti-plus"></i> {{__('db.Add Customer')}}</a>&nbsp;
         @endcan
         @can('customers-import')
-            <a href="#" data-toggle="modal" data-target="#importCustomer" class="btn btn-primary"><i class="dripicons-copy"></i> {{__('db.Import Customer')}}</a>
+            <a href="#" data-toggle="modal" data-target="#importCustomer" class="btn btn-primary"><i class="ti ti-copy"></i> {{__('db.Import Customer')}}</a>
         @endcan
     </div>
     <div class="table-responsive">
@@ -40,11 +44,11 @@
       <div class="modal-content">
 
 
-        <form route ='{{route("customer.import")}}' method ='post' enctype="multipart/form-data">
+        <form action="{{ route('customer.import') }}" method="post" enctype="multipart/form-data">
             @csrf
         <div class="modal-header">
           <h5 id="exampleModalLabel" class="modal-title">{{__('db.Import Customer')}}</h5>
-          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
         </div>
         <div class="modal-body">
           <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -59,7 +63,7 @@
                 <div class="col-md-6">
                     <div class="form-group">
                         <label> {{__('db.Sample File')}}</label>
-                        <a href="sample_file/sample_customer.csv" class="btn btn-info btn-block btn-md"><i class="dripicons-download"></i>  {{__('db.Download')}}</a>
+                        <a href="sample_file/sample_customer.csv" class="btn btn-info btn-block btn-md"><i class="ti ti-download"></i>  {{__('db.Download')}}</a>
                     </div>
                 </div>
             </div>
@@ -77,7 +81,7 @@
         @csrf
         <div class="modal-header">
           <h5 id="exampleModalLabel" class="modal-title">{{__('db.Clear Due')}}</h5>
-          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
         </div>
         <div class="modal-body">
             <p class="italic">
@@ -96,7 +100,7 @@
                 </div>
                 <div class="col-md-6 mt-1">
                     <label>{{__('db.Change')}} : </label>
-                    <p class="change ml-2">{{number_format(0, $general_setting->decimal, '.', '')}}</p>
+                    <p class="change ml-2">{{number_format(0, gen_setting()->decimal, '.', '')}}</p>
                 </div>
                 <div class="col-md-6 mt-1">
                     <label>{{__('db.Paid By')}}</label>
@@ -177,7 +181,7 @@
                     <input type="checkbox" class="custom-control-input" id="clear_due_print_receipt"
                         name="print_receipt" value="1">
                     <label class="custom-control-label" for="clear_due_print_receipt">
-                        <i class="dripicons-print"></i> {{__('db.Print Payment Receipt')}}
+                        <i class="ti ti-printer"></i> {{__('db.Print Payment Receipt')}}
                     </label>
                 </div>
             </div>
@@ -193,9 +197,10 @@
       <div class="modal-content">
         <form action="{{ route('customer.addDeposit') }}" method="POST">
           @csrf
+          <input type="hidden" name="request_token" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
         <div class="modal-header">
           <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Deposit')}}</h5>
-          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
         </div>
         <div class="modal-body">
           <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -205,7 +210,28 @@
                 <input type="number" name="amount" step="any" class="form-control" required>
             </div>
             <div class="form-group">
-                <label>{{__('db.Note')}}</label>
+                <label>{{__('db.Warehouse')}} *</label>
+                <select class="form-control" name="warehouse_id" required>
+                    <option value="">{{__('db.Select warehouse')}}</option>
+                    @foreach($lims_warehouse_list as $warehouse)
+                        <option value="{{$warehouse->id}}" @selected((int) $deposit_default_warehouse_id === (int) $warehouse->id)>{{$warehouse->name}}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="form-group">
+                <label>{{__('db.Account')}}</label>
+                <select class="form-control" name="account_id">
+                    @foreach($lims_account_list as $account)
+                        @if($account->is_default)
+                        <option selected value="{{$account->id}}">{{$account->name}} [{{$account->account_no}}]</option>
+                        @else
+                        <option value="{{$account->id}}">{{$account->name}} [{{$account->account_no}}]</option>
+                        @endif
+                    @endforeach
+                </select>
+            </div>
+            <div class="form-group">
+                <label>{{__('db.note')}}</label>
                 <textarea name="note" rows="4" class="form-control"></textarea>
             </div>
             <input type="submit" value="{{__('db.submit')}}" class="btn btn-primary" id="submit-button">
@@ -222,7 +248,7 @@
           @csrf
         <div class="modal-header">
           <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Point')}}</h5>
-          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
         </div>
         <div class="modal-body">
           <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -230,7 +256,7 @@
                 <input type="hidden" name="customer_id">
                 <label>{{__('db.Points')}} *</label>
                 <input type="number" name="points" step="any" class="form-control" required>
-                <label>{{__('db.Note')}}</label>
+                <label>{{__('db.note')}}</label>
                 <textarea name="note" id="" cols="30" rows="3" class="form-control"></textarea>
             </div>
             <input type="submit" value="{{__('db.submit')}}" class="btn btn-primary" id="submit-button">
@@ -245,7 +271,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{__('db.Points')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
                 <table class="table table-hover points-list">
@@ -254,7 +280,7 @@
                             <th>{{__('db.date')}}</th>
                             <th>{{__('db.Earn Points')}}</th>
                             <th>{{__('db.Redeem Points')}}</th>
-                            <th>{{__('db.Note')}}</th>
+                            <th>{{__('db.note')}}</th>
                             <th>{{__('db.Created By')}}</th>
                             <th>{{__('db.Type')}}</th>
                             <th>{{__('db.action')}}</th>
@@ -272,8 +298,8 @@
     <div role="document" class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 id="exampleModalLabel" class="modal-title">{{__('db.Update Point')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <h5 id="exampleModalLabel" class="modal-title">{{__('db.update_point')}}</h5>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
                 <form action="{{ route('customer.updatePoint') }}" method="POST">
@@ -284,7 +310,7 @@
                         <input type="number" name="points" step="any" class="form-control" required>
                     </div>
                     <div class="form-group">
-                        <label>{{__('db.Note')}}</label>
+                        <label>{{__('db.note')}}</label>
                         <textarea name="note" rows="4" class="form-control"></textarea>
                     </div>
                     <input type="hidden" name="point_id">
@@ -300,7 +326,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{__('db.All Deposit')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
                 <table class="table table-hover deposit-list">
@@ -308,7 +334,7 @@
                         <tr>
                             <th>{{__('db.date')}}</th>
                             <th>{{__('db.Amount')}}</th>
-                            <th>{{__('db.Note')}}</th>
+                            <th>{{__('db.note')}}</th>
                             <th>{{__('db.Created By')}}</th>
                             <th>{{__('db.action')}}</th>
                         </tr>
@@ -326,7 +352,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{__('db.Update Deposit')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
                 <form action="{{ route('customer.updateDeposit') }}" method="POST">
@@ -337,7 +363,27 @@
                         <input type="number" name="amount" step="any" class="form-control" required>
                     </div>
                     <div class="form-group">
-                        <label>{{__('db.Note')}}</label>
+                        <label>{{__('db.Warehouse')}} *</label>
+                        <select class="form-control" name="warehouse_id" required>
+                            @foreach($lims_warehouse_list as $warehouse)
+                                <option value="{{$warehouse->id}}">{{$warehouse->name}}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>{{__('db.Account')}}</label>
+                        <select class="form-control" name="account_id">
+                            @foreach($lims_account_list as $account)
+                                @if($account->is_default)
+                                <option selected value="{{$account->id}}">{{$account->name}} [{{$account->account_no}}]</option>
+                                @else
+                                <option value="{{$account->id}}">{{$account->name}} [{{$account->account_no}}]</option>
+                                @endif
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>{{__('db.note')}}</label>
                         <textarea name="note" rows="4" class="form-control"></textarea>
                     </div>
                     <input type="hidden" name="deposit_id">
@@ -352,20 +398,16 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
     $("ul#people").siblings('a').attr('aria-expanded','true');
     $("ul#people").addClass("show");
     $("ul#people #customer-list-menu").addClass("active");
 
-    function confirmDelete() {
-      if (confirm("Are you sure want to delete?")) {
-          return true;
-      }
-      return false;
-    }
+    function confirmDelete() { return true; }
 
     var customer_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
     var all_permission = <?php echo json_encode($all_permission) ?>;
     @if($lims_reward_point_setting_data)
         var reward_point_setting = <?php echo json_encode($lims_reward_point_setting_data) ?>;
@@ -377,17 +419,17 @@
         }
     });
 
-  $(document).on("click", ".deposit", function() {
+    $(document).on("click", ".deposit", function() {
         var id = $(this).data('id').toString();
         $("#depositModal input[name='customer_id']").val(id);
-  });
+    });
 
-  $(document).on("click", ".point", function() {
+    $(document).on("click", ".point", function() {
         var id = $(this).data('id').toString();
         $("#pointModal input[name='customer_id']").val(id);
-  });
+    });
 
-  $(document).on("click", ".clear-due", function() {
+    $(document).on("click", ".clear-due", function() {
         var id = $(this).data('id').toString();
         // console.log(id);
         $("#clearDueModal input[name='customer_id']").val(id);
@@ -405,7 +447,7 @@
         $('input[name="paying_amount"]').val(balance);
         $('#clearDueModal input[name="balance"]').val(balance);
         $('#p_amount').val(balance);
-  });
+    });
 
     $('select[name="paid_by_id"]').on("change", function() {
         var id = $(this).val();
@@ -452,7 +494,7 @@
             $("#cheque").hide();
             if(id == 6){
                 if($('#p_amount').val() > parseFloat(deposit))
-                    alert('Amount exceeds customer deposit! Customer deposit : ' + deposit);
+                    SaleProToast.show('Amount exceeds customer deposit! Customer deposit : ' + deposit);
             }
             else if(id==7) {
                 pointCalculation($('#p_amount').val());
@@ -476,36 +518,40 @@
     $('#clearDueModal select[name="gift_card_id"]').on("change", function() {
         var id = $(this).val();
         if(expired_date[id] < current_date)
-            alert('This card is expired!');
+            SaleProToast.show('This card is expired!');
         else if($('#clearDueModal input[name="amount"]').val() > balance[id]){
-            alert('Amount exceeds card balance! Gift Card balance: '+ balance[id]);
+            SaleProToast.show('Amount exceeds card balance! Gift Card balance: '+ balance[id]);
         }
     });
 
-    $('input[name="paying_amount"]').on("input", function() {
-        $(".change").text(parseFloat( $(this).val() - $('input[name="amount"]').val() ).toFixed({{$general_setting->decimal}}));
+    $('input[name="paying_amount"]').on("focusout", function() {
+        if($('#p_amount').val() > $(this).val()) {
+            $('#p_amount').val(parseFloat($(this).val()));
+        }else{
+            $(".change").text(parseFloat( $(this).val() - $('input[name="amount"]').val() ).toFixed({{gen_setting()->decimal}}));
+        }
     });
 
     $('#p_amount').on("input", function() {
         if( $(this).val() > parseFloat($('input[name="paying_amount"]').val()) ) {
-            alert('Paying amount cannot be bigger than recieved amount');
+            SaleProToast.show('Paying amount cannot be bigger than recieved amount');
             $(this).val('');
         }
         else if( $(this).val() > parseFloat($('input[name="balance"]').val()) ) {
-            alert('Paying amount cannot be bigger than due amount');
+            SaleProToast.show('Paying amount cannot be bigger than due amount');
             $(this).val('');
         }
-        $(".change").text(parseFloat($('input[name="paying_amount"]').val() - $(this).val()).toFixed({{$general_setting->decimal}}));
+        $(".change").text(parseFloat($('input[name="paying_amount"]').val() - $(this).val()).toFixed({{gen_setting()->decimal}}));
         var id = $('#clearDueModal select[name="paid_by_id"]').val();
         var amount = $(this).val();
         if(id == 2){
             id = $('#clearDueModal select[name="gift_card_id"]').val();
             if(amount > balance[id])
-                alert('Amount exceeds card balance! Gift Card balance: '+ balance[id]);
+                SaleProToast.show('Amount exceeds card balance! Gift Card balance: '+ balance[id]);
         }
         else if(id == 6){
             if(amount > parseFloat(deposit))
-                alert('Amount exceeds customer deposit! Customer deposit : ' + deposit);
+                SaleProToast.show('Amount exceeds customer deposit! Customer deposit : ' + deposit);
         }
         else if(id==7) {
             pointCalculation(amount);
@@ -516,21 +562,21 @@
         availablePoints = $('table.customer-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.points').val();
         required_point = Math.ceil(amount / reward_point_setting['per_point_amount']);
         if(required_point > availablePoints) {
-          alert('Customer does not have sufficient points. Available points: '+availablePoints+'. Required points: '+required_point);
+          SaleProToast.show('Customer does not have sufficient points. Available points: '+availablePoints+'. Required points: '+required_point);
         }
     }
 
     $(document).on('submit', '.clear-due-form', function(e) {
         if( $('input[name="paying_amount"]').val() < parseFloat($('#amount').val()) ) {
-            alert('Paying amount cannot be bigger than recieved amount');
+            SaleProToast.show('Paying amount cannot be bigger than recieved amount');
             $('#p_amount').val('');
-            $(".change").text(parseFloat( $('input[name="paying_amount"]').val() - $('#p_amount').val() ).toFixed({{$general_setting->decimal}}));
+            $(".change").text(parseFloat( $('input[name="paying_amount"]').val() - $('#p_amount').val() ).toFixed({{gen_setting()->decimal}}));
             e.preventDefault();
         }
         else if( $('input[name="edit_paying_amount"]').val() < parseFloat($('input[name="edit_amount"]').val()) ) {
-            alert('Paying amount cannot be bigger than recieved amount');
+            SaleProToast.show('Paying amount cannot be bigger than recieved amount');
             $('input[name="edit_amount"]').val('');
-            $(".change").text(parseFloat( $('input[name="edit_paying_amount"]').val() - $('input[name="edit_amount"]').val() ).toFixed({{$general_setting->decimal}}));
+            $(".change").text(parseFloat( $('input[name="edit_paying_amount"]').val() - $('input[name="edit_amount"]').val() ).toFixed({{gen_setting()->decimal}}));
             e.preventDefault();
         }
 
@@ -558,14 +604,14 @@
                                 '<button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">{{__("db.action")}}<span class="caret"></span><span class="sr-only">Toggle Dropdown</span></button>' +
                                 '<ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">' +
                                     '<li>' +
-                                        '<button type="button" class="btn btn-link edit-btn" data-id="' + data[0][index] + '" data-toggle="modal" data-target="#edit-deposit"><i class="dripicons-document-edit"></i> {{__("db.edit")}}</button>' +
+                                        '<button type="button" class="btn btn-link edit-btn" data-id="' + data[0][index] + '" data-warehouse-id="' + (data[6][index] || '') + '" data-toggle="modal" data-target="#edit-deposit"><i class="ti ti-edit"></i> {{__("db.edit")}}</button>' +
                                     '</li>' +
                                     '<li class="divider"></li>' +
                                     '<form action="{{ route("customer.deleteDeposit") }}" method="POST">' +
                                         '@csrf' +
                                         '<li>' +
                                             '<input type="hidden" name="id" value="' + data[0][index] + '" />' + 
-                                            '<button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> {{__("db.delete")}}</button>' +
+                                            '<button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> {{__("db.delete")}}</button>' +
                                         '</li>' +
                                     '</form>' +
                                 '</ul>' +
@@ -603,14 +649,14 @@
                                 '<button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">{{__("db.action")}}<span class="caret"></span><span class="sr-only">Toggle Dropdown</span></button>' +
                                 '<ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">' +
                                     '<li>' +
-                                        '<button type="button" class="btn btn-link edit-btn" data-id="' + data[0][index] +'" data-toggle="modal" data-target="#edit-point"><i class="dripicons-document-edit"></i> {{__("db.edit")}}</button>' +
+                                        '<button type="button" class="btn btn-link edit-btn" data-id="' + data[0][index] +'" data-toggle="modal" data-target="#edit-point"><i class="ti ti-edit"></i> {{__("db.edit")}}</button>' +
                                     '</li>' +
                                     '<li class="divider"></li>' +
                                     '<form action="{{ route("customer.deletePoints") }}" method="POST">' +
                                         '@csrf' + 
                                         '<li>' +
                                             '<input type="hidden" name="id" value="' + data[0][index] + '" />' +
-                                            '<button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> {{__("db.delete")}}</button>' +
+                                            '<button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> {{__("db.delete")}}</button>' +
                                         '</li>' +
                                     '</form>' +
                                 '</ul>' +
@@ -635,6 +681,7 @@
         $('#edit-deposit input[name="deposit_id"]').val(id);
         $('#edit-deposit input[name="amount"]').val(amount);
         $('#edit-deposit textarea[name="note"]').val(note);
+        $('#edit-deposit select[name="warehouse_id"]').val($(this).data('warehouse-id'));
         $('#view-deposit').modal('hide');
     });
 
@@ -665,7 +712,7 @@
         buttons.push([
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -673,7 +720,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -681,7 +728,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -689,7 +736,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -700,7 +747,7 @@
 
     buttons.push([
         {
-            text: '<i title="delete" class="dripicons-cross"></i>',
+            text: '<i title="delete" class="ti ti-x"></i>',
             className: 'buttons-delete',
             action: function ( e, dt, node, config ) {
                 if(user_verified == '1') {
@@ -710,7 +757,7 @@
                             customer_id[i-1] = $(this).closest('tr').data('customer');
                         }
                     });
-                    if(customer_id.length && confirm("Are you sure want to delete?")) {
+                    if (customer_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                         $.ajax({
                             type:'POST',
                             url:'customer/deletebyselection',
@@ -718,21 +765,23 @@
                                 customerIdArray: customer_id
                             },
                             success:function(data){
-                                alert(data);
+                                SaleProToast.show(data);
                             }
                         });
                         dt.rows({ page: 'current', selected: true }).remove().draw(false);
                     }
+                    });
+                    }
                     else if(!customer_id.length)
-                        alert('No customer is selected!');
+                        SaleProToast.show('No customer is selected!');
                 }
                 else
-                    alert('This feature is disable for demo!');
+                    SaleProToast.show('This feature is disable for demo!');
             }
         },
         {
             extend: 'colvis',
-            text: '<i title="column visibility" class="fa fa-eye"></i>',
+            text: '<i title="column visibility" class="ti ti-eye"></i>',
             columns: ':gt(0)'
         },
     ]);
@@ -759,8 +808,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         order:[['1', 'desc']],

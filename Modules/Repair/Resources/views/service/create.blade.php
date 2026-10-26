@@ -20,7 +20,7 @@
                     </div>
                     <div class="card-body">
 
-                        <form id="service-form" method="POST" action="{{ route('repair.service.store') }}">
+                        <form id="service-form" method="POST" action="{{ route('repair.service.store') }}" novalidate>
                             @csrf
 
                             {{-- ════ SECTION 1: Basic Info ════ --}}
@@ -39,15 +39,16 @@
                                                 @foreach ($lims_customer_list as $customer)
                                                     <option value="{{ $customer->id }}">
                                                         {{ $customer->name }}
-                                                        @if($customer->phone) — {{ $customer->phone }} @endif
+                                                        @if($customer->phone_number) — {{ $customer->phone_number }} @endif
                                                     </option>
                                                 @endforeach
                                             </select>
                                             <button type="button" class="btn btn-default btn-sm"
                                                 data-toggle="modal" data-target="#addCustomerModal">
-                                                <i class="dripicons-plus"></i>
+                                                <i class="ti ti-plus"></i>
                                             </button>
                                         </div>
+                                        @error('customer_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                     </div>
                                 </div>
 
@@ -55,11 +56,12 @@
                                     <div class="form-group">
                                         <label>{{ __('db.Warehouse') }} *</label>
                                         <select required name="warehouse_id" class="selectpicker form-control"
-                                            data-live-search="true" title="{{ __('db.Select warehouse') }}">
+                                            data-live-search="true" title="{{ __('db.select_warehouse') }}">
                                             @foreach ($lims_warehouse_list as $wh)
                                                 <option value="{{ $wh->id }}">{{ $wh->name }}</option>
                                             @endforeach
                                         </select>
+                                        @error('warehouse_id')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                     </div>
                                 </div>
 
@@ -72,13 +74,15 @@
                                             <option value="device">{{ __('db.device') }}</option>
                                             <option value="vehicle">{{ __('db.vehicle') }}</option>
                                         </select>
+                                        @error('service_type')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                     </div>
                                 </div>
 
                                 <div class="col-md-8">
                                     <div class="form-group">
                                         <label>{{ __('db.job_title') }} *</label>
-                                        <input type="text" required name="title" class="form-control"/>
+                                        <input type="text" required name="title" class="form-control" value="{{ old('title') }}"/>
+                                        @error('title')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                     </div>
                                 </div>
 
@@ -130,7 +134,7 @@
                                             </select>
                                             {{-- <button type="button" class="btn btn-default btn-sm"
                                                 data-toggle="modal" data-target="#addTechnicianModal">
-                                                <i class="dripicons-plus"></i>
+                                                <i class="ti ti-plus"></i>
                                             </button> --}}
                                         </div>
                                     </div>
@@ -166,7 +170,7 @@
                                                     data-toggle="modal"
                                                     data-target="#addDeviceTypeModal"
                                                     data-category="device">
-                                                    <i class="dripicons-plus"></i>
+                                                    <i class="ti ti-plus"></i>
                                                 </button>
                                             </div>
                                         </div>
@@ -187,7 +191,7 @@
                                                 </select>
                                                 <button type="button" class="btn btn-default btn-sm"
                                                     data-toggle="modal" data-target="#addBrandModal">
-                                                    <i class="dripicons-plus"></i>
+                                                    <i class="ti ti-plus"></i>
                                                 </button>
                                             </div>
                                         </div>
@@ -226,7 +230,7 @@
                                     <div class="col-md-6">
                                         <div class="form-group">
                                             <label>{{ __('db.issue_reported_by_customer') }}</label>
-                                            <textarea name="issue_reported" rows="2" class="form-control no-tiny"></textarea>
+                                            <textarea name="device_issue_reported" rows="2" class="form-control no-tiny"></textarea>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
@@ -260,7 +264,7 @@
                                                     data-toggle="modal"
                                                     data-target="#addDeviceTypeModal"
                                                     data-category="vehicle">
-                                                    <i class="dripicons-plus"></i>
+                                                    <i class="ti ti-plus"></i>
                                                 </button>
                                             </div>
                                         </div>
@@ -281,24 +285,39 @@
                                                 </select>
                                                 <button type="button" class="btn btn-default btn-sm"
                                                     data-toggle="modal" data-target="#addBrandModal">
-                                                    <i class="dripicons-plus"></i>
+                                                    <i class="ti ti-plus"></i>
                                                 </button>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div class="col-md-3">
+                                    <div class="col-md-2">
                                         <div class="form-group">
                                             <label>{{ __('db.model') }}</label>
                                             <input type="text" name="vehicle_model" class="form-control" />
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-2">
                                         <div class="form-group">
                                             <label>{{ __('db.year') }}</label>
                                             <input type="number" name="vehicle_year" class="form-control" min="1990" max="{{ date('Y') }}" />
                                         </div>
                                     </div>
+
+                                    <div class="col-md-2">
+                                        <div class="form-group">
+                                            <label>{{ __('db.fuel_level') }}</label>
+                                            <select name="fuel_level" class="form-control">
+                                                <option value="">{{ __('db.Please select') }}</option>
+                                                <option value="empty">Empty</option>
+                                                <option value="quarter">1/4</option>
+                                                <option value="half">1/2</option>
+                                                <option value="three_quarter">3/4</option>
+                                                <option value="full">{{ __('db.Full') }}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
                                     <div class="col-md-3">
                                         <div class="form-group">
                                             <label>{{ __('db.registration_no') }}</label>
@@ -323,22 +342,16 @@
                                             <input type="number" name="mileage" class="form-control" />
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+
+                                    <div class="col-md-6">
                                         <div class="form-group">
-                                            <label>{{ __('db.fuel_level') }}</label>
-                                            <select name="fuel_level" class="form-control">
-                                                <option value="">{{ __('db.Please select') }}</option>
-                                                <option value="empty">Empty</option>
-                                                <option value="quarter">1/4</option>
-                                                <option value="half">1/2</option>
-                                                <option value="three_quarter">3/4</option>
-                                                <option value="full">{{ __('db.Full') }}</option>
-                                            </select>
+                                            <label>{{ __('db.issue_reported_by_customer') }}</label>
+                                            <textarea name="vehicle_issue_reported" rows="2" class="form-control no-tiny"></textarea>
                                         </div>
                                     </div>
-                                    <div class="col-md-12">
+                                    <div class="col-md-6">
                                         <div class="form-group">
-                                            <label>{{ __('db.condition_notes') }}</label>
+                                            <label>{{ __('db.condition_on_arrival') }}</label>
                                             <textarea name="vehicle_condition_notes" rows="2" class="form-control no-tiny"></textarea>
                                         </div>
                                     </div>
@@ -359,18 +372,18 @@
     {{-- Button 1: Save and Go to Parts & Billing --}}
     <button type="submit" class="btn btn-primary"
         onclick="document.getElementById('submit_action').value='parts'">
-        <i class="dripicons-checkmark"></i> {{ __('Save & Go to Parts and Billing') }}
+        <i class="ti ti-checkmark"></i> {{ __('Save & Go to Parts and Billing') }}
     </button>
 
     {{-- Button 2: Just Save --}}
     <button type="submit" class="btn btn-success ml-2"
         onclick="document.getElementById('submit_action').value='save'">
-        <i class="dripicons-archive"></i> {{ __('Save') }}
+        <i class="ti ti-archive"></i> {{ __('Save') }}
     </button>
 
     {{-- Button 3: Cancel --}}
     <a href="{{ route('repair.service.index') }}" class="btn btn-secondary ml-2">
-        <i class="dripicons-cross"></i> {{ __('db.Cancel') }}
+        <i class="ti ti-x"></i> {{ __('db.Cancel') }}
     </a>
 
 </div>
@@ -394,7 +407,7 @@
             <div class="modal-header">
                 <h5 class="modal-title">{{ __('db.Add Customer') }}</h5>
                 <button type="button" data-dismiss="modal" class="close">
-                    <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                    <span aria-hidden="true"><i class="ti ti-x"></i></span>
                 </button>
             </div>
             <div class="modal-body">
@@ -419,7 +432,7 @@
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>{{ __('db.Email') }}</label>
+                                <label>{{ __('db.email') }}</label>
                                 <input type="email" name="email" placeholder="example@example.com" class="form-control">
                             </div>
                         </div>
@@ -462,7 +475,7 @@
             <div class="modal-header">
                 <h5 class="modal-title">{{ __('db.Add Brand') }}</h5>
                 <button type="button" data-dismiss="modal" class="close">
-                    <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                    <span aria-hidden="true"><i class="ti ti-x"></i></span>
                 </button>
             </div>
             <div class="modal-body">
@@ -497,7 +510,7 @@
             <div class="modal-header">
                 <h5 class="modal-title" id="deviceTypeModalTitle">Add Type</h5>
                 <button type="button" data-dismiss="modal" class="close">
-                    <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                    <span aria-hidden="true"><i class="ti ti-x"></i></span>
                 </button>
             </div>
             <div class="modal-body">
@@ -530,9 +543,9 @@
     <div role="document" class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">{{ __('db.Add Technician') }}</h5>
+                <h5 class="modal-title">{{ __('db.add_technician') }}</h5>
                 <button type="button" data-dismiss="modal" class="close">
-                    <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                    <span aria-hidden="true"><i class="ti ti-x"></i></span>
                 </button>
             </div>
             <div class="modal-body">
@@ -547,7 +560,7 @@
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label>{{ __('db.Email') }} *</label>
+                                <label>{{ __('db.email') }} *</label>
                                 <input type="email" name="email" required class="form-control">
                             </div>
                         </div>
@@ -593,8 +606,70 @@
     $('#service_type').on('change', function () {
         $('#device-section').hide();
         $('#vehicle-section').hide();
-        if ($(this).val() === 'device')  $('#device-section').slideDown(200);
-        if ($(this).val() === 'vehicle') $('#vehicle-section').slideDown(200);
+
+        // Reset required
+        $('#device_type_select, #device_brand_select, #vehicle_type_select, #vehicle_brand_select').prop('required', false);
+
+        if ($(this).val() === 'device') {
+            $('#device-section').slideDown(200);
+            $('#device_type_select, #device_brand_select').prop('required', true);
+        }
+        if ($(this).val() === 'vehicle') {
+            $('#vehicle-section').slideDown(200);
+            $('#vehicle_type_select, #vehicle_brand_select').prop('required', true);
+        }
+    });
+
+    // ══════════════════════════════════════════
+    // Real-time JS Validation
+    // ══════════════════════════════════════════
+    function validateField($field) {
+        if (!$field.prop('required') || !$field.closest('.form-group').is(':visible')) {
+            $field.removeClass('is-invalid');
+            if ($field.hasClass('selectpicker')) {
+                $field.parent().css({'border': '', 'border-radius': ''});
+            }
+            $field.closest('.form-group').find('.custom-error-msg').remove();
+            return true;
+        }
+
+        var val = $field.val();
+        var isValid = val !== '' && val !== null;
+        if (!isValid) {
+            $field.addClass('is-invalid');
+            if ($field.hasClass('selectpicker')) {
+                $field.parent().css({'border': '1px solid #dc3545', 'border-radius': '4px'});
+            }
+            if ($field.closest('.form-group').find('.custom-error-msg').length === 0) {
+                $field.closest('.form-group').append('<div class="custom-error-msg text-danger" style="font-size: 12px; margin-top: 4px;">This field is required</div>');
+            }
+        } else {
+            $field.removeClass('is-invalid');
+            if ($field.hasClass('selectpicker')) {
+                $field.parent().css({'border': '', 'border-radius': ''});
+            }
+            $field.closest('.form-group').find('.custom-error-msg').remove();
+        }
+        return isValid;
+    }
+
+    $(document).on('input change', 'input[required], select[required], textarea[required]', function() {
+        validateField($(this));
+    });
+
+    $('#service-form').on('submit', function(e) {
+        let isFormValid = true;
+        $(this).find('input, select, textarea').each(function() {
+            if ($(this).prop('required')) {
+                if (!validateField($(this))) {
+                    isFormValid = false;
+                }
+            }
+        });
+
+        if (!isFormValid) {
+            e.preventDefault();
+        }
     });
 
 
@@ -616,7 +691,7 @@
                 $('#customer-modal-form')[0].reset();
             },
             error: function (xhr) {
-                alert(xhr.responseJSON?.message ?? 'Error creating customer.');
+                SaleProToast.show(xhr.responseJSON?.message ?? 'Error creating customer.');
             }
         });
     });
@@ -642,7 +717,7 @@
                 $('#brand-modal-form')[0].reset();
             },
             error: function (xhr) {
-                alert(xhr.responseJSON?.message ?? 'Error creating brand.');
+                SaleProToast.show(xhr.responseJSON?.message ?? 'Error creating brand.');
             }
         });
     });
@@ -667,12 +742,12 @@
         var category    = $('#device_type_category').val(); // "device" | "vehicle"
 
         if (!name) {
-            alert('Name is required.');
+            SaleProToast.show('Name is required.');
             return;
         }
 
         if (!category) {
-            alert('Category is missing. Please close and re-open from the correct button.');
+            SaleProToast.show('Category is missing. Please close and re-open from the correct button.');
             return;
         }
 
@@ -691,7 +766,7 @@
                 // Controller returns the full DeviceType model as JSON
                 // res = { id: X, name: "...", category: "device|vehicle", ... }
                 if (!res || typeof res.id === 'undefined') {
-                    alert('Unexpected response. Please refresh and try again.');
+                    SaleProToast.show('Unexpected response. Please refresh and try again.');
                     return;
                 }
 
@@ -713,9 +788,9 @@
                 if (errors) {
                     // Show first validation error
                     var firstError = Object.values(errors)[0];
-                    alert(Array.isArray(firstError) ? firstError[0] : firstError);
+                    SaleProToast.show(Array.isArray(firstError)? firstError[0] : firstError);
                 } else {
-                    alert(xhr.responseJSON?.message ?? 'Error saving type.');
+                    SaleProToast.show(xhr.responseJSON?.message ?? 'Error saving type.');
                 }
             }
         });
@@ -739,7 +814,7 @@
                 $('#technician-modal-form')[0].reset();
             },
             error: function (xhr) {
-                alert(xhr.responseJSON?.message ?? 'Error creating technician.');
+                SaleProToast.show(xhr.responseJSON?.message ?? 'Error creating technician.');
             }
         });
     });

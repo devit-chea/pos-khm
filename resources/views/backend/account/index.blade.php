@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <x-success-message key="message" />
 <x-error-message key="not_permitted" />
@@ -6,7 +10,7 @@
 
 <section>
     <div class="container-fluid">
-        <button class="btn btn-info" data-toggle="modal" data-target="#account-modal"><i class="dripicons-plus"></i> {{__('db.Add Account')}}</button>
+        <button class="btn btn-info" data-toggle="modal" data-target="#account-modal"><i class="ti ti-plus"></i> {{ $doubleEntryAccounting ? __('db.payment_account_add') : __('db.Add Account') }}</button>
     </div>
     <div class="table-responsive">
         <table id="account-table" class="table">
@@ -15,29 +19,39 @@
                     <th class="not-exported"></th>
                     <th>{{__('db.Account')}} No</th>
                     <th>{{__('db.name')}}</th>
-                    <th>{{__('db.Initial Balance')}}</th>
-                    <th>{{__('db.Available Balance')}}</th>
+                    <th>{{ $doubleEntryAccounting ? __('db.payment_account_mapping') : __('db.Initial Balance') }}</th>
+                    <th>{{ $doubleEntryAccounting ? __('db.payment_account_journal_balance') : __('db.Available Balance') }}</th>
                     <th>{{__('db.Default')}}</th>
-                    <th>{{__('db.Note')}}</th>
+                    <th>{{__('db.note')}}</th>
                     <th class="not-exported">{{__('db.action')}}</th>
                 </tr>
             </thead>
             <tbody>
+                @php
+                    $lims_account_list = $lims_account_all;
+                @endphp
+
                 @foreach($lims_account_all as $key=>$account)
                 <tr>
                     <td>{{$key}}</td>
                     <td>{{ $account->account_no }}</td>
                     <td>{{ $account->name }}</td>
-                    @if($account->initial_balance)
-                        <td>{{ number_format((float)$account->initial_balance, $general_setting->decimal, '.', '')}}</td>
+                    @if($doubleEntryAccounting)
+                        <td>@if($account->mapping_valid)<a href="{{ route('accounting.generalLedger', ['account_id' => $account->mapped_account->id]) }}">{{ $account->mapped_account->name }}</a>@else<span class="text-warning">{{ __('db.payment_account_unmapped') }}</span>@endif</td>
+                    @elseif($account->initial_balance)
+                        <td>{{ number_format((float)$account->initial_balance, gen_setting()->decimal, '.', '')}}</td>
                     @else
-                        <td>{{number_format(0, $general_setting->decimal, '.', '')}}</td>
+                        <td>{{number_format(0, gen_setting()->decimal, '.', '')}}</td>
                     @endif
 
-                    @if($account->balance)
-                        <td>{{ number_format((float)$account->balance, $general_setting->decimal, '.', '')}}</td>
+                    @if($doubleEntryAccounting && $account->journal_balance !== null)
+                        <td>{{ number_format((float)$account->journal_balance, gen_setting()->decimal, '.', '') }}</td>
+                    @elseif($doubleEntryAccounting)
+                        <td>{{ __('db.payment_account_balance_unavailable') }}</td>
+                    @elseif($account->balance)
+                        <td>{{ number_format((float)$account->balance, gen_setting()->decimal, '.', '')}}</td>
                     @else
-                        <td>{{number_format(0, $general_setting->decimal, '.', '')}}</td>
+                        <td>{{number_format(0, gen_setting()->decimal, '.', '')}}</td>
                     @endif
                     <td>
                         @if($account->is_default)
@@ -54,14 +68,14 @@
                                 <span class="sr-only">Toggle Dropdown</span>
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
-                                <li><button type="button" data-id="{{$account->id}}" data-account_no="{{$account->account_no}}" data-name="{{$account->name}}"  data-initial_balance="{{$account->initial_balance}}" data-note="{{$account->note}}" class="edit-btn btn btn-link" data-toggle="modal" data-target="#editModal"><i class="dripicons-document-edit"></i> {{__('db.edit')}}</button></li>
-                                <li id="account-statement-menu"><a id="account-statement" href="" class="btn btn-link"><i class="dripicons-document"></i> {{__('db.Statement')}}</a></li>
+                                <li><button type="button" data-id="{{$account->id}}" data-account_no="{{$account->account_no}}" data-name="{{$account->name}}"  data-initial_balance="{{$account->initial_balance}}" data-note="{{$account->note}}" class="edit-btn btn btn-link" data-toggle="modal" data-target="#editModal"><i class="ti ti-edit"></i> {{__('db.edit')}}</button></li>
+                                @if(!$doubleEntryAccounting)<li id="account-statement-menu"><a href="" class="account-statement-btn btn btn-link" data-id="{{$account->id}}"><i class="ti ti-document"></i> {{__('db.Statement')}}</a></li>@endif
                                 <li class="divider"></li>
                                 <form action="{{ route('accounts.destroy', $account->id) }}" method="POST">
                                     @csrf
                                     @method('DELETE')
                                     <li>
-                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> {{__('db.delete')}}</button>
+                                        <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> {{__('db.delete')}}</button>
                                     </li>
                                 </form>
                             </ul>
@@ -88,7 +102,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{__('db.Update Account')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
               <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -104,12 +118,12 @@
                         <label>{{__('db.name')}} *</label>
                         <input type="text" name="name" required class="form-control">
                     </div>
-                    <div class="form-group">
+                    @if(!$doubleEntryAccounting)<div class="form-group">
                         <label>{{__('db.Initial Balance')}}</label>
                         <input type="number" name="initial_balance" step="any" class="form-control">
-                    </div>
+                    </div>@else<div class="alert alert-info">{{ __('db.payment_account_opening_balance_guidance') }}</div>@endif
                     <div class="form-group">
-                        <label>{{__('db.Note')}}</label>
+                        <label>{{__('db.note')}}</label>
                         <textarea name="note" rows="3" class="form-control"></textarea>
                     </div>
                     <div class="form-group">
@@ -124,6 +138,7 @@
 
 @endsection
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $("ul#account").siblings('a').attr('aria-expanded','true');
@@ -138,6 +153,13 @@
         $("#editModal textarea[name='note']").val( $(this).data('note') );
     });
 
+    $('.account-statement-btn').on('click', function(e) {
+        e.preventDefault();
+        var accountId = $(this).data('id');
+        $('#account-statement-modal select[name="account_id"]').val(accountId).selectpicker('refresh');
+        $('#account-statement-modal').modal();
+    });
+
     $('.default').on('change', function() {
         //off to on
         if ($(this).parent().hasClass("btn-success")) {
@@ -147,7 +169,7 @@
             $('.default').not($(this)).prop('checked', false);
             $(this).prop('checked', true);
             $.get('make-default/' + id, function(data) {
-                alert(data);
+                SaleProToast.show(data);
             });
         }
         //on to off
@@ -155,16 +177,11 @@
             $(this).parent().removeClass('btn-danger off');
             $(this).parent().addClass('btn-success');
             $(this).prop('checked', true);
-            alert('Please make another account default first!');
+            SaleProToast.show('Please make another account default first!');
         }
     });
 
-function confirmDelete() {
-    if (confirm("Are you sure want to delete?")) {
-        return true;
-    }
-    return false;
-}
+function confirmDelete() { return true; }
     var table = $('#account-table').DataTable( {
         "order": [],
         'language': {
@@ -172,8 +189,8 @@ function confirmDelete() {
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -202,7 +219,7 @@ function confirmDelete() {
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -216,7 +233,7 @@ function confirmDelete() {
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -230,7 +247,7 @@ function confirmDelete() {
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -244,7 +261,7 @@ function confirmDelete() {
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -258,7 +275,7 @@ function confirmDelete() {
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],
@@ -270,10 +287,10 @@ function confirmDelete() {
     function datatable_sum(dt_selector, is_calling_first) {
         if (dt_selector.rows( '.selected' ).any() && is_calling_first) {
             var rows = dt_selector.rows( '.selected' ).indexes();
-            $( dt_selector.column( 3 ).footer() ).html(dt_selector.cells( rows, 3, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 3 ).footer() ).html(dt_selector.cells( rows, 3, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
         else {
-            $( dt_selector.column( 3 ).footer() ).html(dt_selector.cells( rows, 3, { page: 'current' } ).data().sum().toFixed({{$general_setting->decimal}}));
+            $( dt_selector.column( 3 ).footer() ).html(dt_selector.cells( rows, 3, { page: 'current' } ).data().sum().toFixed({{gen_setting()->decimal}}));
         }
     }
 

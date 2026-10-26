@@ -1,13 +1,35 @@
+@php
+    $qrText = static function (string $key): string {
+        $translationKey = 'db.' . $key;
+        $translated = __($translationKey);
+
+        return $translated === $translationKey ? $key : $translated;
+    };
+    $qrMessages = [
+        'generate' => $qrText('Generate QR Code'),
+        'generating' => $qrText('Generating...'),
+        'failed' => $qrText('QR Code generation failed'),
+        'request_failed' => $qrText('Unable to complete the QR request.'),
+        'generate_first' => $qrText('Generate QR first'),
+        'copied' => $qrText('QR link copied to clipboard'),
+        'print_title' => $qrText('Print QR'),
+    ];
+@endphp
+
+<x-toast />
+
 <div class="card p-4 mb-4">
     <h4 class="card-title">{{ __('db.Catalogue QR') }}</h4>
     <hr>
     <div class="row"> 
         <!-- QR Code Generation Form -->        
         <div class="col-md-6">
+            <form id="qr-generation-form" method="POST">
+            @csrf
 
-            @if(in_array('restaurant',explode(',',$general_setting->modules)))
+            @if(in_array('restaurant',explode(',',gen_setting()->modules)) && isset($tables))
             <div class="form-group mb-3">
-                <label>{{ __('db.Table') }}</label>q
+                <label>{{ __('db.table') }}</label>
                 <select id="table_id" class="form-control">
                     @foreach($tables as $table)
                         <option value="{{ $table->id }}">{{ $table->name }}</option>
@@ -16,9 +38,9 @@
             </div>
             @else
             <div class="form-group mb-3">
-                <label>{{ __('db.Location') }}</label>
+                <label>{{ __('db.Warehouse') }}</label>
                 <select id="location_id" class="form-control">
-                    @foreach($lims_warehouse_all as $location)
+                    @foreach($lims_warehouse_list as $location)
                         <option value="{{ $location->id }}">{{ $location->name }}</option>
                     @endforeach
                 </select>
@@ -27,12 +49,12 @@
 
             <div class="form-group mb-3">
                 <label>{{ __('db.Title') }}</label>
-                <input type="text" id="qr_title" class="form-control" value="My Shop Name">
+                <input type="text" id="qr_title" class="form-control" value="{{ $qrText('My Shop Name') }}">
             </div>
 
             <div class="form-group mb-3">
                 <label>{{ __('db.Subtitle') }}</label>
-                <input type="text" id="qr_subtitle" class="form-control" value="Product Catalogue">
+                <input type="text" id="qr_subtitle" class="form-control" value="{{ $qrText('Product Catalogue') }}">
             </div>
 
             <div class="form-group mb-3">
@@ -45,7 +67,7 @@
                     </div>
                     <input type="text" id="qr_color" name="theme_color" value="#374b5e" required class="form-control hex-color-input" placeholder="#374b5e" data-picker-id="theme_color_picker" />
                 </div>
-                <small class="text-muted">Use HEX like <code>#6366F1</code></small>
+                <small class="text-muted">{{ $qrText('Use HEX like') }} <code>#6366F1</code></small>
             </div>
 
             <div class="form-check mb-3">
@@ -53,12 +75,13 @@
                 <label class="form-check-label">{{ __('db.Show Logo') }}</label>
             </div>
 
-            <button class="btn btn-primary generateQR" onclick="generateQR()">{{ __('db.Generate QR Code') }}</button>
+            <button type="submit" class="btn btn-primary generateQR">{{ __('db.Generate QR Code') }}</button>
+            </form>
         </div>
         <div class="col-md-6">
             <div class="card p-5 text-center">
-                <h4 id="preview_title">My Shop Name</h4>
-                <p id="preview_subtitle">Product Catalogue</p>
+                <h4 id="preview_title">{{ $qrText('My Shop Name') }}</h4>
+                <p id="preview_subtitle">{{ $qrText('Product Catalogue') }}</p>
 
                 <div id="qrcode" class="mb-3 mt-3">
                     <div style="margin: 0 auto;width: 200px;height: 200px;background: #fff;padding: 10px;border: 1px solid #ccc; border-radius:15px">
@@ -84,13 +107,13 @@
                     </div>
                 </div>
                 <div class="d-flex justify-content-center">
-                    <button class="btn btn-success mt-3 mx-1 d-flex align-items-center" onclick="downloadQR()" disabled>
+                    <button type="button" id="qr_download" class="btn btn-success mt-3 mx-1 d-flex align-items-center" onclick="downloadQR()" disabled>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-download"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" /><path d="M7 11l5 5l5 -5" /><path d="M12 4l0 12" /></svg>
                         <span class="ml-1">{{ __('db.Download QR') }}</span>
                     </button>
-                    <button class="btn btn-primary mt-3 mx-1 d-flex align-items-center" onclick="printQR()" disabled>
+                    <button type="button" id="qr_print" class="btn btn-primary mt-3 mx-1 d-flex align-items-center" onclick="printQR()" disabled>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-printer"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2" /><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4" /><path d="M7 15a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2l0 -4" /></svg>
-                        <span class="ml-1">{{ __('db.Print') }}</span>
+                        <span class="ml-1">{{ __('db.print') }}</span>
                     </button>
                 </div>
             </div>
@@ -102,16 +125,31 @@
 @push('scripts')
 <script>
 
-function generateQR(type = 'warehouse', id = null) {
+const qrMessages = @json($qrMessages);
 
-    let locationId = id ? id : $('#location_id').val();
+function resetQrActions() {
+    $('#qrcode').empty();
+    $('#qr_actions').addClass('d-none');
+    $('#qr_link').val('');
+    $('#qr_open').attr('href', '#');
+    $('#qr_download').prop('disabled', true).removeAttr('data-url');
+    $('#qr_print').prop('disabled', true);
+}
 
-    @if(in_array('restaurant',explode(',',$general_setting->modules)))
-        type = 'table';
-        locationId = $('#table_id').val();
+function generateQR() {
+    const modal = $('#qrModal');
+    const rowType = modal.attr('data-qr-type');
+    const rowId = modal.attr('data-qr-id');
+    const hasExplicitTarget = Boolean(rowType && rowId);
+    let type;
+    let id;
+
+    @if(in_array('restaurant',explode(',',gen_setting()->modules)) && isset($tables))
+        type = hasExplicitTarget ? rowType : 'table';
+        id = hasExplicitTarget ? rowId : $('#table_id').val();
     @else
-        type = 'warehouse';
-        locationId = $('#location_id').val();
+        type = hasExplicitTarget ? rowType : 'warehouse';
+        id = hasExplicitTarget ? rowId : $('#location_id').val();
     @endif
 
     let color = $('#qr_color').val();
@@ -124,10 +162,10 @@ function generateQR(type = 'warehouse', id = null) {
     $('#preview_subtitle').text(subtitle);
 
     let btn = $('.generateQR');
-    btn.text('Generating...').prop('disabled', true);
+    btn.text(qrMessages.generating).prop('disabled', true);
 
     $.ajax({
-        url: `{{url('/')}}/qr/generate/${type}/${locationId}`,
+        url: `{{url('/')}}/qr/generate/${type}/${id}`,
         method: 'POST',
         data: {
             _token: '{{ csrf_token() }}',
@@ -148,42 +186,57 @@ function generateQR(type = 'warehouse', id = null) {
                 $('#qr_link').val(res.url);
                 $('#qr_open').attr('href', res.url);
                 $('#qr_actions').removeClass('d-none');
-                // Enable download
-                $('.btn-success')
+                $('#qr_download')
                     .prop('disabled', false)
-                    .attr('data-url', res.qr_url);
+                    .attr('data-url', res.download_url);
+                $('#qr_print').prop('disabled', false);
+                modal.attr('data-qr-type', res.entity_type).attr('data-qr-id', res.entity_id);
+                window.saleProToast(res.message, 'success');
 
             } else {
-                alert('Failed to generate QR');
+                window.saleProToast(res.message || qrMessages.failed, 'error');
             }
 
         },
-        error: function() {
-            alert('Server error');
+        error: function(xhr) {
+            window.saleProToast(xhr.responseJSON?.message || qrMessages.request_failed, 'error');
         },
         complete: function() {
-            btn.text('Generate QR Code').prop('disabled', false);
+            btn.text(qrMessages.generate).prop('disabled', false);
         }
     });
 }
 
+$(document).on('submit', '#qr-generation-form', function(event) {
+    event.preventDefault();
+    generateQR();
+});
+
 // Download QR
 function downloadQR() {
-    let url = $('.btn-success').attr('data-url');
-    if (!url) return alert('Generate QR first');
+    let url = $('#qr_download').attr('data-url');
+    if (!url) {
+        window.saleProToast(qrMessages.generate_first, 'warning');
+        return;
+    }
 
     let link = document.createElement('a');
     link.href = url;
-    link.download = 'qr.png';
     link.click();
 }
 
-function copyQrUrl() {
-    var copyText = document.getElementById("qr_link");
-    copyText.select();
-    copyText.setSelectionRange(0, 99999);
-    document.execCommand("copy");
-    alert("Copied: " + copyText.value);
+async function copyQrUrl() {
+    const copyText = document.getElementById('qr_link');
+
+    try {
+        await navigator.clipboard.writeText(copyText.value);
+    } catch (error) {
+        copyText.select();
+        copyText.setSelectionRange(0, 99999);
+        document.execCommand('copy');
+    }
+
+    window.saleProToast(qrMessages.copied, 'success');
 }
 
 function printQR() {
@@ -202,7 +255,7 @@ function printQR() {
     printWindow.document.write(`
         <html>
         <head>
-            <title>Print QR</title>
+            <title>${qrMessages.print_title}</title>
             <style>
                 body {
                     text-align: center;

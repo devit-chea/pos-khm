@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <x-validation-error fieldName="name" />
 <x-validation-error fieldName="code" />
@@ -7,7 +11,7 @@
 
 <section>
     <div class="container-fluid">
-        <button class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="dripicons-plus"></i> {{__('db.Add Currency')}} </button>&nbsp;
+        <button class="btn btn-info" data-toggle="modal" data-target="#createModal"><i class="ti ti-plus"></i> {{__('db.Add Currency')}} </button>&nbsp;
     </div>
     <div class="table-responsive">
         <table id="currency-table" class="table">
@@ -40,14 +44,14 @@
                                 <span class="sr-only">Toggle Dropdown</span>
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
-                                <li><button type="button" data-id="{{$currency_data->id}}" data-name="{{$currency_data->name}}" data-code="{{$currency_data->code}}" data-symbol="{{$currency_data->symbol}}" data-exchange_rate="{{$currency_data->exchange_rate}}" data-rounding="{{$currency_data->rounding}}" data-show_in_pos="{{$currency_data->show_in_pos ? 1 : 0}}" class="edit-btn btn btn-link" data-toggle="modal" data-target="#editModal"><i class="dripicons-document-edit"></i> {{__('db.edit')}}</button></li>
+                                <li><button type="button" data-id="{{$currency_data->id}}" data-name="{{$currency_data->name}}" data-code="{{$currency_data->code}}" data-symbol="{{$currency_data->symbol}}" data-exchange_rate="{{$currency_data->exchange_rate}}" data-rounding="{{$currency_data->rounding}}" data-show_in_pos="{{$currency_data->show_in_pos ? 1 : 0}}" class="edit-btn btn btn-link" data-toggle="modal" data-target="#editModal"><i class="ti ti-edit"></i> {{__('db.edit')}}</button></li>
                                 @if($currency_data->exchange_rate != 1)
                                 <li class="divider"></li>
                                 <form action="{{ route('currency.destroy', $currency_data->id) }}" method="POST">
                                     @csrf
                                     @method('DELETE')
                                     <li>
-                                        <button type="submit" class="btn btn-link" onclick="return confirm('Are you sure want to delete?')"><i class="dripicons-trash"></i> {{__('db.delete')}}</button>
+                                        <button type="submit" class="btn btn-link" data-confirm-message="Are you sure want to delete?"><i class="ti ti-trash"></i> {{__('db.delete')}}</button>
                                     </li>
                                 </form>
                                 @endif
@@ -69,7 +73,7 @@
                 <div class="modal-header">
                     <h5 id="exampleModalLabel" class="modal-title">{{ __('db.Add Currency') }}</h5>
                     <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                        <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                        <span aria-hidden="true"><i class="ti ti-x"></i></span>
                     </button>
                 </div>
                 <div class="modal-body">
@@ -128,7 +132,7 @@
                 <div class="modal-header">
                     <h5 id="exampleModalLabel" class="modal-title">{{ __('db.Update Currency') }}</h5>
                     <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                        <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                        <span aria-hidden="true"><i class="ti ti-x"></i></span>
                     </button>
                 </div>
                 <div class="modal-body">
@@ -152,7 +156,7 @@
                     <div class="form-group">
                         <label>
                             {{ __('db.Exchange Rate') }} * 
-                            <i class="dripicons-question" data-toggle="tooltip" title="{{ __('db.If this is your default currency, the exchange rate must be 1') }}"></i>
+                            <i class="ti ti-info-circle" data-toggle="tooltip" title="{{ __('db.If this is your default currency, the exchange rate must be 1') }}"></i>
                         </label>
                         <input type="number" name="exchange_rate" required class="form-control" id="edit_exchange_rate" min="0.0000001" step="any" placeholder="{{ __('db.Type exchange rate') }}">
                     </div>
@@ -184,6 +188,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $('#add_exchange_rate,#edit_exchange_rate').on('input',function(){
@@ -222,8 +227,8 @@
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -252,7 +257,7 @@
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -281,7 +286,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -298,7 +303,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -315,7 +320,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible',
@@ -324,7 +329,7 @@
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],

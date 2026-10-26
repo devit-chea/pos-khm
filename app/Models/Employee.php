@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\WarehouseScoped;
 use Illuminate\Database\Eloquent\Model;
 
 class Employee extends Model
 {
+    use WarehouseScoped;
+
     protected $fillable = [
         "name",
         "image",
@@ -24,7 +27,8 @@ class Employee extends Model
         "is_sale_agent",
         "sale_commission_percent",
         "sales_target",
-        'warehouse_id'
+        'warehouse_id',
+        'company_id'
     ];
 
     protected $casts = [
@@ -41,6 +45,12 @@ class Employee extends Model
         return $this->belongsTo(User::class);
     }
 
+    /** Sales explicitly assigned to this employee as sales/service staff. */
+    public function sales()
+    {
+        return $this->hasMany(Sale::class, 'sales_agent_id');
+    }
+
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class);
@@ -54,5 +64,20 @@ class Employee extends Model
     public function designation()
     {
         return $this->belongsTo(Designation::class);
+    }
+
+    public function projects()
+    {
+        return $this->belongsToMany(\Modules\Project\Entities\Project::class, 'employee_project', 'employee_id', 'project_id');
+    }
+
+    public function tasks()
+    {
+        return $this->belongsToMany(\Modules\Project\Entities\Task::class, 'employee_task', 'employee_id', 'task_id');
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
     }
 }

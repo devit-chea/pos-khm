@@ -1,22 +1,25 @@
+@php
+    $asset_prefix = !config('database.connections.saleprosaas_landlord') ? '' : '../../';
+@endphp
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
 
 <x-success-message key="create_message" />
 <x-success-message key="import_message" />
+<x-success-message key="success" />
 <x-error-message key="not_permitted" />
 <x-error-message key="message" />
 
 <section>
     <div class="container-fluid">
         @if(in_array("products-add", $all_permission))
-            <a href="{{route('manufacturing.recipes.create')}}" class="btn btn-info add-product-btn"><i class="dripicons-plus"></i> {{__('db.add_recipes')}}</a>
+            <a href="{{route('manufacturing.recipes.create')}}" class="btn btn-info add-product-btn"><i class="ti ti-plus"></i> {{__('db.add_recipes')}}</a>
 
         @endif
-        @if( in_array("products-edit", $all_permission) && in_array('ecommerce',explode(',',$general_setting->modules)) )
-            <a href="{{route('product.allProductInStock')}}" class="btn btn-dark add-product-btn"><i class="dripicons-stack"></i> {{__('db.All Product In Stock')}}</a>
-            <a href="{{route('product.showAllProductOnline')}}" class="btn btn-dark add-product-btn"><i class="dripicons-wifi"></i> {{__('db.Show All Product Online')}}</a>
-        @endif
-
     </div>
     <div class="table-responsive">
         <table id="product-data-table" class="table" style="width: 100%">
@@ -46,10 +49,10 @@
 
         <div class="modal-header">
           <h5 id="exampleModalLabel" class="modal-title">Import Product</h5>
-          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
         </div>
         <div class="modal-body">
-          <p class="italic"><small>{{__('db.The field labels marked with * are required input fields')}}.</small></p>
+          <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
            <p>{{__('db.The correct column order is')}} (image, name*, code*, type*, category*, unit_code*, cost*, price*, product_details, variant_name, item_code, additional_price) {{__('db.and you must follow this')}}.</p>
            <p>{{__('db.To display Image it must be stored in')}} images/product {{__('db.directory')}}. {{__('db.Image name must be same as product name')}}</p>
            <div class="row">
@@ -62,11 +65,11 @@
                 <div class="col-md-6">
                     <div class="form-group">
                         <label> {{__('db.Sample File')}}</label>
-                        <a href="sample_file/sample_products.csv" class="btn btn-info btn-block btn-md"><i class="dripicons-download"></i>  {{__('db.Download')}}</a>
+                        <a href="sample_file/sample_products.csv" class="btn btn-info btn-block btn-md"><i class="ti ti-download"></i>  {{__('db.Download')}}</a>
                     </div>
                 </div>
            </div>
-            <button type="submit" class="btn btn-primary">{{__('db.Submit')}}</button>
+            <button type="submit" class="btn btn-primary">{{__('db.submit')}}</button>
         </div>
         </form>
       </div>
@@ -78,8 +81,8 @@
       <div class="modal-content">
         <div class="modal-header">
           <h5 id="exampleModalLabel" class="modal-title">{{__('db.Product Details')}}</h5>
-          <button id="print-btn" type="button" class="btn btn-default btn-sm ml-3"><i class="dripicons-print"></i> {{__('db.Print')}}</button>
-          <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+          <button id="print-btn" type="button" class="btn btn-default btn-sm ml-3"><i class="ti ti-printer"></i> {{__('db.print')}}</button>
+          <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
         </div>
         <div class="modal-body">
             <div class="row">
@@ -122,6 +125,7 @@
 
 @endsection
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script>
 
     $("ul#product").siblings('a').attr('aria-expanded','true');
@@ -130,7 +134,7 @@
 
     @if(config('database.connections.saleprosaas_landlord'))
         if(localStorage.getItem("message")) {
-            alert(localStorage.getItem("message"));
+            SaleProToast.show(localStorage.getItem("message"););
             localStorage.removeItem("message");
         }
 
@@ -147,12 +151,7 @@
         });
     @endif
 
-    function confirmDelete() {
-        if (confirm("Are you sure want to delete?")) {
-            return true;
-        }
-        return false;
-    }
+    function confirmDelete() { return true; }
 
     var columns = [{"data": "key"},{"data": "name"},{"data": "category"},{"data": "unit"},{"data": "cost"},{"data": "price"}];
     var field_name = <?php echo json_encode($field_name) ?>;
@@ -170,7 +169,7 @@
     var product_id = [];
     var all_permission = <?php echo json_encode($all_permission) ?>;
     var role_id = <?php echo json_encode($role_id) ?>;
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
     var logoUrl = <?php echo json_encode(url('logo', $general_setting->site_logo)) ?>;
     var warehouse_id = <?php echo json_encode($warehouse_id); ?>;
 
@@ -205,7 +204,7 @@
           var divToPrint=document.getElementById('product-details');
           var newWin=window.open('','Print-Window');
           newWin.document.open();
-          newWin.document.write('<link rel="stylesheet" href="<?php echo asset('vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css"><style type="text/css">@media print {.modal-dialog { max-width: 1000px;} }</style><body onload="window.print()">'+divToPrint.innerHTML+'</body>');
+          newWin.document.write('<link rel="stylesheet" href="<?php echo asset($asset_prefix . 'vendor/bootstrap/css/bootstrap.min.css') ?>" type="text/css"><style type="text/css">@media print {.modal-dialog { max-width: 1000px;} }</style><body onload="window.print()">'+divToPrint.innerHTML+'</body>');
           newWin.document.close();
           setTimeout(function(){newWin.close();},10);
     });
@@ -227,18 +226,18 @@
                 slidertext = '<div id="product-img-slider" class="carousel slide" data-ride="carousel"><div class="carousel-inner">';
                 for (var i = 0; i < product_image.length; i++) {
                     if(!i)
-                        slidertext += '<div class="carousel-item active"><img src="images/product/'+product_image[i]+'" height="300" width="100%"></div>';
+                        slidertext += '<div class="carousel-item active"><img src="{{url("images/product")}}/'+product_image[i]+'" height="300" width="100%"></div>';
                     else
-                        slidertext += '<div class="carousel-item"><img src="images/product/'+product_image[i]+'" height="300" width="100%"></div>';
+                        slidertext += '<div class="carousel-item"><img src="{{url("images/product")}}/'+product_image[i]+'" height="300" width="100%"></div>';
                 }
                 slidertext += '</div><a class="carousel-control-prev" href="#product-img-slider" data-slide="prev"><span class="carousel-control-prev-icon" aria-hidden="true"></span><span class="sr-only">Previous</span></a><a class="carousel-control-next" href="#product-img-slider" data-slide="next"><span class="carousel-control-next-icon" aria-hidden="true"></span><span class="sr-only">Next</span></a></div>';
             }
             else {
-                slidertext = '<img src="images/product/'+product[18]+'" height="300" width="100%">';
+                slidertext = '<img src="{{url("images/product")}}/'+product[18]+'" height="300" width="100%">';
             }
         }
         else {
-            slidertext = '<img src="images/product/zummXD2dvAtI.png" height="300" width="100%">';
+            slidertext = '<img src="{{url("images/product/zummXD2dvAtI.png")}}" height="300" width="100%">';
         }
         $("#recipe-header").text('');
         $("table.item-list thead").remove();
@@ -259,6 +258,7 @@
             price_list = product[16].split(",");
             combo_unit = product[20].split(",");
             wastage_percent = product[21].split(",");
+            combo_unit_id_list = product[22] ? product[22].split(",") : [];
             $(".item-list thead").remove();
             $(".item-list tbody").remove();
             var newHead = $("<thead>");
@@ -269,15 +269,20 @@
             $(product_list).each(function(i) {
                 if(!variant_list[i])
                     variant_list[i] = 0;
-                let url = '{{ route("products.getdata", [":product", ":variant"]) }}';
-                url = url.replace(':product', product_list[i]).replace(':variant', variant_list[i]);
-                $.get(url, function(data) {
+                let url = '{{ route("manufacturing.recipes.get-ingredient-data") }}';
+                $.get(url, {
+                    product_id: product_list[i],
+                    variant_id: variant_list[i],
+                    qty: qty_list[i],
+                    price: price_list[i],
+                    combo_unit_id: combo_unit_id_list[i]
+                }, function(data) {
                     var newRow = $("<tr>");
                     var cols = '';
-                    cols += '<td>' + data['name'] +' [' + data['code'] + ']</td>';
+                    cols += '<td>' + data.name +' [' + data.code + ']</td>';
                     cols += '<td>' + wastage_percent[i] +'</td>';
                     cols += '<td>' + qty_list[i] + '('+combo_unit[i]+')</td>';
-                    cols += '<td>' + price_list[i] + '</td>';
+                    cols += '<td>' + parseFloat(data.calculated_price).toFixed(2) + '</td>';
 
                     newRow.append(cols);
                     newBody.append(newRow);
@@ -291,7 +296,7 @@
                     var newHead = $("<thead>");
                     var newBody = $("<tbody>");
                     var newRow = $("<tr>");
-                    newRow.append('<th>{{__("db.Variant")}}</th><th>{{__("db.Item Code")}}</th><th>{{__("db.Additional Cost")}}</th><th>{{__("db.Additional Price")}}</th><th>{{__("db.Qty")}}</th>');
+                    newRow.append('<th>{{__("db.Variant")}}</th><th>{{__("db.Item Code")}}</th><th>{{__("db.Additional Cost")}}</th><th>{{__("db.Additional Price")}}</th><th>{{__("db.qty")}}</th>');
                     newHead.append(newRow);
                     $.each(variantData, function(i) {
                         var newRow = $("<tr>");
@@ -420,8 +425,8 @@
                  "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
                 "search":  '{{__("db.Search")}}',
                 'paginate': {
-                        'previous': '<i class="dripicons-chevron-left"></i>',
-                        'next': '<i class="dripicons-chevron-right"></i>'
+                        'previous': '<i class="ti ti-chevron-left"></i>',
+                        'next': '<i class="ti ti-chevron-right"></i>'
                 }
             },
             order:[['2', 'asc']],
@@ -451,7 +456,7 @@
             buttons: [
                 {
                     extend: 'pdf',
-                    text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                    text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                     exportOptions: {
                         columns: ':visible:not(.not-exported)',
                         rows: ':visible',
@@ -480,7 +485,7 @@
                 },
                 {
                     extend: 'excel',
-                    text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                    text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                     exportOptions: {
                         columns: ':visible:not(.not-exported)',
                         rows: ':visible',
@@ -497,7 +502,7 @@
                 },
                 {
                     extend: 'csv',
-                    text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                    text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                     exportOptions: {
                         columns: ':visible:not(.not-exported)',
                         rows: ':visible',
@@ -515,7 +520,7 @@
                 {
                     extend: 'print',
                     title: '',
-                    text: '<i title="print" class="fa fa-print"></i>',
+                    text: '<i title="print" class="ti ti-printer"></i>',
                     exportOptions: {
                         columns: ':visible:not(.not-exported)',
                         rows: ':visible',
@@ -535,7 +540,7 @@
                     }*/
                 },
                 {
-                    text: '<i title="delete" class="dripicons-cross"></i>',
+                    text: '<i title="delete" class="ti ti-x"></i>',
                     className: 'buttons-delete',
                     action: function ( e, dt, node, config ) {
                         if(user_verified == '1') {
@@ -555,22 +560,22 @@
                                         productIdArray: product_id
                                     },
                                     success:function(data) {
-                                        alert(data);
+                                        SaleProToast.show(data);
                                         //dt.rows({ page: 'current', selected: true }).deselect();
                                         dt.rows({ page: 'current', selected: true }).remove().draw(false);
                                     }
                                 });
                             }
                             else if(!product_id.length)
-                                alert('No product is selected!');
+                                SaleProToast.show('No product is selected!');
                         }
                         else
-                            alert('This feature is disable for demo!');
+                            SaleProToast.show('This feature is disable for demo!');
                     }
                 },
                 {
                     extend: 'colvis',
-                    text: '<i title="column visibility" class="fa fa-eye"></i>',
+                    text: '<i title="column visibility" class="ti ti-eye"></i>',
                     columns: ':gt(0)'
                 },
             ],

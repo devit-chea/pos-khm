@@ -47,7 +47,7 @@
                                         <label>{{__('db.add_product')}} *</label>
                                         <div class="search-box input-group">
 
-                                            <button type="button" class="btn btn-secondary btn-lg"><i class="fa fa-barcode"></i></button>
+                                            <button type="button" class="btn btn-secondary btn-lg"><i class="ti ti-barcode"></i></button>
                                             <input type="text" name="product_code_name" id="lims_productcodeSearch" placeholder="{{__('db.Please type product code and select')}}" class="form-control" />
                                         </div>
                                     </div>
@@ -61,7 +61,7 @@
                                                         <th>{{__('db.name')}}</th>
                                                         <th>{{__('db.Code')}}</th>
                                                         <th>{{__('db.Quantity')}}</th>
-                                                        <th><i class="dripicons-trash"></i></th>
+                                                        <th><i class="ti ti-trash"></i></th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -71,7 +71,7 @@
                                     </div>
                                 </div>
                                 <div class="form-group mt-2">
-                                    <strong>{{__('db.Print')}}: </strong>&nbsp;
+                                    <strong>{{__('db.print')}}: </strong>&nbsp;
                                     <strong><input type="checkbox" name="name" checked /> {{__('db.Product Name')}}</strong>&nbsp;
                                     <strong><input type="checkbox" name="price" checked/> {{__('db.Price')}}</strong>&nbsp;
                                     <strong><input type="checkbox" name="promo_price"/> {{__('db.Promotional Price')}}</strong>
@@ -103,8 +103,8 @@
             <div class="modal-content">
                 <div class="modal-header">
                   <h5 id="modal_header" class="modal-title">{{__('db.Barcode')}}</h5>&nbsp;&nbsp;
-                  <button id="print-btn" type="button" class="btn btn-default btn-sm"><i class="dripicons-print"></i> {{__('db.Print')}}</button>
-                  <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                  <button id="print-btn" type="button" class="btn btn-default btn-sm"><i class="ti ti-printer"></i> {{__('db.print')}}</button>
+                  <button type="button" id="close-btn" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                     <div id="label-content">
@@ -161,8 +161,7 @@
                 var flag = 1;
                 $(".product-code").each(function() {
                     if ($(this).text() == data[1]) {
-                        alert('duplicate input is not allowed!')
-                        flag = 0;
+                        SaleProToast.show('duplicate input is not allowed!');flag = 0;
                     }
                 });
                 $("input[name='product_code_name']").val('');
@@ -260,7 +259,7 @@
             $('#print-barcode').modal('show');
         }
         else
-            alert('Please select paper size');
+            SaleProToast.show('Please select paper size');
     });
 
     $("#print-btn").on("click", function(){

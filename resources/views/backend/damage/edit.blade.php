@@ -56,7 +56,7 @@
                                             <label>{{ __('db.Select Product') }}</label>
                                             <div class="search-box input-group">
                                                 <button type="button" class="btn btn-secondary btn-lg">
-                                                    <i class="fa fa-barcode"></i>
+                                                    <i class="ti ti-barcode"></i>
                                                 </button>
                                                 <input type="text" name="product_code_name"
                                                     id="lims_productcodeSearch"
@@ -79,7 +79,7 @@
                                                             <th>{{ __('db.Damage Quantity') }}</th>
                                                             <th>{{ __('db.Adjust Quantity') }}</th>
                                                             {{-- action column removed --}}
-                                                            <th><i class="dripicons-trash"></i></th>
+                                                            <th><i class="ti ti-trash"></i></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -127,7 +127,7 @@
                                                     <tfoot class="tfoot active">
                                                         <th colspan="5">{{ __('db.Total') }}</th>
                                                         <th id="total-qty" colspan="1">0</th>
-                                                        <th><i class="dripicons-trash"></i></th>
+                                                        <th><i class="ti ti-trash"></i></th>
                                                     </tfoot>
                                                 </table>
                                             </div>
@@ -144,7 +144,7 @@
                                     <div class="row">
                                         <div class="col-md-12">
                                             <div class="form-group">
-                                                <label>{{ __('db.Note') }}</label>
+                                                <label>{{ __('db.note') }}</label>
                                                 <textarea rows="5" class="form-control" name="note">{{ $lims_damage_data->note }}</textarea>
                                             </div>
                                         </div>
@@ -281,7 +281,7 @@
     $('#damage-form').on('submit', function (e) {
         var rownumber = $('table.order-list tbody tr:last').index();
         if (rownumber < 0) {
-            alert("Please insert product to order table!");
+            SaleProToast.show("Please insert product to order table!");
             e.preventDefault();
         }
     });
@@ -334,7 +334,7 @@
         var pos = product_code.indexOf(row_product_code);
 
         if (qty > parseFloat(product_qty[pos])) {
-            alert('Quantity exceeds stock quantity!');
+            SaleProToast.show('Quantity exceeds stock quantity!');
             var row_qty = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val();
             row_qty = row_qty.substring(0, row_qty.length - 1);
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val(row_qty);

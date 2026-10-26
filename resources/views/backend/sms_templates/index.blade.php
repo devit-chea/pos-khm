@@ -1,4 +1,8 @@
-@extends('backend.layout.main') 
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ 
 @section('content')
 
 <section>
@@ -8,7 +12,7 @@
                 <h3 class="text-center">{{__('db.SMS Template List')}}</h3>
             </div>
         </div>
-        <button class="btn btn-info" data-toggle="modal" data-target="#smstemplates-modal"><i class="dripicons-plus"></i> {{__('db.Add Template')}}</button>
+        <button class="btn btn-info" data-toggle="modal" data-target="#smstemplates-modal"><i class="ti ti-plus"></i> {{__('db.Add Template')}}</button>
     </div>
 
     <div class="table-responsive">
@@ -47,14 +51,14 @@
                                 </button>
                                 <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                                     <li>
-                                        <button type="button" data-id="{{$template->id}}" data-name="{{$template->name}}" data-content="{{$template->content}}" data-is_default="{{$template->is_default}}" data-is_default_ecommerce="{{$template->is_default_ecommerce}}"class="edit-btn btn btn-link" data-toggle="modal" data-target="#editModal" ><i class="dripicons-document-edit"></i>  {{__('db.edit')}}</button>
+                                        <button type="button" data-id="{{$template->id}}" data-name="{{$template->name}}" data-content="{{$template->content}}" data-is_default="{{$template->is_default}}" data-is_default_ecommerce="{{$template->is_default_ecommerce}}"class="edit-btn btn btn-link" data-toggle="modal" data-target="#editModal" ><i class="ti ti-edit"></i>  {{__('db.edit')}}</button>
                                     </li>
                                     <li class="divider"></li>
                                     <form action="{{ route('smstemplates.destroy', $template->id) }}" method="POST">
                                         @csrf
                                         @method('DELETE')
                                         <li>
-                                            <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> {{__('db.delete')}}</button>
+                                            <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}"><i class="ti ti-trash"></i> {{__('db.delete')}}</button>
                                         </li>
                                     </form>
                                 </ul>
@@ -73,7 +77,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Template')}}</h5>
-          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+          <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
         </div>
         <div class="modal-body">
           <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -116,7 +120,7 @@ Thanks for the order. Order reference: [reference]. Order status: [sale_status] 
         <div class="modal-content">
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{__('db.Update Template')}}</h5>
-                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
               <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
@@ -153,6 +157,7 @@ Thanks for the order. Order reference: [reference]. Order status: [sale_status] 
 
 @endsection
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
     $.ajaxSetup({
         headers: {
@@ -177,8 +182,8 @@ Thanks for the order. Order reference: [reference]. Order status: [sale_status] 
              "info":      '<small>{{__("db.Showing")}} _START_ - _END_ (_TOTAL_)</small>',
             "search":  '{{__("db.Search")}}',
             'paginate': {
-                    'previous': '<i class="dripicons-chevron-left"></i>',
-                    'next': '<i class="dripicons-chevron-right"></i>'
+                    'previous': '<i class="ti ti-chevron-left"></i>',
+                    'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         'columnDefs': [
@@ -207,7 +212,7 @@ Thanks for the order. Order reference: [reference]. Order status: [sale_status] 
         buttons: [
             {
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -215,7 +220,7 @@ Thanks for the order. Order reference: [reference]. Order status: [sale_status] 
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -223,7 +228,7 @@ Thanks for the order. Order reference: [reference]. Order status: [sale_status] 
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -231,7 +236,7 @@ Thanks for the order. Order reference: [reference]. Order status: [sale_status] 
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -239,7 +244,7 @@ Thanks for the order. Order reference: [reference]. Order status: [sale_status] 
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],

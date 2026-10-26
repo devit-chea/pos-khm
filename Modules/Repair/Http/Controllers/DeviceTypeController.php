@@ -43,7 +43,7 @@ class DeviceTypeController extends Controller
         if (isset($request->ajax))
             return $deviceType;
         else
-            return redirect()->back()->with('message', __('db.Device Type created successfully'));
+            return redirect()->back()->with('message', __('db.device_type_created_successfully'));
     }
 
     public function edit($id)
@@ -73,7 +73,7 @@ class DeviceTypeController extends Controller
         $lims_device_type_data->save();
 
         $this->cacheForget('device_type_list');
-        return redirect()->back()->with('message', __('db.Device Type updated successfully'));
+        return redirect()->back()->with('message', __('db.device_type_updated_successfully'));
     }
 
     public function importDeviceType(Request $request)
@@ -113,7 +113,7 @@ class DeviceTypeController extends Controller
         }
 
         $this->cacheForget('device_type_list');
-        return redirect('device-type')->with('message', __('db.Device Type imported successfully'));
+        return redirect('device-type')->with('message', __('db.device_type_imported_successfully'));
     }
 
     public function deleteBySelection(Request $request)
@@ -137,7 +137,7 @@ class DeviceTypeController extends Controller
         $lims_device_type_data->save();
 
         $this->cacheForget('device_type_list');
-        return back()->with('not_permitted', __('db.Device Type deleted successfully!'));
+        return back()->with('not_permitted', __('db.device_type_deleted_successfully'));
 
     }
 

@@ -27,16 +27,31 @@ use App\Models\Warehouse;
 use App\Traits\MailInfo;
 use App\Traits\StaffAccess;
 use App\Traits\TenantInfo;
+use App\Services\RegisterReconciliationService;
+use App\Http\Requests\StoreSaleReturnRequest;
+use App\Http\Requests\UpdateSaleReturnRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Mail;
 use Spatie\Permission\Models\Role;
 
 class ReturnController extends Controller
 {
     use TenantInfo, MailInfo, StaffAccess;
+
+    protected $accountingService;
+    protected \App\Services\Domain\SaleReturnImeiService $imeiService;
+
+    public function __construct(
+        \App\Services\AccountingService $accountingService,
+        \App\Services\Domain\SaleReturnImeiService $imeiService
+    ) {
+        $this->accountingService = $accountingService;
+        $this->imeiService = $imeiService;
+    }
 
     public function index(Request $request)
     {
@@ -107,7 +122,7 @@ class ReturnController extends Controller
         $order = 'returns.'.$columns[$request->input('order.0.column')];
         $dir = $request->input('order.0.dir');
         if(empty($request->input('search.value'))) {
-            $q = Returns::with('biller', 'customer', 'warehouse', 'user')
+            $q = Returns::with('biller', 'customer', 'warehouse', 'user', 'refundPayments')
                 ->whereDate('created_at', '>=' ,$request->input('starting_date'))
                 ->whereDate('created_at', '<=' ,$request->input('ending_date'))
                 ->offset($start)
@@ -156,7 +171,7 @@ class ReturnController extends Controller
 
             // ✅ Fetch
             $returnss = $q->select('returns.*')
-                ->with('biller', 'customer', 'warehouse', 'user')
+                ->with('biller', 'customer', 'warehouse', 'user', 'refundPayments')
                 ->distinct('returns.id')
                 ->offset($start)
                 ->limit($limit)
@@ -184,7 +199,7 @@ class ReturnController extends Controller
                 $nestedData['warehouse'] = $returns->warehouse->name;
                 $nestedData['biller'] = $returns->biller->name;
                 $nestedData['customer'] = $returns->customer->name;
-                $nestedData['grand_total'] = number_format($returns->grand_total / $returns->exchange_rate, config('decimal'));
+                $nestedData['grand_total'] = number_format($returns->display_grand_total / $returns->exchange_rate, config('decimal'));
                 $nestedData['options'] = '<div class="btn-group">
                             <button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">'.__("db.action").'
                               <span class="caret"></span>
@@ -192,17 +207,17 @@ class ReturnController extends Controller
                             </button>
                             <ul class="dropdown-menu edit-options dropdown-menu-right dropdown-default" user="menu">
                                 <li>
-                                    <button type="button" class="btn btn-link view"><i class="fa fa-eye"></i> '.__('db.View').'</button>
+                                    <button type="button" class="btn btn-link view"><i class="ti ti-eye"></i> '.__('db.View').'</button>
                                 </li>';
                 if(in_array("returns-edit", $request['all_permission'])) {
                     $nestedData['options'] .= '<li>
-                        <a href="'.route('return-sale.edit', $returns->id).'" class="btn btn-link"><i class="dripicons-document-edit"></i> '.__('db.edit').'</a>
+                        <a href="'.route('return-sale.edit', $returns->id).'" class="btn btn-link"><i class="ti ti-edit"></i> '.__('db.edit').'</a>
                         </li>';
                 }
                 if(in_array("returns-delete", $request['all_permission']))
                     $nestedData['options'] .= '<form action="' . route("return-sale.destroy", $returns->id) . '" method="POST">'.csrf_field().'' . method_field("DELETE") . '
                             <li>
-                              <button type="submit" class="btn btn-link" onclick="return confirmDelete()"><i class="dripicons-trash"></i> '.__("db.delete").'</button>
+                              <button type="submit" class="btn btn-link" data-confirm-message="' . __('db.Are you sure want to delete?') . '"><i class="ti ti-trash"></i> '.__("db.delete").'</button>
                             </li></form>
                         </ul>
                     </div>';
@@ -212,7 +227,7 @@ class ReturnController extends Controller
                 else
                     $currency_code = 'N/A';
 
-                $nestedData['return'] = array( '[ "'.date(config('date_format'), strtotime($returns->created_at->toDateString())).'"', ' "'.$returns->reference_no.'"', ' "'.$returns->warehouse->name.'"', ' "'.$returns->biller->name.'"', ' "'.$returns->biller->company_name.'"', ' "'.$returns->biller->email.'"', ' "'.$returns->biller->phone_number.'"', ' "'.$returns->biller->address.'"', ' "'.$returns->biller->city.'"', ' "'.$returns->customer->name.'"', ' "'.$returns->customer->phone_number.'"', ' "'.$returns->customer->address.'"', ' "'.$returns->customer->city.'"', ' "'.$returns->id.'"', ' "'.$returns->total_tax.'"', ' "'.$returns->total_discount.'"', ' "'.$returns->total_price.'"', ' "'.$returns->order_tax.'"', ' "'.$returns->order_tax_rate.'"', ' "'.$returns->grand_total.'"', ' "'.preg_replace('/[\n\r]/', "<br>", $returns->return_note).'"', ' "'.preg_replace('/[\n\r]/', "<br>", $returns->staff_note).'"', ' "'.$returns->user->name.'"', ' "'.$returns->user->email.'"', ' "'.$nestedData['sale_reference'].'"', ' "'.$returns->document.'"', ' "'.$currency_code.'"', ' "'.$returns->exchange_rate.'"]'
+                $nestedData['return'] = array( '[ "'.date(config('date_format'), strtotime($returns->created_at->toDateString())).'"', ' "'.$returns->reference_no.'"', ' "'.$returns->warehouse->name.'"', ' "'.$returns->biller->name.'"', ' "'.$returns->biller->company_name.'"', ' "'.$returns->biller->email.'"', ' "'.$returns->biller->phone_number.'"', ' "'.$returns->biller->address.'"', ' "'.$returns->biller->city.'"', ' "'.$returns->customer->name.'"', ' "'.$returns->customer->phone_number.'"', ' "'.$returns->customer->address.'"', ' "'.$returns->customer->city.'"', ' "'.$returns->id.'"', ' "'.$returns->total_tax.'"', ' "'.$returns->total_discount.'"', ' "'.$returns->total_price.'"', ' "'.$returns->order_tax.'"', ' "'.$returns->order_tax_rate.'"', ' "'.$returns->grand_total.'"', ' "'.preg_replace('/[\n\r]/', "<br>", $returns->return_note).'"', ' "'.preg_replace('/[\n\r]/', "<br>", $returns->staff_note).'"', ' "'.$returns->user->name.'"', ' "'.$returns->user->email.'"', ' "'.$nestedData['sale_reference'].'"', ' "'.$returns->document.'"', ' "'.$currency_code.'"', ' "'.$returns->exchange_rate.'"', ' "'.e($returns->refund_payment_method).'"]'
                 );
                 $data[] = $nestedData;
             }
@@ -224,19 +239,22 @@ class ReturnController extends Controller
             "data"            => $data
         );
 
-        echo json_encode($json_data);
+        return response()->json($json_data);
     }
 
     public function create(Request $request)
     {
         $role = Role::find(Auth::user()->role_id);
-        if($role->hasPermissionTo('returns-add')) {
+        if($role?->checkPermissionTo('returns-add')) {
             $lims_sale_data = Sale::where([
                 ['reference_no', $request->input('reference_no')],
                 ['sale_status', 1]
             ])->whereNull('deleted_at')->select('id', 'sale_status', 'payment_status', 'paid_amount', 'order_discount')->first();
             if(!$lims_sale_data){
                 $lims_sale_data = Sale::where('reference_no', $request->input('reference_no'))->whereNull('deleted_at')->first();
+                if (!$lims_sale_data) {
+                    return redirect()->back()->with('not_permitted', __('db.This reference either does not exist or status not completed!'));
+                }
                 $lims_return_data = Returns::where('sale_id',$lims_sale_data->id)->first();
                 $lims_product_sale_data = Product_Sale::where('sale_id', $lims_sale_data->id)->get();
                 if($lims_return_data && $role->hasPermissionTo('returns-edit')){
@@ -245,7 +263,8 @@ class ReturnController extends Controller
                     $lims_biller_list = Biller::where('is_active',true)->get();
                     $lims_tax_list = Tax::where('is_active',true)->get();
                     $lims_product_return_data = ProductReturn::where('return_id', $lims_return_data->id)->get();
-                    return view('backend.return.edit',compact('lims_customer_list', 'lims_product_sale_data','lims_warehouse_list', 'lims_biller_list', 'lims_tax_list', 'lims_return_data','lims_product_return_data','lims_sale_data'));
+                    $returnSourceLineIds = $this->returnSourceLineIds($lims_return_data, $lims_product_return_data);
+                    return view('backend.return.edit',compact('lims_customer_list', 'lims_product_sale_data','lims_warehouse_list', 'lims_biller_list', 'lims_tax_list', 'lims_return_data','lims_product_return_data','lims_sale_data', 'returnSourceLineIds'));
                 }else{
                     return redirect()->back()->with('not_permitted', __('db.This reference either does not exist or status not completed!'));
                 }
@@ -253,38 +272,69 @@ class ReturnController extends Controller
             $lims_product_sale_data = Product_Sale::where('sale_id', $lims_sale_data->id)->get();
             $lims_tax_list = Tax::where('is_active',true)->get();
             $lims_warehouse_list = Warehouse::where('is_active',true)->get();
-            return view('backend.return.create', compact('lims_tax_list', 'lims_sale_data', 'lims_product_sale_data', 'lims_warehouse_list'));
+            $lims_account_list = app(\App\Services\PaymentAccountService::class)->validOperationalAccounts();
+            $refund_payment_methods = app(RegisterReconciliationService::class)->refundMethods();
+
+            return view('backend.return.create', compact('lims_tax_list', 'lims_sale_data', 'lims_product_sale_data', 'lims_warehouse_list', 'lims_account_list', 'refund_payment_methods'));
         }
         else
             return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
     }
 
-    public function store(Request $request)
+    public function store(StoreSaleReturnRequest $request)
     {
+        if ($request->boolean('refund')) {
+            $request->validate([
+                'paying_method' => ['required', 'string', 'max:191'],
+                'refund_amount' => ['required', 'numeric', 'gt:0'],
+            ]);
+        }
         DB::beginTransaction();
         try {
             // $used_points = ceil($data['amount'] / $lims_reward_point_setting_data->per_point_amount);
             $data = $request->except('document','total_sale_discount');
             $data['reference_no'] = 'rr-' . date("Ymd") . '-'. date("his");
-            $data['total_discount'] = $request->total_sale_discount;
+            $data = $this->withAuthoritativeReturnTotals($data, (float) ($request->total_sale_discount ?? 0));
             $data['user_id'] = Auth::id();
             $lims_sale_data = Sale::whereNull('deleted_at')->select('id', 'warehouse_id', 'customer_id', 'biller_id', 'currency_id', 'exchange_rate', 'sale_status','payment_status', 'paid_amount')->find($data['sale_id']);
+            if (!$lims_sale_data) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['sale_id' => 'Target sale not found.']);
+            }
+            $zatcaTicket = app(\App\Services\ZatcaIntegrationService::class)->beginReturnRequest($lims_sale_data, $request->all(), (int) Auth::id());
+            if ($zatcaTicket !== null && $zatcaTicket['return'] !== null) {
+                DB::commit();
+                return redirect('return-sale')->with('message', 'This return was already saved. No additional stock change or refund was made.');
+            }
             $data['user_id'] = Auth::id();
             $data['customer_id'] = $lims_sale_data->customer_id;
             $data['warehouse_id'] = $lims_sale_data->warehouse_id;
+            $validatedLines = $this->imeiService->validateAndPrepareStore($data, $lims_sale_data);
+            $lims_sale_data = reset($validatedLines)['sale'];
+            $data = app(\App\Services\ZatcaIntegrationService::class)->prepareReturnData($lims_sale_data, $data, $request->only(['grand_total', 'total_tax']));
+            if (isset($data['_zatca_return_plan'])) {
+                $this->imeiService->validateFiscalStock($validatedLines, $data);
+            }
+            $data['warehouse_id'] = $lims_sale_data->warehouse_id;
+            $data['customer_id'] = $lims_sale_data->customer_id;
             $data['biller_id'] = $lims_sale_data->biller_id;
             $data['currency_id'] = $lims_sale_data->currency_id;
             $data['exchange_rate'] = $lims_sale_data->exchange_rate;
-            $cash_register_data = CashRegister::where([
-                ['user_id', $data['user_id']],
-                ['warehouse_id', $data['warehouse_id']],
-                ['status', true]
-            ])->first();
-            if($cash_register_data)
-                $data['cash_register_id'] = $cash_register_data->id;
+            $refund = $request->refund ?? 0;
+            // The shared payment boundary validates actual collections and all
+            // earlier refunds; a credit sale must reject rather than ignore it.
+            $hasRefund = (bool) $refund;
+            if ($hasRefund && (float) $data['grand_total'] === 0.0) {
+                throw ValidationException::withMessages(['refund_amount' => 'A zero-value sale cannot issue a cash refund.']);
+            }
 
-            $lims_account_data = Account::where('is_default', true)->first();
-            $data['account_id'] = $lims_account_data->id;
+            if ($hasRefund) {
+                if (empty($data['account_id'])) {
+                    $lims_account_data = Account::where('is_default', true)->first() ?? Account::first();
+                    $data['account_id'] = $lims_account_data?->id;
+                }
+            } else {
+                $data['account_id'] = null;
+            }
 
             $document = $request->document;
             if ($document) {
@@ -296,8 +346,7 @@ class ReturnController extends Controller
                         'extension' => 'in:jpg,jpeg,png,gif,pdf,csv,docx,xlsx,txt',
                     ]
                 );
-                if ($v->fails())
-                    return redirect()->back()->withErrors($v->errors());
+                $v->validate();
 
                 $ext = pathinfo($document->getClientOriginalName(), PATHINFO_EXTENSION);
                 $documentName = date("Ymdhis");
@@ -314,14 +363,31 @@ class ReturnController extends Controller
 
             $lims_return_data = Returns::create($data); //success here...........
 
-            $refund = $request->refund ?? 0;
-
             // refund logic only for completed sale and payment status is paid(4) or partial(3)
-            if($refund && $lims_sale_data->paid_amount > 0) { 
+            if($hasRefund) {
+
+                $cash_register_data = CashRegister::where([
+                    ['user_id', $data['user_id']],
+                    ['warehouse_id', $data['warehouse_id']],
+                    ['status', true]
+                ])->first();
+                
+                if($cash_register_data)
+                    $data['cash_register_id'] = $cash_register_data->id;
 
                 // REFUND PAYMENT LOGIC
                 $refund_amount = $request->refund_amount ?? $lims_sale_data->paid_amount;
-                $paying_method = $request->paying_method ?? 'Cash';
+                $paying_method = trim((string) $request->paying_method);
+
+                // A customer deposit is a liability redeemed by the original
+                // sale payment, not a tender that can be paid back out. A sale
+                // return records its own refund payment and never changes the
+                // original deposit redemption.
+                if (strcasecmp($paying_method, 'Deposit') === 0) {
+                    throw ValidationException::withMessages([
+                        'paying_method' => __('db.customer_deposit_refund_tender_unsupported'),
+                    ]);
+                }
 
                 // create payment reference
                 $payment_reference = 'spr-' . date("Ymd") . '-' . date("his");
@@ -336,11 +402,17 @@ class ReturnController extends Controller
                     'account_id' => $data['account_id'],
                     'amount' => $refund_amount,
                     'paying_method' => $paying_method,
+                    'currency_id' => $data['currency_id'],
+                    'exchange_rate' => $data['exchange_rate'] ?: 1,
                     'created_at' => now(),
                     'updated_at' => now()
                 ];
 
-                Payment::create($payment_data);
+                $refundPayment = Payment::create($payment_data);
+                $result = $this->accountingService->recordPayment($refundPayment);
+                if (!$result->success || (isset($data['_zatca_return_plan']) && !$result->isPosted())) {
+                    throw new \App\Exceptions\AccountingException($result->error ?? 'Fiscal refund journal was not posted.');
+                }
 
             }
 
@@ -354,9 +426,9 @@ class ReturnController extends Controller
             $mail_data['order_tax_rate'] = $lims_return_data->order_tax_rate;
             $mail_data['grand_total'] = $lims_return_data->grand_total;
 
-            $product_sale_ids = $data['product_sale_id'];
-            $imei_number = $data['imei_number'];
-            $product_batch_id = $data['product_batch_id'];
+            $product_sale_ids = $data['product_sale_id'] ?? [];
+            $imei_number = $data['imei_number'] ?? [];
+            $product_batch_id = $data['product_batch_id'] ?? [];
             $product_code = $data['product_code'];
             $qty = $data['qty'];
             $sale_unit = $data['sale_unit'];
@@ -365,13 +437,29 @@ class ReturnController extends Controller
             $tax_rate = $data['tax_rate'];
             $tax = $data['tax'];
             $total = $data['subtotal'];
-            foreach ($product_sale_ids as $product_sale_id) {
-                $key = array_search($product_sale_id, $data['product_sale_id']);
-                $pro_id = $data['product_id'][$key];
+            foreach ($data['product_id'] as $key => $pro_id) {
+                $product_sale_id = $product_sale_ids[$key] ?? ($validatedLines[$key]['product_sale']->id ?? null);
                 $lims_product_data = Product::find($pro_id);
                 $variant_id = null;
 
-                if($sale_unit[$key] != 'n/a') {
+                if ($lims_product_data->is_imei) {
+                    $authoritative = $validatedLines[$key];
+                    $variant_id = $authoritative['variant_id'];
+                    $variant_data = $variant_id ? Variant::find($variant_id) : null;
+                    $sale_unit_id = $authoritative['sale_unit_id'];
+                    $lims_sale_unit_data = $authoritative['unit'];
+                    $product_batch_id[$key] = $authoritative['product_batch_id'];
+                }
+                elseif (isset($data['_zatca_return_plan'])) {
+                    $authoritative = $validatedLines[$key];
+                    $this->imeiService->restoreFiscalStock($authoritative);
+                    $variant_id = $authoritative['variant_id'];
+                    $variant_data = $variant_id ? Variant::find($variant_id) : null;
+                    $sale_unit_id = $authoritative['sale_unit_id'];
+                    $lims_sale_unit_data = $authoritative['unit'];
+                    $product_batch_id[$key] = $authoritative['product_batch_id'];
+                }
+                elseif($sale_unit[$key] != 'n/a') {
                     $lims_sale_unit_data  = Unit::where('unit_name', $sale_unit[$key])->first();
                     $sale_unit_id = $lims_sale_unit_data->id;
                     if($lims_sale_unit_data->operator == '*')
@@ -389,7 +477,7 @@ class ReturnController extends Controller
                         $variant_data = Variant::find($lims_product_variant_data->variant_id);
                         $variant_id = $variant_data->id;
                     }
-                    elseif($product_batch_id[$key]) {
+                    elseif(!empty($product_batch_id[$key])) {
                         $lims_product_warehouse_data = Product_Warehouse::where([
                             ['product_batch_id', $product_batch_id[$key] ],
                             ['warehouse_id', $data['warehouse_id'] ]
@@ -414,8 +502,27 @@ class ReturnController extends Controller
                         else
                             $variant_list = [];
                         $qty_list = explode(",", $lims_product_data->qty_list);
+                        $combo_unit_ids = $lims_product_data->combo_unit_id 
+                            ? explode(",", $lims_product_data->combo_unit_id) 
+                            : [];
+
                         foreach ($product_list as $index => $child_id) {
                             $child_data = Product::find($child_id);
+                            if(!$child_data) continue;
+
+                            $required = (float) $qty_list[$index];
+                            if (isset($combo_unit_ids[$index]) && $combo_unit_ids[$index] != $child_data->unit_id) {
+                                $unit = Unit::find($combo_unit_ids[$index]);
+                                if ($unit) {
+                                    if ($unit->operator == '*') {
+                                        $required = $required * $unit->operation_value;
+                                    } elseif ($unit->operator == '/') {
+                                        $required = $required / $unit->operation_value;
+                                    }
+                                }
+                            }
+                            $return_qty = $qty[$key] * $required;
+
                             if(count($variant_list) && $variant_list[$index]) {
                                 $child_product_variant_data = ProductVariant::where([
                                     ['product_id', $child_id],
@@ -428,8 +535,10 @@ class ReturnController extends Controller
                                     ['warehouse_id', $data['warehouse_id'] ],
                                 ])->first();
 
-                                $child_product_variant_data->qty += $qty[$key] * $qty_list[$index];
-                                $child_product_variant_data->save();
+                                if ($child_product_variant_data) {
+                                    $child_product_variant_data->qty += $return_qty;
+                                    $child_product_variant_data->save();
+                                }
                             }
                             else {
                                 $child_warehouse_data = Product_Warehouse::where([
@@ -438,24 +547,19 @@ class ReturnController extends Controller
                                 ])->first();
                             }
 
-                            $child_data->qty += $qty[$key] * $qty_list[$index];
-                            $child_warehouse_data->qty += $qty[$key] * $qty_list[$index];
+                            $child_data->qty += $return_qty;
+                            if ($child_warehouse_data) {
+                                $child_warehouse_data->qty += $return_qty;
+                                $child_warehouse_data->save();
+                            }
 
                             $child_data->save();
-                            $child_warehouse_data->save();
                         }
                     }
                     $sale_unit_id = 0;
                 }
 
-                //add imei number if available
-                if($imei_number[$key] && !str_contains($imei_number[$key], "null")) {
-                    if($lims_product_warehouse_data->imei_number)
-                        $lims_product_warehouse_data->imei_number .= ',' . $imei_number[$key];
-                    else
-                        $lims_product_warehouse_data->imei_number = $imei_number[$key];
-                    $lims_product_warehouse_data->save();
-                }
+                // Handled authoritatively by SaleReturnImeiService
 
                 if($lims_product_data->is_variant)
                     $mail_data['products'][$key] = $lims_product_data->name . ' [' . $variant_data->name . ']';
@@ -469,13 +573,15 @@ class ReturnController extends Controller
 
                 $mail_data['qty'][$key] = $qty[$key];
                 $mail_data['total'][$key] = $total[$key];
-                $store_return = ProductReturn::insert(
+                $canonicalImei = $validatedLines[$key]['canonical_imei_str'] ?? null;
+                $createdProductReturn = ProductReturn::create(
                     [
                         'return_id' => $lims_return_data->id,
+                        'product_sale_id' => $validatedLines[$key]['product_sale_id'],
                         'product_id' => $pro_id,
-                        'product_batch_id' => $product_batch_id[$key],
-                        'variant_id' => $variant_id,
-                        'imei_number' => $imei_number[$key],
+                        'product_batch_id' => $product_batch_id[$key] ?? ($validatedLines[$key]['product_batch_id'] ?? null),
+                        'variant_id' => $variant_id ?? ($validatedLines[$key]['variant_id'] ?? null),
+                        'imei_number' => $canonicalImei,
                         'qty' => $qty[$key],
                         'sale_unit_id' => $sale_unit_id,
                         'net_unit_price' => $net_unit_price[$key],
@@ -486,32 +592,70 @@ class ReturnController extends Controller
                         'created_at' => \Carbon\Carbon::now(),
                         'updated_at' => \Carbon\Carbon::now()]
                 );
-                $product_sale_data = Product_Sale::where([
-                                        ['product_id', $pro_id],
-                                        ['sale_id', $data['sale_id']]
-                                    ])->select('id', 'return_qty')->first();
-                $product_sale_data->return_qty += $qty[$key];
-                $product_sale_data->save();
-
-                // reward point return in customer table...
-                $lims_payment_data = $lims_sale_data->payments[0] ?? null;
-                $lims_reward_point_setting_data = RewardPointSetting::latest()->first();
-
-                if(isset($lims_payment_data->used_points) && $lims_payment_data->used_points != null){
-                    $return_points = ceil($request->product_price[$key] / $lims_reward_point_setting_data->per_point_amount);
-                    $lims_customer_data->update(['points'=> ($return_points + $lims_customer_data->points)]);
+                app(\App\Services\ImportCostAllocationService::class)->allocateReturnCost(
+                    $lims_return_data, $createdProductReturn, $lims_sale_data->id
+                );
+                if (isset($validatedLines[$key]['product_sale'])) {
+                    $product_sale_data = $validatedLines[$key]['product_sale'];
+                    $product_sale_data->return_qty += $qty[$key];
+                    $product_sale_data->save();
+                } else {
+                    $product_sale_data = Product_Sale::where([
+                        ['product_id', $pro_id],
+                        ['sale_id', $data['sale_id']]
+                    ])->first();
+                    if ($product_sale_data) {
+                        $product_sale_data->return_qty += $qty[$key];
+                        $product_sale_data->save();
+                    }
                 }
 
-                if (isset($lims_payment_data->used_points) && $lims_payment_data->paying_method == 'Deposit') {
-                    $lims_customer_data->expense -= (float) $lims_payment_data->amount;
-                    $lims_customer_data->save();
-                }
+            }
+
+            app(\App\Services\ZatcaIntegrationService::class)->persistReturnPricing($lims_return_data, $data);
+            $this->imeiService->applyStoreImeis((int)$data['warehouse_id'], $validatedLines);
+            app(\App\Services\RewardPointService::class)->reconcileReturn($lims_return_data);
+
+            if (class_exists(\Modules\IndiaGST\Services\Calculation\IndiaGstSaleReturnTransactionService::class)) {
+                app(\Modules\IndiaGST\Services\Calculation\IndiaGstSaleReturnTransactionService::class)->recordSaleReturnSnapshot($lims_return_data, $data);
             }
 
             $message = 'Return created successfully';
-            if($data['change_sale_status'])
+            if(isset($data['_zatca_return_plan']) ? (bool) $data['change_sale_status'] : $request->boolean('change_sale_status'))
                 $lims_sale_data->update(['sale_status' => 4]);
 
+            try {
+                $res = null;
+                if ((float) $lims_return_data->grand_total > 0 || isset($data['_zatca_return_plan'])) {
+                    $res = $this->accountingService->recordSaleReturn($lims_return_data, 'sale_return_created');
+                    if (!$res->success || (isset($data['_zatca_return_plan']) && !$res->isPosted())) {
+                        throw new \App\Exceptions\AccountingException($res->error ?? 'Fiscal return journal was not posted.');
+                    }
+                }
+                $lims_return_data->accounting_status = $res ? $res->sourceStatus() : 'pending';
+                $lims_return_data->save();
+            } catch (\App\Exceptions\AccountingException $e) {
+                \Log::error('Accounting error on Sale Return Store: ' . $e->getMessage());
+                throw $e;
+            }
+            app(\App\Services\ZatcaIntegrationService::class)->completeReturnRequest($lims_return_data, $zatcaTicket);
+            DB::commit();
+
+        } catch (\App\Exceptions\SaleValidationException $e) {
+            DB::rollBack();
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                ($e->getField() ?: 'zatca_mode') => $e->getMessage(),
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('Return creation failed: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString());
+            return redirect()->back()->with('not_permitted', 'Something went wrong: ' . $e->getMessage());
+        }
+
+            app(\App\Services\ZatcaIntegrationService::class)->processReturn($lims_return_data);
             $mail_setting = MailSetting::latest()->first();
             if($mail_data['email'] && $mail_setting) {
                 $this->setMailInfo($mail_setting);
@@ -522,13 +666,54 @@ class ReturnController extends Controller
                     $message = 'Return created successfully. Please setup your mail setting to send mail.';
                 }
             }
-            DB::commit();
             return redirect('return-sale')->with('message', $message);
+    }
 
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            return redirect()->back()->with('not_permitted', 'Something went wrong: ' . $e->getMessage());
+    private function withAuthoritativeReturnTotals(array $data, float $returnDiscount): array
+    {
+        $data['item'] = count($data['product_sale_id'] ?? []);
+        $data['total_qty'] = array_sum(array_map('floatval', $data['qty'] ?? []));
+        $data['total_discount'] = $returnDiscount;
+        $data['total_tax'] = array_sum(array_map('floatval', $data['tax'] ?? []));
+        $data['total_price'] = array_sum(array_map('floatval', $data['subtotal'] ?? []));
+        $data['order_tax_rate'] = (float) ($data['order_tax_rate'] ?? 0);
+        $data['order_tax'] = $data['total_price'] * ($data['order_tax_rate'] / 100);
+        $data['grand_total'] = $data['total_price'] + $data['order_tax'] - $data['total_discount'];
+
+        $sale = Sale::whereKey($data['sale_id'] ?? null)->first();
+        if ($sale && (float) $sale->grand_total === 0.0 && (float) $sale->coupon_discount > 0) {
+            $data['total_discount'] = $data['total_price'] + $data['order_tax'];
+            $data['grand_total'] = 0;
         }
+
+        return $data;
+    }
+
+    private function returnSourceLineIds(Returns $return, $returnLines): array
+    {
+        $saleLines = Product_Sale::where('sale_id', $return->sale_id)->get()->keyBy('id');
+        $resolved = [];
+
+        foreach ($returnLines as $returnLine) {
+            $source = $returnLine->product_sale_id ? $saleLines->get($returnLine->product_sale_id) : null;
+            if (!$source) {
+                $matches = $saleLines->filter(fn ($candidate) =>
+                    (int) $candidate->product_id === (int) $returnLine->product_id
+                    && (int) $candidate->variant_id === (int) $returnLine->variant_id
+                    && (int) $candidate->product_batch_id === (int) $returnLine->product_batch_id
+                );
+                $source = $matches->count() === 1 ? $matches->first() : null;
+            }
+
+            if ($source
+                && (int) $source->product_id === (int) $returnLine->product_id
+                && (int) $source->variant_id === (int) $returnLine->variant_id
+                && (int) $source->product_batch_id === (int) $returnLine->product_batch_id) {
+                $resolved[$returnLine->id] = $source->id;
+            }
+        }
+
+        return $resolved;
     }
 
     public function getCustomerGroup($id)
@@ -737,7 +922,7 @@ class ReturnController extends Controller
 
                 if($product_return_data->sale_unit_id){
                     $lims_unit_data = Unit::find($product_return_data->sale_unit_id);
-                    $mail_data['unit'][$key] = $lims_unit_data->unit_code;
+                    $mail_data['unit'][$key] = $lims_unit_data ? $lims_unit_data->unit_code : '';
                 }
                 else
                     $mail_data['unit'][$key] = '';
@@ -761,12 +946,14 @@ class ReturnController extends Controller
 
     public function productReturnData($id)
     {
+        Returns::findOrFail($id);
+
         $lims_product_return_data = ProductReturn::where('return_id', $id)->get();
         foreach ($lims_product_return_data as $key => $product_return_data) {
             $product = Product::find($product_return_data->product_id);
             if($product_return_data->sale_unit_id != 0){
                 $unit_data = Unit::find($product_return_data->sale_unit_id);
-                $unit = $unit_data->unit_code;
+                $unit = $unit_data ? $unit_data->unit_code : '';
             }
             else
                 $unit = '';
@@ -795,29 +982,47 @@ class ReturnController extends Controller
 
     public function edit($id)
     {
+        $lims_return_data = Returns::findOrFail($id);
+
+        if (app(\App\Services\ZatcaIntegrationService::class)->isSourceLocked('return', (int) $id)) {
+            return redirect()->back()->with('not_permitted', 'This return already has a Phase 2 credit note and is immutable.');
+        }
+
         $role = Role::find(Auth::user()->role_id);
         if($role->hasPermissionTo('returns-edit')){
             $lims_customer_list = Customer::where('is_active',true)->get();
             $lims_warehouse_list = Warehouse::where('is_active',true)->get();
             $lims_biller_list = Biller::where('is_active',true)->get();
             $lims_tax_list = Tax::where('is_active',true)->get();
-            $lims_return_data = Returns::find($id);
             $lims_product_return_data = ProductReturn::where('return_id', $id)->get();
-            return view('backend.return.edit',compact('lims_customer_list', 'lims_warehouse_list', 'lims_biller_list', 'lims_tax_list', 'lims_return_data','lims_product_return_data'));
+            $returnSourceLineIds = $this->returnSourceLineIds($lims_return_data, $lims_product_return_data);
+            return view('backend.return.edit',compact('lims_customer_list', 'lims_warehouse_list', 'lims_biller_list', 'lims_tax_list', 'lims_return_data','lims_product_return_data', 'returnSourceLineIds'));
         }
         else
             return redirect()->back()->with('not_permitted', __('db.Sorry! You are not allowed to access this module'));
     }
 
 
-    public function update(Request $request, $id)
+    public function update(UpdateSaleReturnRequest $request, $id)
     {
+        if (app(\App\Services\ZatcaIntegrationService::class)->isSourceLocked('return', (int) $id)) {
+            return redirect()->back()->with('not_permitted', 'A Phase 2 credit note has already been generated for this return and cannot be edited.');
+        }
+
         DB::beginTransaction(); // Start transaction
         try {
             $data = $request->except('document','total_sale_discount');
+            $data = $this->withAuthoritativeReturnTotals($data, (float) ($request->total_sale_discount ?? 0));
             $document = $request->document;
-            $lims_return_data = Returns::find($id);
-            $data['total_discount'] = $request->input('total_discount') + $lims_return_data->total_discount ?? 0;
+            $lims_return_data = Returns::findOrFail($id);
+            app(\App\Services\ImportCostAllocationService::class)->reverseReturnCost($lims_return_data);
+            $validatedLines = $this->imeiService->validateAndProcessUpdate($lims_return_data, $data);
+            $originalSale = Sale::findOrFail($lims_return_data->sale_id);
+            $data['sale_id'] = $originalSale->id;
+            $data['warehouse_id'] = $originalSale->warehouse_id;
+            $data['customer_id'] = $originalSale->customer_id;
+            $data['biller_id'] = $originalSale->biller_id;
+            $data['total_discount'] = (float) ($data['total_discount'] ?? 0);
             if ($document) {
                 $v = Validator::make(
                     [
@@ -827,8 +1032,7 @@ class ReturnController extends Controller
                         'extension' => 'in:jpg,jpeg,png,gif,pdf,csv,docx,xlsx,txt',
                     ]
                 );
-                if ($v->fails())
-                    return redirect()->back()->withErrors($v->errors());
+                $v->validate();
 
                 $this->fileDelete(public_path('documents/sale_return/'), $lims_return_data->document);
 
@@ -848,10 +1052,10 @@ class ReturnController extends Controller
             $lims_product_return_data = ProductReturn::where('return_id', $id)->get();
 
             $product_id = $data['product_id'];
-            $imei_number = $data['imei_number'];
-            $product_batch_id = $data['product_batch_id'];
+            $imei_number = $data['imei_number'] ?? [];
+            $product_batch_id = $data['product_batch_id'] ?? [];
             $product_code = $data['product_code'];
-            $product_variant_id = $data['product_variant_id'];
+            $product_variant_id = $data['product_variant_id'] ?? [];
             $qty = $data['qty'];
             $sale_unit = $data['sale_unit'];
             $net_unit_price = $data['net_unit_price'];
@@ -859,18 +1063,46 @@ class ReturnController extends Controller
             $tax_rate = $data['tax_rate'];
             $tax = $data['tax'];
             $total = $data['subtotal'];
+            $retainedProductReturnIds = collect($validatedLines)
+                ->flatMap(fn ($row) => collect($row['old_returns'])->pluck('id'))
+                ->map(fn ($returnId) => (int) $returnId)
+                ->all();
 
             foreach ($lims_product_return_data as $key => $product_return_data) {
                 $old_product_id[] = $product_return_data->product_id;
                 $old_product_variant_id[] = null;
                 $lims_product_data = Product::find($product_return_data->product_id);
+                if ($lims_product_data->is_imei) {
+                    if (!in_array((int) $product_return_data->id, $retainedProductReturnIds, true)) {
+                        $product_return_data->delete();
+                    }
+                    continue;
+                }
                 if($lims_product_data->type == 'combo') {
                     $product_list = explode(",", $lims_product_data->product_list);
                     $variant_list = explode(",", $lims_product_data->variant_list);
                     $qty_list = explode(",", $lims_product_data->qty_list);
+                    $combo_unit_ids = $lims_product_data->combo_unit_id 
+                        ? explode(",", $lims_product_data->combo_unit_id) 
+                        : [];
 
                     foreach ($product_list as $index=>$child_id) {
                         $child_data = Product::find($child_id);
+                        if(!$child_data) continue;
+
+                        $required = (float) $qty_list[$index];
+                        if (isset($combo_unit_ids[$index]) && $combo_unit_ids[$index] != $child_data->unit_id) {
+                            $unit = Unit::find($combo_unit_ids[$index]);
+                            if ($unit) {
+                                if ($unit->operator == '*') {
+                                    $required = $required * $unit->operation_value;
+                                } elseif ($unit->operator == '/') {
+                                    $required = $required / $unit->operation_value;
+                                }
+                            }
+                        }
+                        $restore_qty = $product_return_data->qty * $required;
+
                         if($variant_list[$index]) {
                             $child_product_variant_data = ProductVariant::where([
                                 ['product_id', $child_id],
@@ -883,8 +1115,10 @@ class ReturnController extends Controller
                                 ['warehouse_id', $lims_return_data->warehouse_id ],
                             ])->first();
 
-                            $child_product_variant_data->qty -= $qty[$key] * $qty_list[$index];
-                            $child_product_variant_data->save();
+                            if ($child_product_variant_data) {
+                                $child_product_variant_data->qty -= $restore_qty;
+                                $child_product_variant_data->save();
+                            }
                         }
                         else {
                             $child_warehouse_data = Product_Warehouse::where([
@@ -893,15 +1127,21 @@ class ReturnController extends Controller
                             ])->first();
                         }
 
-                        $child_data->qty -= $product_return_data->qty * $qty_list[$index];
-                        $child_warehouse_data->qty -= $product_return_data->qty * $qty_list[$index];
+                        $child_data->qty -= $restore_qty;
+                        if ($child_warehouse_data) {
+                            $child_warehouse_data->qty -= $restore_qty;
+                            $child_warehouse_data->save();
+                        }
 
                         $child_data->save();
-                        $child_warehouse_data->save();
                     }
                 }
                 elseif($product_return_data->sale_unit_id != 0) {
                     $lims_sale_unit_data = Unit::find($product_return_data->sale_unit_id);
+                    if (!$lims_sale_unit_data) {
+                        \Log::error("Calculation integrity error: Sale unit ID {$product_return_data->sale_unit_id} not found for product ID {$product_return_data->product_id} in return ID {$id}.");
+                        throw new \Exception("Data integrity error: referenced unit #{$product_return_data->sale_unit_id} could not be resolved for return calculation.");
+                    }
                     if ($lims_sale_unit_data->operator == '*')
                         $quantity = $product_return_data->qty * $lims_sale_unit_data->operation_value;
                     elseif($lims_sale_unit_data->operator == '/')
@@ -935,28 +1175,23 @@ class ReturnController extends Controller
                     $lims_product_data->save();
                     $lims_product_warehouse_data->save();
                 }
-                //deduct imei number if available
-                if($product_return_data->imei_number && !str_contains($product_return_data->imei_number, "null")) {
-                    $imei_numbers = explode(",", $product_return_data->imei_number);
-                    $all_imei_numbers = explode(",", $lims_product_warehouse_data->imei_number);
-                    foreach ($imei_numbers as $number) {
-                        if (($j = array_search($number, $all_imei_numbers)) !== false) {
-                            unset($all_imei_numbers[$j]);
-                        }
-                    }
-                    $lims_product_warehouse_data->imei_number = implode(",", $all_imei_numbers);
-                    $lims_product_warehouse_data->save();
-                }
-                if($product_return_data->variant_id && !(in_array($old_product_variant_id[$key], $product_variant_id)) ){
+                // Handled authoritatively by SaleReturnImeiService via validateAndProcessUpdate
+                if (!in_array((int) $product_return_data->id, $retainedProductReturnIds, true)) {
                     $product_return_data->delete();
                 }
-                elseif( !(in_array($old_product_id[$key], $product_id)) )
-                    $product_return_data->delete();
             }
             foreach ($product_id as $key => $pro_id) {
                 $lims_product_data = Product::find($pro_id);
                 $product_return['variant_id'] = null;
-                if($sale_unit[$key] != 'n/a' && $sale_unit[$key] != null) {
+                if ($lims_product_data->is_imei) {
+                    $authoritative = $validatedLines[$key];
+                    $product_return['variant_id'] = $authoritative['variant_id'];
+                    $variant_data = $authoritative['variant_id'] ? Variant::find($authoritative['variant_id']) : null;
+                    $sale_unit_id = $authoritative['sale_unit_id'];
+                    $lims_sale_unit_data = $authoritative['unit'];
+                    $product_batch_id[$key] = $authoritative['product_batch_id'];
+                }
+                elseif($sale_unit[$key] != 'n/a' && $sale_unit[$key] != null) {
                     $lims_sale_unit_data = Unit::where('unit_name', $sale_unit[$key])->first();
                     $sale_unit_id = $lims_sale_unit_data->id;
                     if ($lims_sale_unit_data->operator == '*')
@@ -1002,10 +1237,28 @@ class ReturnController extends Controller
                         $product_list = explode(",", $lims_product_data->product_list);
                         $variant_list = explode(",", $lims_product_data->variant_list);
                         $qty_list = explode(",", $lims_product_data->qty_list);
+                        $combo_unit_ids = $lims_product_data->combo_unit_id 
+                            ? explode(",", $lims_product_data->combo_unit_id) 
+                            : [];
 
                         foreach ($product_list as $index=>$child_id) {
                             $child_data = Product::find($child_id);
-                            if($variant_list[$index]) {
+                            if(!$child_data) continue;
+
+                            $required = (float) $qty_list[$index];
+                            if (isset($combo_unit_ids[$index]) && $combo_unit_ids[$index] != $child_data->unit_id) {
+                                $unit = Unit::find($combo_unit_ids[$index]);
+                                if ($unit) {
+                                    if ($unit->operator == '*') {
+                                        $required = $required * $unit->operation_value;
+                                    } elseif ($unit->operator == '/') {
+                                        $required = $required / $unit->operation_value;
+                                    }
+                                }
+                            }
+                            $add_qty = $qty[$key] * $required;
+
+                            if(count($variant_list) && isset($variant_list[$index]) && $variant_list[$index]) {
                                 $child_product_variant_data = ProductVariant::where([
                                     ['product_id', $child_id],
                                     ['variant_id', $variant_list[$index]]
@@ -1017,8 +1270,10 @@ class ReturnController extends Controller
                                     ['warehouse_id', $data['warehouse_id'] ],
                                 ])->first();
 
-                                $child_product_variant_data->qty += $qty[$key] * $qty_list[$index];
-                                $child_product_variant_data->save();
+                                if ($child_product_variant_data) {
+                                    $child_product_variant_data->qty += $add_qty;
+                                    $child_product_variant_data->save();
+                                }
                             }
                             else {
                                 $child_warehouse_data = Product_Warehouse::where([
@@ -1027,23 +1282,18 @@ class ReturnController extends Controller
                                 ])->first();
                             }
 
-                            $child_data->qty += $qty[$key] * $qty_list[$index];
-                            $child_warehouse_data->qty += $qty[$key] * $qty_list[$index];
+                            $child_data->qty += $add_qty;
+                            if ($child_warehouse_data) {
+                                $child_warehouse_data->qty += $add_qty;
+                                $child_warehouse_data->save();
+                            }
 
                             $child_data->save();
-                            $child_warehouse_data->save();
                         }
                     }
                     $sale_unit_id = 0;
                 }
-                //add imei number if available
-                if($imei_number[$key] && !str_contains($imei_number[$key], "null")) {
-                    if($lims_product_warehouse_data->imei_number)
-                        $lims_product_warehouse_data->imei_number .= ',' . $imei_number[$key];
-                    else
-                        $lims_product_warehouse_data->imei_number = $imei_number[$key];
-                    $lims_product_warehouse_data->save();
-                }
+                // Handled authoritatively by SaleReturnImeiService via validateAndProcessUpdate
 
                 if($lims_product_data->is_variant)
                     $mail_data['products'][$key] = $lims_product_data->name . ' [' . $variant_data->name .']';
@@ -1059,9 +1309,10 @@ class ReturnController extends Controller
                 $mail_data['total'][$key] = $total[$key];
 
                 $product_return['return_id'] = $id ;
+                $product_return['product_sale_id'] = $validatedLines[$key]['product_sale_id'];
                 $product_return['product_id'] = $pro_id;
-                $product_return['imei_number'] = $imei_number[$key];
-                $product_return['product_batch_id'] = $product_batch_id[$key];
+                $product_return['imei_number'] = $validatedLines[$key]['canonical_imei_str'] ?? null;
+                $product_return['product_batch_id'] = $product_batch_id[$key] ?? null;
                 $product_return['qty'] = $qty[$key];
                 $product_return['sale_unit_id'] = $sale_unit_id;
                 $product_return['net_unit_price'] = $net_unit_price[$key];
@@ -1070,24 +1321,53 @@ class ReturnController extends Controller
                 $product_return['tax'] = $tax[$key];
                 $product_return['total'] = $total[$key];
 
-                if($product_return['variant_id'] && in_array($product_variant_id[$key], $old_product_variant_id)) {
-                    ProductReturn::where([
-                        ['product_id', $pro_id],
-                        ['variant_id', $product_return['variant_id']],
-                        ['return_id', $id]
-                    ])->update($product_return);
-                }
-                elseif( $product_return['variant_id'] === null && (in_array($pro_id, $old_product_id)) ) {
-                    ProductReturn::where([
-                        ['return_id', $id],
-                        ['product_id', $pro_id]
-                        ])->update($product_return);
-                }
-                else
+                $previous = $validatedLines[$key]['old_returns'];
+                if ($previous) {
+                    $previous[0]->update($product_return);
+                } else {
                     ProductReturn::create($product_return);
+                }
             }
             $lims_return_data->update($data);
             $lims_customer_data = Customer::find($data['customer_id']);
+
+            try {
+                $revRes = $this->accountingService->reverseTransaction(get_class($lims_return_data), $lims_return_data->id);
+                if (!$revRes->success && $revRes->error !== 'No entries to reverse') {
+                    throw new \App\Exceptions\AccountingException($revRes->error);
+                }
+                
+                $lims_return_data->accounting_status = 'pending';
+                $res = null;
+                if ((float) $lims_return_data->grand_total > 0) {
+                    $res = $this->accountingService->recordSaleReturn($lims_return_data, 'sale_return_updated');
+                    if (!$res->success) {
+                        throw new \App\Exceptions\AccountingException($res->error);
+                    }
+                }
+                $lims_return_data->accounting_status = $res ? $res->sourceStatus() : 'pending';
+                $lims_return_data->save();
+            } catch (\App\Exceptions\AccountingException $e) {
+                \Log::error('Accounting error on Sale Return Update: ' . $e->getMessage());
+                throw $e;
+            }
+            foreach (ProductReturn::where('return_id', $id)->get() as $updatedReturnLine) {
+                app(\App\Services\ImportCostAllocationService::class)->allocateReturnCost(
+                    $lims_return_data, $updatedReturnLine, $originalSale->id
+                );
+            }
+            DB::commit();
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack(); // Rollback on error
+            \Log::error('Return update failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Something went wrong: ' . $e->getMessage());
+        }
+
+            app(\App\Services\ZatcaIntegrationService::class)->processReturn($lims_return_data->fresh());
             $mail_setting = MailSetting::latest()->first();
 
 
@@ -1112,42 +1392,71 @@ class ReturnController extends Controller
                 }
             }
 
-            DB::commit(); // Commit transaction
             return redirect('return-sale')->with('message', $message);
-
-        } catch (\Exception $e) {
-            DB::rollBack(); // Rollback on error
-            return redirect()->back()->with('error', 'Something went wrong: ' . $e->getMessage());
-        }
     }
 
     public function deleteBySelection(Request $request)
     {
-        $return_id = $request['returnIdArray'];
+        $request->validate(['returnIdArray' => ['required', 'array'], 'returnIdArray.*' => ['required', 'integer', 'distinct']]);
+        $return_id = array_map('intval', $request['returnIdArray']);
+        sort($return_id, SORT_NUMERIC);
 
-        $refund_return_ids = Payment::whereIn('return_id', $return_ids)
-                            ->pluck('return_id')
-                            ->toArray();
-        foreach ($return_id as $id) {
-            $lims_return_data = Returns::find($id);
+        DB::beginTransaction();
+        try {
+            $this->imeiService->lockBulkReturns($return_id);
+            $refund_return_ids = Payment::whereIn('return_id', $return_id)->orderBy('id')->lockForUpdate()->get()->pluck('return_id')->all();
+            foreach ($return_id as $id) {
+                $lims_return_data = Returns::find($id);
+                if (!$lims_return_data) {
+                    continue;
+                }
 
-            $refund = Payment::where('return_id', $lims_return_data->id)->latest()->first();
+                if (in_array($id, $refund_return_ids)) {
+                    continue;
+                }
+                if (app(\App\Services\ZatcaIntegrationService::class)->isSourceLocked('return', (int) $id)) {
+                    throw ValidationException::withMessages(['return_id' => 'A Phase 2 credit note prevents deletion of this return.']);
+                }
 
-            if (in_array($id, $refund_return_ids)) {
-                continue;
-            }
+                app(\App\Services\ImportCostAllocationService::class)->reverseReturnCost($lims_return_data);
+
+                $this->imeiService->processDestroy($lims_return_data);
+
+                $refund = Payment::where('return_id', $lims_return_data->id)->latest()->first();
 
             $lims_product_return_data = ProductReturn::where('return_id', $id)->get();
 
             foreach ($lims_product_return_data as $key => $product_return_data) {
                 $lims_product_data = Product::find($product_return_data->product_id);
+                if ($lims_product_data->is_imei) {
+                    $product_return_data->delete();
+                    continue;
+                }
                 if( $lims_product_data->type == 'combo' ){
                     $product_list = explode(",", $lims_product_data->product_list);
                     $variant_list = explode(",", $lims_product_data->variant_list);
                     $qty_list = explode(",", $lims_product_data->qty_list);
+                    $combo_unit_ids = $lims_product_data->combo_unit_id 
+                        ? explode(",", $lims_product_data->combo_unit_id) 
+                        : [];
 
                     foreach ($product_list as $index => $child_id) {
                         $child_data = Product::find($child_id);
+                        if(!$child_data) continue;
+
+                        $required = (float) $qty_list[$index];
+                        if (isset($combo_unit_ids[$index]) && $combo_unit_ids[$index] != $child_data->unit_id) {
+                            $unit = Unit::find($combo_unit_ids[$index]);
+                            if ($unit) {
+                                if ($unit->operator == '*') {
+                                    $required = $required * $unit->operation_value;
+                                } elseif ($unit->operator == '/') {
+                                    $required = $required / $unit->operation_value;
+                                }
+                            }
+                        }
+                        $deduct_qty = $product_return_data->qty * $required;
+
                         if($variant_list[$index]) {
                             $child_product_variant_data = ProductVariant::where([
                                 ['product_id', $child_id],
@@ -1160,8 +1469,10 @@ class ReturnController extends Controller
                                 ['warehouse_id', $lims_return_data->warehouse_id ],
                             ])->first();
 
-                            $child_product_variant_data->qty -= $product_return_data->qty * $qty_list[$index];
-                            $child_product_variant_data->save();
+                            if ($child_product_variant_data) {
+                                $child_product_variant_data->qty -= $deduct_qty;
+                                $child_product_variant_data->save();
+                            }
                         }
                         else {
                             $child_warehouse_data = Product_Warehouse::where([
@@ -1170,15 +1481,21 @@ class ReturnController extends Controller
                             ])->first();
                         }
 
-                        $child_data->qty -= $product_return_data->qty * $qty_list[$index];
-                        $child_warehouse_data->qty -= $product_return_data->qty * $qty_list[$index];
+                        $child_data->qty -= $deduct_qty;
+                        if ($child_warehouse_data) {
+                            $child_warehouse_data->qty -= $deduct_qty;
+                            $child_warehouse_data->save();
+                        }
 
                         $child_data->save();
-                        $child_warehouse_data->save();
                     }
                 }
                 elseif($product_return_data->sale_unit_id != 0){
                     $lims_sale_unit_data = Unit::find($product_return_data->sale_unit_id);
+                    if (!$lims_sale_unit_data) {
+                        \Log::error("Calculation integrity error: Sale unit ID {$product_return_data->sale_unit_id} not found for product ID {$product_return_data->product_id} in return ID {$id}.");
+                        throw new \Exception("Data integrity error: referenced unit #{$product_return_data->sale_unit_id} could not be resolved for return calculation.");
+                    }
 
                     if ($lims_sale_unit_data->operator == '*')
                         $quantity = $product_return_data->qty * $lims_sale_unit_data->operation_value;
@@ -1226,16 +1543,50 @@ class ReturnController extends Controller
 
             $this->fileDelete(public_path('documents/sale_return/'), $lims_return_data->document);
 
+            try {
+                $revRes = $this->accountingService->reverseTransaction(get_class($lims_return_data), $id, '_deleted');
+                if (!$revRes->success && $revRes->error !== 'No entries to reverse') {
+                    throw new \App\Exceptions\AccountingException($revRes->error);
+                }
+                if (Returns::where('id', $id)->exists() && \Schema::hasColumn($lims_return_data->getTable(), 'accounting_status')) {
+                    $lims_return_data->accounting_status = 'reversed';
+                    $lims_return_data->save();
+                }
+            } catch (\App\Exceptions\AccountingException $e) {
+                \Log::error('Accounting error on Sale Return Delete Selection: ' . $e->getMessage());
+                throw $e;
+            }
         }
+        DB::commit();
         return 'Return deleted successfully!';
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('Delete by selection failed: ' . $e->getMessage());
+            return response('Something went wrong: ' . $e->getMessage(), 500);
+        }
     }
 
     public function destroy($id)
     {
-        $lims_return_data = Returns::find($id);
-        $refund = Payment::where('return_id', $lims_return_data->id)->latest()->first();
+        if (app(\App\Services\ZatcaIntegrationService::class)->isSourceLocked('return', (int) $id)) {
+            return response('A Phase 2 credit note exists for this return and cannot be deleted.', 422);
+        }
 
-        if($refund){
+        try {
+        DB::beginTransaction();
+
+        $lims_return_data = Returns::findOrFail($id);
+        app(\App\Services\ImportCostAllocationService::class)->reverseReturnCost($lims_return_data);
+        $this->imeiService->processDestroy($lims_return_data);
+        $refunds = Payment::where('return_id', $lims_return_data->id)->orderBy('id')->lockForUpdate()->get();
+        foreach ($refunds as $refund) {
+            $reversal = $this->accountingService->reverseTransaction(get_class($refund), $refund->id, '_deleted');
+            if (!$reversal->success && $reversal->error !== 'No entries to reverse') {
+                throw new \App\Exceptions\AccountingException($reversal->error);
+            }
             $refund->delete();
         }
 
@@ -1243,6 +1594,10 @@ class ReturnController extends Controller
 
         foreach ($lims_product_return_data as $key => $product_return_data) {
             $lims_product_data = Product::find($product_return_data->product_id);
+            if ($lims_product_data->is_imei) {
+                $product_return_data->delete();
+                continue;
+            }
             if( $lims_product_data->type == 'combo' ){
                 $product_list = explode(",", $lims_product_data->product_list);
                 $variant_list = explode(",", $lims_product_data->variant_list);
@@ -1281,6 +1636,10 @@ class ReturnController extends Controller
             }
             elseif($product_return_data->sale_unit_id != 0){
                 $lims_sale_unit_data = Unit::find($product_return_data->sale_unit_id);
+                if (!$lims_sale_unit_data) {
+                    \Log::error("Calculation integrity error: Sale unit ID {$product_return_data->sale_unit_id} not found for product ID {$product_return_data->product_id} in return ID {$id}.");
+                    throw new \Exception("Data integrity error: referenced unit #{$product_return_data->sale_unit_id} could not be resolved for return calculation.");
+                }
 
                 if ($lims_sale_unit_data->operator == '*')
                     $quantity = $product_return_data->qty * $lims_sale_unit_data->operation_value;
@@ -1311,44 +1670,73 @@ class ReturnController extends Controller
                 $lims_product_data->save();
                 $lims_product_warehouse_data->save();
             }
-            //deduct imei number if available
-            if($product_return_data->imei_number && !str_contains($product_return_data->imei_number, "null")) {
-                $imei_numbers = explode(",", $product_return_data->imei_number);
-                $all_imei_numbers = explode(",", $lims_product_warehouse_data->imei_number);
-                foreach ($imei_numbers as $number) {
-                    if (($j = array_search($number, $all_imei_numbers)) !== false) {
-                        unset($all_imei_numbers[$j]);
-                    }
-                }
-                $lims_product_warehouse_data->imei_number = implode(",", $all_imei_numbers);
-                $lims_product_warehouse_data->save();
-            }
+            // Handled authoritatively by SaleReturnImeiService::processDestroy
             if($lims_return_data->sale_id) {
                 $product_sale_data = Product_Sale::where([
+                    ['id', $product_return_data->product_sale_id],
                     ['sale_id', $lims_return_data->sale_id],
-                    ['product_id', $product_return_data->product_id]
                 ])->select('id', 'return_qty')->first();
+                if (!$product_sale_data) {
+                    throw ValidationException::withMessages([
+                        'product_sale_id' => 'Return detail is missing its exact original sale line.',
+                    ]);
+                }
                 $product_sale_data->return_qty -= $product_return_data->qty;
                 $product_sale_data->save();
 
-                $lims_payment_data = Payment::where('sale_id', $lims_return_data->sale_id)
-                    ->latest()
-                    ->first();
-                $lims_customer_data = Customer::find($lims_return_data->customer_id);
-
-                if ($lims_payment_data && $lims_payment_data->paying_method === 'Deposit') {
-                    $lims_customer_data->expense = (float) $lims_customer_data->expense + (float) $lims_payment_data->amount;
-                    $lims_customer_data->save();
-                }
             }
             $product_return_data->delete();
         }
         if($lims_return_data->sale_id) {
             Sale::find($lims_return_data->sale_id)->update(['sale_status' => 1]);
         }
+
+        // Reverse accounting while the source return still exists. If reversal
+        // fails, the surrounding database transaction rolls back stock, return
+        // lines, sale status, and accounting together instead of leaving an
+        // operational deletion without its matching journal reversal.
+        try {
+            $revRes = $this->accountingService->reverseTransaction(get_class($lims_return_data), $id, '_deleted');
+            if (!$revRes->success && $revRes->error !== 'No entries to reverse') {
+                throw new \App\Exceptions\AccountingException($revRes->error);
+            }
+            if (\Schema::hasColumn($lims_return_data->getTable(), 'accounting_status')) {
+                $lims_return_data->accounting_status = 'reversed';
+                $lims_return_data->save();
+            }
+        } catch (\App\Exceptions\AccountingException $e) {
+            \Log::error('Accounting error on Sale Return Destroy: ' . $e->getMessage());
+            throw $e;
+        }
+
+        $document = $lims_return_data->document;
         $lims_return_data->delete();
-        $this->fileDelete(public_path('documents/sale_return/'), $lims_return_data->document);
+        DB::commit();
+
+        // Filesystem deletion is intentionally after the successful DB commit so
+        // an accounting rollback never restores the DB row after its document has
+        // already been irreversibly removed from disk. A filesystem cleanup error
+        // must not turn an already-committed accounting deletion into a false DB
+        // rollback attempt.
+        try {
+            $this->fileDelete(public_path('documents/sale_return/'), $document);
+        } catch (\Throwable $fileException) {
+            \Log::warning('Sale return document cleanup failed after commit', [
+                'return_id' => (int) $id,
+                'document' => $document,
+                'error' => $fileException->getMessage(),
+            ]);
+        }
 
         return redirect('return-sale')->with('not_permitted', __('db.Data deleted successfully'));
+
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('Return deletion failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', 'Return deletion failed: ' . $e->getMessage());
+        }
     }
 }

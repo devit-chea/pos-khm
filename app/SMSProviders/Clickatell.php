@@ -2,22 +2,33 @@
 
 namespace App\SMSProviders;
 
-use Clickatell\Rest;
-use Clickatell\ClickatellException;
+use Illuminate\Support\Facades\Http;
 
 class Clickatell
 {
     public function send($data)
     {
-        try {
-            $clickatell = new \Clickatell\Rest(env('CLICKATELL_API_KEY'));
-            foreach ($data['numbers'] as $number) {
-                $result = $clickatell->sendMessage(['to' => [$number], 'content' => $data['message']]);
-            }
-        }
-        catch (ClickatellException $e) {
-            return redirect()->back()->with('not_permitted', 'Please setup your <a href="sms_setting">SMS Setting</a> to send SMS.');
-        }
-        $message = "SMS sent successfully";
+        $details = is_string($data['details'] ?? null)
+            ? json_decode($data['details'], true)
+            : (array) ($data['details'] ?? []);
+
+        $apiKey = $details['api_key'] ?? env('CLICKATELL_API_KEY', '');
+        $numbers = !empty($data['numbers']) ? (array) $data['numbers'] : [$data['recipent'] ?? ''];
+        $message = $data['message'] ?? '';
+
+        $endpoint = 'https://platform.clickatell.com/messages/http/send';
+
+        $response = Http::withHeaders([
+            'Authorization' => $apiKey,
+            'Accept'        => 'application/json',
+        ])->timeout(15)->post($endpoint, [
+            'to'      => array_values(array_filter($numbers)),
+            'content' => $message,
+        ]);
+
+        return $response->json() ?? [
+            'status' => $response->successful() ? 'success' : 'failed',
+            'body'   => $response->body(),
+        ];
     }
 }

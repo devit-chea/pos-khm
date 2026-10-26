@@ -1,0 +1,28 @@
+{
+    "name": "Electronics Theme",
+    "version": "1.0",
+    "industry": "electronics",
+    "stylesheet": "style-electronics.css",
+    "description": "A catalog-first storefront for electronics, appliances, gadgets and accessories with prominent search, department navigation, dense product merchandising and brand-friendly styling.",
+    "preview": {
+        "accent": "#2563eb",
+        "dark": "#0f172a",
+        "surface": "#f5f7fb"
+    },
+    "supported_widgets": [
+        "text-widget",
+        "one-c-banner-widget",
+        "two-c-banner-widget",
+        "three-c-banner-widget",
+        "image-slider-widget",
+        "product-category-widget",
+        "category-slider-widget",
+        "product-collection-widget",
+        "tab-product-collection-widget",
+        "brand-slider-widget",
+        "hero-video-widget",
+        "masonry-product-widget",
+        "deal-of-the-day-widget",
+        "recent-blog-widget"
+    ]
+}

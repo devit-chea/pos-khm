@@ -4,96 +4,156 @@
 <x-success-message key="message" />
 <x-error-message key="not_permitted" />
 
+@if($errors->any())
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+        <ul class="mb-0">
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
 <section>
     <div class="container-fluid">
 
-        <ul class="nav nav-tabs" id="bookingTabs" role="tablist">
-            <li class="nav-item">
-                <a class="nav-link active" id="calendar-tab" data-toggle="tab" href="#tab-calendar" role="tab">
-                    <i class="dripicons-calendar"></i> {{ __('db.Calendar View') }}
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" id="list-tab" data-toggle="tab" href="#tab-list" role="tab">
-                    <i class="dripicons-list"></i> {{ __('db.List View') }}
-                </a>
-            </li>
-        </ul>
+        <div class="booking-page-header d-flex align-items-center justify-content-between mb-0">
+            <div>
+                <h4 class="mb-0 font-weight-bold" style="color:#566a7f;">
+                    <i class="dripicons-calendar mr-2" style="color:#696cff;"></i>{{ __('db.Booking') }}
+                </h4>
+                <small class="text-muted">{{ __('db.manage_bookings_and_appointments') }}</small>
+            </div>
+
+            <div class="d-flex align-items-center" style="gap:10px;">
+                {{-- View switcher --}}
+                <div class="view-switcher-group" role="group">
+                    <a class="view-btn active" id="calendar-tab" data-toggle="tab" href="#tab-calendar" role="tab">
+                        <i class="dripicons-calendar"></i> {{ __('db.Calendar View') }}
+                    </a>
+                    <a class="view-btn" id="list-tab" data-toggle="tab" href="#tab-list" role="tab">
+                        <i class="dripicons-list"></i> {{ __('db.List View') }}
+                    </a>
+                </div>
+
+                {{-- Add booking --}}
+                <button class="btn btn-primary px-4" data-toggle="modal" data-target="#booking-modal" id="addBookingBtnHeader">
+                    <i class="dripicons-plus mr-1"></i> {{ __('db.Add Booking') }}
+                </button>
+            </div>
+        </div>
 
         <div class="tab-content">
 
             {{-- TAB 1: CALENDAR --}}
             <div class="tab-pane fade show active" id="tab-calendar" role="tabpanel">
-                <div class="card border-top-0">
-                    <div class="card-body p-0">
-                        <div class="row no-gutters">
+                <div class="booking-calendar-wrapper">
+                    <div class="row no-gutters">
 
-                            {{-- Sidebar --}}
-                            <div class="col-auto border-right" style="width:230px;min-height:650px;background:#fafafa;">
-                                <div class="p-3 border-bottom">
-                                    <button class="btn btn-primary btn-block" data-toggle="modal"
-                                            data-target="#booking-modal" id="addBookingBtn">
-                                        <i class="dripicons-plus"></i> {{ __('db.Add Booking') }}
-                                    </button>
+                        {{-- Sidebar --}}
+                        <div class="col-auto booking-sidebar">
+
+                            {{-- Mini Stats --}}
+                            <div class="sidebar-stats-grid p-3 border-bottom">
+                                <div class="stat-chip stat-booked">
+                                    <span class="stat-dot"></span>
+                                    <div>
+                                        <div class="stat-label">{{ __('db.Booked') }}</div>
+                                        <div class="stat-count" id="stat-count-booked">—</div>
+                                    </div>
                                 </div>
-                                <div class="p-3">
-                                    <p class="text-muted text-uppercase" style="font-size:11px;font-weight:600;letter-spacing:1px;">{{ __("db.Filters") }}</p>
-
-                                    @if(Auth::user()->role_id <= 2)
-                                    <div class="mb-3">
-                                        <select id="warehouseFilter" class="selectpicker form-control form-control-sm"
-                                                data-live-search="true" title="All Warehouses">
-                                            <option value="">{{ __('db.All Warehouses') }}</option>
-                                            @foreach($lims_warehouse_list as $wh)
-                                                <option value="{{ $wh->id }}">{{ $wh->name }}</option>
-                                            @endforeach
-                                        </select>
+                                <div class="stat-chip stat-waiting">
+                                    <span class="stat-dot"></span>
+                                    <div>
+                                        <div class="stat-label">{{ __('db.Waiting') }}</div>
+                                        <div class="stat-count" id="stat-count-waiting">—</div>
                                     </div>
-                                    @endif
-
-                                    <div class="filter-item d-flex align-items-center mb-2 p-2 rounded" style="cursor:pointer;" onclick="toggleFilter('Booked')">
-                                        <span style="width:12px;height:12px;border-radius:50%;background:#696cff;flex-shrink:0;margin-right:8px;"></span>
-                                        <span>{{ __('db.Booked') }}</span>
-                                        <input type="checkbox" class="cal-filter d-none" id="filter-booked" data-value="Booked" checked>
-                                        <i class="dripicons-checkmark ml-auto text-primary filter-icon-booked"></i>
+                                </div>
+                                <div class="stat-chip stat-completed">
+                                    <span class="stat-dot"></span>
+                                    <div>
+                                        <div class="stat-label">{{ __('db.Completed') }}</div>
+                                        <div class="stat-count" id="stat-count-completed">—</div>
                                     </div>
-                                    <div class="filter-item d-flex align-items-center mb-2 p-2 rounded" style="cursor:pointer;" onclick="toggleFilter('Waiting')">
-                                        <span style="width:12px;height:12px;border-radius:50%;background:#ffab00;flex-shrink:0;margin-right:8px;"></span>
-                                        <span>{{ __('db.Waiting') }}</span>
-                                        <input type="checkbox" class="cal-filter d-none" id="filter-waiting" data-value="Waiting" checked>
-                                        <i class="dripicons-checkmark ml-auto text-warning filter-icon-waiting"></i>
+                                </div>
+                                <div class="stat-chip stat-cancelled">
+                                    <span class="stat-dot"></span>
+                                    <div>
+                                        <div class="stat-label">{{ __('db.Cancelled') }}</div>
+                                        <div class="stat-count" id="stat-count-cancelled">—</div>
                                     </div>
-                                    <div class="filter-item d-flex align-items-center mb-2 p-2 rounded" style="cursor:pointer;" onclick="toggleFilter('Completed')">
-                                        <span style="width:12px;height:12px;border-radius:50%;background:#28c76f;flex-shrink:0;margin-right:8px;"></span>
-                                        <span>{{ __('db.Completed') }}</span>
-                                        <input type="checkbox" class="cal-filter d-none" id="filter-completed" data-value="Completed" checked>
-                                        <i class="dripicons-checkmark ml-auto text-success filter-icon-completed"></i>
-                                    </div>
-                                    <div class="filter-item d-flex align-items-center mb-2 p-2 rounded" style="cursor:pointer;" onclick="toggleFilter('Cancelled')">
-                                        <span style="width:12px;height:12px;border-radius:50%;background:#ea5455;flex-shrink:0;margin-right:8px;"></span>
-                                        <span>{{ __('db.Cancelled') }}</span>
-                                        <input type="checkbox" class="cal-filter d-none" id="filter-cancelled" data-value="Cancelled" checked>
-                                        <i class="dripicons-checkmark ml-auto text-danger filter-icon-cancelled"></i>
-                                    </div>
-
                                 </div>
                             </div>
 
-                            {{-- Calendar with loader --}}
-                            <div class="col p-3 position-relative">
-                                {{-- Loader overlay --}}
-                                <div id="calendarLoader" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.85);z-index:10;display:flex;align-items:center;justify-content:center;border-radius:4px;">
-                                    <div class="text-center">
-                                        <div class="spinner-border text-primary" style="width:3rem;height:3rem;" role="status">
-                                            <span class="sr-only">Loading...</span>
-                                        </div>
-                                        <p class="mt-2 text-muted">Loading calendar...</p>
-                                    </div>
-                                </div>
-                                <div id="calendar"></div>
-                            </div>
+                            {{-- Filters --}}
+                            <div class="p-3">
+                                <p class="sidebar-section-label">{{ __("db.filters") }}</p>
 
+                                @if(Auth::user()->role_id <= 2)
+                                <div class="mb-3">
+                                    <label class="sidebar-field-label"><i class="dripicons-store mr-1"></i>{{ __('db.Warehouse') }}</label>
+                                    <select id="warehouseFilter" class="selectpicker form-control form-control-sm"
+                                            data-live-search="true" title="{{ __('db.All Warehouse') }}">
+                                        <option value="">{{ __('db.All Warehouse') }}</option>
+                                        @foreach($lims_warehouse_list as $wh)
+                                            <option value="{{ $wh->id }}">{{ $wh->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                @endif
+
+                                <p class="sidebar-section-label mt-2">{{ __('db.Status') }}</p>
+
+                                <div class="filter-pill" onclick="toggleFilter('Booked')">
+                                    <span class="filter-pill-dot" style="background:#696cff;"></span>
+                                    <span class="filter-pill-label">{{ __('db.Booked') }}</span>
+                                    <input type="checkbox" class="cal-filter d-none" id="filter-booked" data-value="Booked" checked>
+                                    <i class="dripicons-checkmark filter-pill-check filter-icon-booked" style="color:#696cff;"></i>
+                                </div>
+                                <div class="filter-pill" onclick="toggleFilter('Waiting')">
+                                    <span class="filter-pill-dot" style="background:#ffab00;"></span>
+                                    <span class="filter-pill-label">{{ __('db.Waiting') }}</span>
+                                    <input type="checkbox" class="cal-filter d-none" id="filter-waiting" data-value="Waiting" checked>
+                                    <i class="dripicons-checkmark filter-pill-check filter-icon-waiting" style="color:#ffab00;"></i>
+                                </div>
+                                <div class="filter-pill" onclick="toggleFilter('Completed')">
+                                    <span class="filter-pill-dot" style="background:#28c76f;"></span>
+                                    <span class="filter-pill-label">{{ __('db.Completed') }}</span>
+                                    <input type="checkbox" class="cal-filter d-none" id="filter-completed" data-value="Completed" checked>
+                                    <i class="dripicons-checkmark filter-pill-check filter-icon-completed" style="color:#28c76f;"></i>
+                                </div>
+                                <div class="filter-pill" onclick="toggleFilter('Cancelled')">
+                                    <span class="filter-pill-dot" style="background:#ea5455;"></span>
+                                    <span class="filter-pill-label">{{ __('db.Cancelled') }}</span>
+                                    <input type="checkbox" class="cal-filter d-none" id="filter-cancelled" data-value="Cancelled" checked>
+                                    <i class="dripicons-checkmark filter-pill-check filter-icon-cancelled" style="color:#ea5455;"></i>
+                                </div>
+
+                                <hr class="my-3">
+                                <div class="sidebar-today-box">
+                                    <div class="sidebar-today-date" id="sidebar-today-date"></div>
+                                    <div class="sidebar-today-label">{{ __('db.Today') }}</div>
+                                </div>
+                            </div>
                         </div>
+
+                        {{-- Calendar Area --}}
+                        <div class="col position-relative">
+                            {{-- Loader overlay --}}
+                            <div id="calendarLoader" class="calendar-loader-overlay">
+                                <div class="text-center">
+                                    <div class="calendar-loader-spinner">
+                                        <div class="spinner-inner"></div>
+                                    </div>
+                                    <p class="mt-3 text-muted" style="font-size:13px;font-weight:500;">Loading calendar...</p>
+                                </div>
+                            </div>
+                            <div id="calendar" class="p-3"></div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -158,10 +218,10 @@
                                     <th>{{ __('db.Employee') }}</th>
                                     <th>Product / Service</th>
                                     <th>Price</th>
-                                    <th>{{ __('db.Start') }}</th>
-                                    <th>{{ __('db.End') }}</th>
+                                    <th>{{ __('db.start') }}</th>
+                                    <th>{{ __('db.end') }}</th>
                                     <th>{{ __('db.Status') }}</th>
-                                    <th>{{ __('db.Note') }}</th>
+                                    <th>{{ __('db.note') }}</th>
                                     <th class="not-exported">{{ __('db.action') }}</th>
                                 </tr>
                             </thead>
@@ -201,7 +261,7 @@
                                                     @csrf
                                                     @method('DELETE')
                                                     <li>
-                                                        <button type="submit" class="btn btn-link" onclick="return confirmDelete()">
+                                                        <button type="submit" class="btn btn-link" data-confirm-message="{{ __('db.Are you sure want to delete?') }}">
                                                             <i class="dripicons-trash"></i> {{ __('db.delete') }}
                                                         </button>
                                                     </li>
@@ -228,7 +288,7 @@
             <div class="modal-header">
                 <h5 id="bookingModalLabel" class="modal-title">{{ __("db.Add Booking") }}</h5>
                 <button type="button" data-dismiss="modal" aria-label="Close" class="close">
-                    <span aria-hidden="true"><i class="dripicons-cross"></i></span>
+                    <span aria-hidden="true"><i class="ti ti-x"></i></span>
                 </button>
             </div>
             <div class="modal-body">
@@ -306,29 +366,30 @@
                                    class="form-control" placeholder="0.00" step="any" min="0">
                         </div>
 
-                        {{-- Start Date --}}
+                        {{-- Start Date & Time --}}
                         <div class="col-md-6 form-group">
                             <label>{{ __('db.Start Date') }} *</label>
-                            <input type="text" name="start_date" id="b_start_date"
-                                   class="form-control date"
-                                   placeholder="{{ __('db.Choose date') }}"
-                                   value="{{date($general_setting->date_format,strtotime('now'))}}"
-                                   required>
+                            <div class="d-flex">
+                                <input type="text" id="visible_start_date" class="form-control" style="width: 55%; border-right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0;" required>
+                                <input type="time" id="visible_start_time" class="form-control" style="width: 45%; border-top-left-radius: 0; border-bottom-left-radius: 0;" required>
+                            </div>
+                            <input type="hidden" name="start_date" id="b_start_date">
                         </div>
 
+                        {{-- End Date & Time --}}
                         <div class="col-md-6 form-group">
                             <label>{{ __('db.End Date') }} *</label>
-                            <input type="text" name="end_date" id="b_end_date"
-                                   class="form-control date"
-                                   placeholder="{{ __('db.Choose date') }}"
-                                   value="{{ date($general_setting->date_format, strtotime('now')) }}"
-                                   required>
+                            <div class="d-flex">
+                                <input type="text" id="visible_end_date" class="form-control" style="width: 55%; border-right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0;" required>
+                                <input type="time" id="visible_end_time" class="form-control" style="width: 45%; border-top-left-radius: 0; border-bottom-left-radius: 0;" required>
+                            </div>
+                            <input type="hidden" name="end_date" id="b_end_date">
                         </div>
 
                     </div>
 
                     <div class="form-group">
-                        <label>{{ __('db.Note') }}</label>
+                        <label>{{ __('db.note') }}</label>
                         <textarea name="note" id="b_note" rows="3" class="form-control" placeholder="Enter note..."></textarea>
                     </div>
                     {{-- <div class="form-group">
@@ -355,24 +416,292 @@
 @endsection
 
 @push('css')
+    @include('backend.layout.partials.datatable_css')
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css">
 <style>
-    #calendar { min-height: 650px; }
-    .fc .fc-button-primary { background-color: #5a8dee !important; border-color: #5a8dee !important; }
-    .fc .fc-button-primary:hover,
-    .fc .fc-button-primary:not(:disabled).fc-button-active { background-color: #4a7de2 !important; border-color: #4a7de2 !important; }
-    .fc .fc-daygrid-day.fc-day-today { background: #eff3ff !important; }
-    .fc-event { border-radius: 4px !important; font-size: 12px !important; padding: 2px 5px !important; }
-    .fc-col-header-cell { background: #f8f9fa; font-weight: 600; }
-    .filter-item { transition: background .15s; }
-    .filter-item:hover { background: #f0f0f0; }
-    .filter-item.inactive { opacity: .4; }
-    .nav-tabs { border-bottom: 2px solid #dee2e6; }
-    .tab-content > .tab-pane { border: 1px solid #dee2e6; border-top: none; }
+
+/* ── Page Header ───────────────────────────── */
+.booking-page-header { padding: 18px 4px 14px; }
+
+/* ── View Switcher (in header) ─────────────── */
+.view-switcher-group {
+    display: inline-flex;
+    border-radius: .375rem;
+    overflow: hidden;
+    border: 1px solid #696cff;
+    box-shadow: 0 2px 6px rgba(105,108,255,.20);
+}
+.view-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: .44rem 1rem;
+    font-size: .9375rem;
+    font-weight: 500;
+    line-height: 1.53;
+    color: #696cff;
+    background: #fff;
+    cursor: pointer;
+    text-decoration: none !important;
+    transition: background .18s, color .18s;
+    border: none;
+    outline: none;
+    white-space: nowrap;
+}
+.view-btn + .view-btn { border-left: 1px solid #696cff; }
+.view-btn:hover:not(.active) { background: #eaebff; color: #696cff; text-decoration: none; }
+.view-btn.active {
+    background: #696cff;
+    color: #fff !important;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+/* ── Tab content box ───────────────────────── */
+.tab-content > .tab-pane {
+    border: 1px solid #dee2e6;
+    border-radius: 0 0 12px 12px;
+}
+
+/* ── Calendar Wrapper ──────────────────────── */
+.booking-calendar-wrapper {
+    background: #fff;
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+}
+
+
+/* ── Sidebar ───────────────────────────────── */
+.booking-sidebar {
+    width: 240px;
+    min-height: 680px;
+    background: #f8f7fa;
+    border-right: 1px solid #e8e8ee;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Mini Stat chips ───────────────────────── */
+.sidebar-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    margin-top: 2px;
+}
+.stat-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border-radius: 8px;
+    padding: 8px 10px;
+    border: 1px solid #e8e8ee;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+.stat-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.stat-booked   .stat-dot { background: #696cff; }
+.stat-waiting  .stat-dot { background: #ffab00; }
+.stat-completed .stat-dot { background: #28c76f; }
+.stat-cancelled .stat-dot { background: #ea5455; }
+.stat-label { font-size: 10px; color: #a1acb8; font-weight: 500; line-height: 1; margin-bottom: 2px; text-transform: uppercase; letter-spacing: .5px; }
+.stat-count { font-size: 17px; font-weight: 700; color: #566a7f; line-height: 1; }
+
+/* ── Sidebar labels ────────────────────────── */
+.sidebar-section-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #a1acb8;
+    margin-bottom: 8px;
+}
+.sidebar-field-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #697a8d;
+    display: block;
+    margin-bottom: 5px;
+}
+
+/* ── Filter Pills ──────────────────────────── */
+.filter-pill {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background .15s, transform .1s;
+    margin-bottom: 4px;
+    background: #fff;
+    border: 1px solid #e8e8ee;
+    user-select: none;
+}
+.filter-pill:hover { background: #eaebff; border-color: #c5c7ff; transform: translateX(2px); }
+.filter-pill.inactive { opacity: .45; }
+.filter-pill-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-right: 9px; }
+.filter-pill-label { font-size: 13px; color: #566a7f; font-weight: 500; flex: 1; }
+.filter-pill-check { font-size: 12px; margin-left: auto; }
+
+/* ── Today box ─────────────────────────────── */
+.sidebar-today-box {
+    background: linear-gradient(135deg, #696cff 0%, #9155fd 100%);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(105,108,255,.35);
+}
+.sidebar-today-date { font-size: 18px; font-weight: 700; line-height: 1.2; }
+.sidebar-today-label { font-size: 11px; opacity: .85; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+
+/* ── Calendar Loader ───────────────────────── */
+.calendar-loader-overlay {
+    position: absolute; top:0; left:0; right:0; bottom:0;
+    background: rgba(255,255,255,.9);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+}
+.calendar-loader-spinner {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    border: 4px solid #eaebff;
+    border-top-color: #696cff;
+    animation: spin .8s linear infinite;
+    margin: 0 auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── FullCalendar overrides ────────────────── */
+#calendar { min-height: 640px; }
+
+.fc .fc-toolbar.fc-header-toolbar { margin-bottom: 1em; }
+.fc .fc-toolbar-title { font-size: 1.1rem !important; font-weight: 700 !important; color: #566a7f; }
+
+.fc .fc-button {
+    border-radius: 0 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    padding: 5px 13px !important;
+    text-transform: capitalize !important;
+    letter-spacing: .3px !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+/* Stand-alone buttons (prev, next, today) */
+.fc .fc-prev-button,
+.fc .fc-next-button { border-radius: 6px !important; }
+.fc .fc-today-button { border-radius: 6px !important; }
+
+/* Button group — fix border-radius for first/last child */
+.fc .fc-button-group { border-radius: 8px !important; overflow: hidden; box-shadow: 0 1px 4px rgba(105,108,255,.20); }
+.fc .fc-button-group .fc-button:first-child { border-radius: 8px 0 0 8px !important; }
+.fc .fc-button-group .fc-button:last-child  { border-radius: 0 8px 8px 0 !important; }
+
+/* Separator between group buttons */
+.fc .fc-button-group .fc-button + .fc-button { border-left: 1px solid rgba(255,255,255,.25) !important; }
+
+.fc .fc-button-primary {
+    background-color: #696cff !important;
+    border-color: #696cff !important;
+}
+.fc .fc-button-primary:hover {
+    background-color: #5a5ce8 !important;
+    border-color: #5a5ce8 !important;
+}
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+    background-color: #4a4cd0 !important;
+    border-color: #4a4cd0 !important;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,.18) !important;
+}
+
+.fc-theme-standard th { background: #f4f5f8 !important; }
+.fc-theme-standard td, .fc-theme-standard th { border-color: #eceef1 !important; }
+.fc .fc-daygrid-day-number { font-size: 12px; font-weight: 600; color: #697a8d; }
+.fc .fc-daygrid-day.fc-day-today {
+    background: linear-gradient(180deg, #eaebff 0%, #f4f5f8 100%) !important;
+}
+.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number { color: #696cff; }
+
+.fc-event {
+    border-radius: 5px !important;
+    font-size: 11.5px !important;
+    font-weight: 500 !important;
+    border: none !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,.12) !important;
+    cursor: pointer !important;
+    transition: transform .15s, box-shadow .15s !important;
+}
+.fc-daygrid-event {
+    padding: 2px 7px !important;
+}
+.fc-timegrid-event .fc-event-main {
+    padding: 2px 4px !important;
+}
+.fc-timegrid-event .fc-event-main-frame {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: 100%;
+}
+.fc-timegrid-event-short .fc-event-main {
+    padding: 0 4px !important;
+}
+.fc-timegrid-event-short .fc-event-main-frame {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4px;
+    height: 100%;
+    overflow: hidden;
+}
+.fc-timegrid-event-short .fc-event-time {
+    font-weight: 700;
+    white-space: nowrap;
+}
+.fc-timegrid-event-short .fc-event-title-container {
+    flex-grow: 1;
+    min-width: 0;
+}
+.fc-timegrid-event-short .fc-event-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.fc-event:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 10px rgba(0,0,0,.18) !important;
+}
+
+.fc-col-header-cell-cushion {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: .8px !important;
+    color: #697a8d !important;
+    padding: 8px 4px !important;
+}
+
+.fc .fc-daygrid-more-link {
+    font-size: 11px;
+    color: #696cff;
+    font-weight: 600;
+}
+
+/* ── Tooltip ───────────────────────────────── */
+.tooltip-inner { max-width: 220px; text-align: left; font-size: 12px; }
+
 </style>
 @endpush
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
 <script>
 $(document).ready(function () {
@@ -384,11 +713,61 @@ $(document).ready(function () {
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
     $('.selectpicker').selectpicker({ style: 'btn-link' });
 
-    function confirmDelete() { return confirm("Are you sure want to delete?"); }
+    var date_format = '{{ gen_setting()->date_format }}';
+    var moment_format = date_format.replace('d', 'DD').replace('m', 'MM').replace('Y', 'YYYY') + ' hh:mm A';
+    var moment_format_date = date_format.replace('d', 'DD').replace('m', 'MM').replace('Y', 'YYYY');
+
+    function initDateTimePicker(dateId, timeId, hiddenId) {
+        $(dateId).daterangepicker({
+            singleDatePicker: true,
+            timePicker: false,
+            autoApply: true,
+            locale: { format: moment_format_date }
+        });
+
+        function updateHidden() {
+            var d = $(dateId).val();
+            var t = $(timeId).val();
+            if (d && t) {
+                var dt = moment(d + ' ' + t, moment_format_date + ' HH:mm');
+                if(dt.isValid()) {
+                    $(hiddenId).val(dt.format('YYYY-MM-DD HH:mm:ss'));
+                }
+            }
+
+            // Auto-adjust End Date if it's before Start Date
+            setTimeout(function() {
+                var sD = $('#visible_start_date').val(), sT = $('#visible_start_time').val();
+                var eD = $('#visible_end_date').val(), eT = $('#visible_end_time').val();
+                if(sD && sT && eD && eT) {
+                    var startM = moment(sD + ' ' + sT, moment_format_date + ' HH:mm');
+                    var endM   = moment(eD + ' ' + eT, moment_format_date + ' HH:mm');
+                    if(startM.isValid() && endM.isValid() && endM.isBefore(startM)) {
+                        $('#visible_end_date').data('daterangepicker').setStartDate(startM);
+                        $('#visible_end_date').data('daterangepicker').setEndDate(startM);
+                        $('#visible_end_date').val(startM.format(moment_format_date));
+                        $('#visible_end_time').val(startM.format('HH:mm'));
+                        $('#b_end_date').val(startM.format('YYYY-MM-DD HH:mm:ss'));
+                    }
+                }
+            }, 50);
+        }
+        $(dateId).on('apply.daterangepicker change', updateHidden);
+        $(timeId).on('change input', updateHidden);
+    }
+
+    initDateTimePicker('#visible_start_date', '#visible_start_time', '#b_start_date');
+    initDateTimePicker('#visible_end_date', '#visible_end_time', '#b_end_date');
+
+    // set default for hidden inputs
+    $('#b_start_date').val(moment().format('YYYY-MM-DD HH:mm:ss'));
+    $('#b_end_date').val(moment().format('YYYY-MM-DD HH:mm:ss'));
+
+    function confirmDelete() { return true; }
 
     // ── DataTable ─────────────────────────────────────────────────
     var booking_id    = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')) ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified'))?>;
 
     $('#booking-table').DataTable({
         "order": [],
@@ -411,17 +790,19 @@ $(document).ready(function () {
             { extend: 'csv',    text: '<i class="fa fa-file-text-o"></i>',       exportOptions: { columns: ':visible:Not(.not-exported)' }, footer: true },
             { extend: 'print',  text: '<i class="fa fa-print"></i>',             exportOptions: { columns: ':visible:Not(.not-exported)' }, footer: true },
             {
-                text: '<i class="dripicons-cross"></i>', className: 'buttons-delete',
+                text: '<i class="ti ti-x"></i>', className: 'buttons-delete',
                 action: function (e, dt) {
                     if (user_verified == '1') {
                         booking_id.length = 0;
                         $(':checkbox:checked').each(function (i) { if (i) booking_id[i-1] = $(this).closest('tr').data('id'); });
-                        if (booking_id.length && confirm("Are you sure want to delete?")) {
+                        if (booking_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                             $.ajax({ type:'POST', url:'{{ url("bookings/deletebyselection") }}', data:{ bookingIdArray: booking_id },
-                                success: function(data) { alert(data); dt.rows({ page:'current', selected:true }).remove().draw(false); }
+                                success: function(data) { SaleProToast.show(data); dt.rows({ page:'current', selected:true }).remove().draw(false); }
                             });
-                        } else if (!booking_id.length) alert('Nothing is selected!');
-                    } else alert('This feature is disabled for demo!');
+                        }
+                        });
+                        } else if (!booking_id.length) SaleProToast.show('Nothing is selected!');
+                    } else SaleProToast.show('This feature is disabled for demo!');
                 }
             },
             { extend: 'colvis', text: '<i class="fa fa-eye"></i>', columns: ':gt(0)' },
@@ -475,7 +856,18 @@ $(document).ready(function () {
                 start: info.startStr, end: info.endStr,
                 status: statuses.join(','),
                 warehouse_id: $('#warehouseFilter').val() || ''
-            }, successCb).fail(failureCb);
+            }, function(data) {
+                successCb(data);
+                // Update stat counts
+                var counts = { Booked: 0, Waiting: 0, Completed: 0, Cancelled: 0 };
+                $.each(data, function(i, ev) {
+                    if (counts[ev.extendedProps.status] !== undefined) counts[ev.extendedProps.status]++;
+                });
+                $('#stat-count-booked').text(counts.Booked);
+                $('#stat-count-waiting').text(counts.Waiting);
+                $('#stat-count-completed').text(counts.Completed);
+                $('#stat-count-cancelled').text(counts.Cancelled);
+            }).fail(failureCb);
         },
 
         dateClick:  function (info)  { openAddForm(info.dateStr); },
@@ -483,7 +875,11 @@ $(document).ready(function () {
 
         eventDidMount: function (info) {
             var p = info.event.extendedProps;
-            var tip = 'Customer: ' + (p.customer || '') +
+            var startFmt = moment(info.event.start).format(moment_format);
+            var endFmt = info.event.end ? moment(info.event.end).format(moment_format) : startFmt;
+
+            var tip = 'Time: ' + startFmt + ' to ' + endFmt +
+                      '\nCustomer: ' + (p.customer || '') +
                       '\nStatus: '   + (p.status   || '') +
                       '\nEmployee: ' + (p.employee  || '');
             if (p.note) tip += '\nNote: ' + p.note;
@@ -491,10 +887,17 @@ $(document).ready(function () {
         },
     });
 
-    // ── Tab switch → re-render calendar ──────────────────────────
+    // ── Tab switch → re-render calendar + sync view-btn active ───
     $('#calendar-tab').on('shown.bs.tab', function () {
+        $('.view-btn').removeClass('active');
+        $(this).addClass('active');
         calendar.render();
         calendar.updateSize();
+    });
+
+    $('#list-tab').on('shown.bs.tab', function () {
+        $('.view-btn').removeClass('active');
+        $(this).addClass('active');
     });
 
     // ── Default: Calendar active, List only when ?tab=list ────────
@@ -511,10 +914,13 @@ $(document).ready(function () {
         calendar.refetchEvents();
     });
 
+    // ── Today date in sidebar ─────────────────────────────────────
+    $('#sidebar-today-date').text(moment().format('D MMM, YYYY'));
+
     // ── Toggle filter ─────────────────────────────────────────────
     window.toggleFilter = function (status) {
         var cb  = $('#filter-' + status.toLowerCase());
-        var row = cb.closest('.filter-item');
+        var row = cb.closest('.filter-pill');
         cb.prop('checked', !cb.prop('checked'));
         row.toggleClass('inactive', !cb.prop('checked'));
         calendar.refetchEvents();
@@ -530,13 +936,37 @@ $(document).ready(function () {
         $('#bookingSubmitBtn').prop('disabled', false).text('{{ __("db.submit") }}');
         $('#bookingModalLabel').text('Add Booking');
         $('.selectpicker').selectpicker('refresh');
+
+        var now = moment();
+        $('#b_start_date').val(now.format('YYYY-MM-DD HH:mm:ss'));
+        $('#b_end_date').val(now.format('YYYY-MM-DD HH:mm:ss'));
+
+        $('#visible_start_time').val(now.format('HH:mm'));
+        $('#visible_end_time').val(now.format('HH:mm'));
+
+        $('#visible_start_date').data('daterangepicker').setStartDate(now);
+        $('#visible_start_date').data('daterangepicker').setEndDate(now);
+        $('#visible_end_date').data('daterangepicker').setStartDate(now);
+        $('#visible_end_date').data('daterangepicker').setEndDate(now);
     }
 
     function openAddForm(dateStr) {
         resetModal();
         if (dateStr) {
-            $('#b_start_date').val(dateStr);
-            $('#b_end_date').val(dateStr);
+            var defaultTimeStr = ' 09:00:00';
+            var formattedDate = dateStr.includes('T') ? dateStr.replace('T', ' ').slice(0, 19) : dateStr + defaultTimeStr;
+            var mDt = moment(formattedDate, 'YYYY-MM-DD HH:mm:ss');
+
+            $('#b_start_date').val(formattedDate);
+            $('#b_end_date').val(formattedDate);
+
+            $('#visible_start_time').val(mDt.format('HH:mm'));
+            $('#visible_end_time').val(mDt.format('HH:mm'));
+
+            $('#visible_start_date').data('daterangepicker').setStartDate(mDt);
+            $('#visible_start_date').data('daterangepicker').setEndDate(mDt);
+            $('#visible_end_date').data('daterangepicker').setStartDate(mDt);
+            $('#visible_end_date').data('daterangepicker').setEndDate(mDt);
         }
         $('#booking-modal').modal('show');
     }
@@ -559,8 +989,23 @@ $(document).ready(function () {
         $('#b_note').val(p.note || '');
         $('.selectpicker').selectpicker('refresh');
 
-        $('#b_start_date').val(event.start ? event.start.toISOString().slice(0,10) : '');
-        $('#b_end_date').val(event.end ? event.end.toISOString().slice(0,10) : '');
+        var startStr = event.start ? moment(event.start).format('YYYY-MM-DD HH:mm:ss') : '';
+        var endStr   = event.end ? moment(event.end).format('YYYY-MM-DD HH:mm:ss') : '';
+
+        $('#b_start_date').val(startStr);
+        $('#b_end_date').val(endStr);
+        if(startStr) {
+            var sM = moment(startStr, 'YYYY-MM-DD HH:mm:ss');
+            $('#visible_start_time').val(sM.format('HH:mm'));
+            $('#visible_start_date').data('daterangepicker').setStartDate(sM);
+            $('#visible_start_date').data('daterangepicker').setEndDate(sM);
+        }
+        if(endStr) {
+            var eM = moment(endStr, 'YYYY-MM-DD HH:mm:ss');
+            $('#visible_end_time').val(eM.format('HH:mm'));
+            $('#visible_end_date').data('daterangepicker').setStartDate(eM);
+            $('#visible_end_date').data('daterangepicker').setEndDate(eM);
+        }
         $('#booking-modal').modal('show');
     }
 
@@ -581,8 +1026,23 @@ $(document).ready(function () {
         $('#b_note').val(b.note || '');
         $('.selectpicker').selectpicker('refresh');
 
-        $('#b_start_date').val(b.start_date ? b.start_date.slice(0,10) : '');
-        $('#b_end_date').val(b.end_date ? b.end_date.slice(0,10) : '');
+        var startStr = b.start_date ? b.start_date : '';
+        var endStr   = b.end_date ? b.end_date : '';
+
+        $('#b_start_date').val(startStr);
+        $('#b_end_date').val(endStr);
+        if(startStr) {
+            var sM = moment(startStr, 'YYYY-MM-DD HH:mm:ss');
+            $('#visible_start_time').val(sM.format('HH:mm'));
+            $('#visible_start_date').data('daterangepicker').setStartDate(sM);
+            $('#visible_start_date').data('daterangepicker').setEndDate(sM);
+        }
+        if(endStr) {
+            var eM = moment(endStr, 'YYYY-MM-DD HH:mm:ss');
+            $('#visible_end_time').val(eM.format('HH:mm'));
+            $('#visible_end_date').data('daterangepicker').setStartDate(eM);
+            $('#visible_end_date').data('daterangepicker').setEndDate(eM);
+        }
         $('#booking-modal').modal('show');
     }
 
@@ -590,10 +1050,10 @@ $(document).ready(function () {
 
     // ── Submit + loading ──────────────────────────────────────────
     $('#bookingForm').on('submit', function (e) {
-        if (!$('#b_warehouse_id').val()) { e.preventDefault(); alert('Please select Warehouse!'); return; }
-        if (!$('#b_customer_id').val())  { e.preventDefault(); alert('Please select Customer!');  return; }
-        if (!$('#b_start_date').val())   { e.preventDefault(); alert('Please select Start Date!'); return; }
-        if (!$('#b_end_date').val())     { e.preventDefault(); alert('Please select End Date!');   return; }
+        if (!$('#b_warehouse_id').val()) { e.preventDefault(); SaleProToast.show('Please select Warehouse!'); return; }
+        if (!$('#b_customer_id').val())  { e.preventDefault(); SaleProToast.show('Please select Customer!');  return; }
+        if (!$('#b_start_date').val())   { e.preventDefault(); SaleProToast.show('Please select Start Date!'); return; }
+        if (!$('#b_end_date').val())     { e.preventDefault(); SaleProToast.show('Please select End Date!');   return; }
 
         $('#bookingSubmitBtn')
             .prop('disabled', true)
@@ -603,22 +1063,23 @@ $(document).ready(function () {
     // ── Delete ────────────────────────────────────────────────────
     $('#bookingDeleteBtn').on('click', function () {
         var id = $('#bookingForm').attr('action').split('/').pop();
-        if (!id || !confirm('Are you sure want to delete?')) return;
-        $.ajax({
-            type: 'POST',
-            url:  '{{ url("bookings") }}/' + id,
-            data: { _token: $('meta[name="csrf-token"]').attr('content'), _method: 'DELETE' },
-            success: function (data) {
-                if (data.success) { $('#booking-modal').modal('hide'); location.href = '{{ route("booking.index") }}?tab=list'; }
+        if (!id) return;
+        SaleProConfirm.open({ message: '{{ __("db.Are you sure want to delete?") }}' }).then(function(confirmed) {
+            if (confirmed) {
+                $.ajax({
+                    type: 'POST',
+                    url:  '{{ url("bookings") }}/' + id,
+                    data: { _token: $('meta[name="csrf-token"]').attr('content'), _method: 'DELETE' },
+                    success: function (data) {
+                        if (data.success) { $('#booking-modal').modal('hide'); location.href = '{{ route("booking.index") }}?tab=list'; }
+                    }
+                });
             }
         });
     });
 
     $('#booking-modal').on('hidden.bs.modal', function () { resetModal(); });
 
-});
-$('.start_date').datetimepicker({
-    format: 'DD-MM-YYYY',
 });
 </script>
 @endpush

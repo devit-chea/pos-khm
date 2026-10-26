@@ -5,7 +5,7 @@
 @endphp
 
 <head>
-    <link rel="icon" type="image/png" href="{{ url('logo', $general_setting->site_logo) }}" />
+    <link rel="icon" type="image/png" href="{{ url('logo', gen_setting()->site_logo) }}" />
     <title>{{ $lims_quotation_data->customer->name . '_Quotation_' . $lims_quotation_data->reference_no }}</title>
     @php
         $primary_color =
@@ -36,9 +36,9 @@
     @php $url = url()->previous(); @endphp
     <div class="hidden-print">
         <table><tr>
-            <td><a href="{{ $url }}" class="btn btn-info"><i class="fa fa-arrow-left"></i> {{ __('db.Back') }}</a></td>
-            <td><button onclick="window.print();" class="btn btn-primary"><i class="dripicons-print"></i> {{ __('db.Print') }}</button></td>
-            <td><button id="download-btn" onclick="downloadPDF()"><i class="fa fa-download"></i> {{ __('db.download_pdf') }}</button></td>
+            <td><a href="{{ $url }}" class="btn btn-info"><i class="ti ti-arrow-left"></i> {{ __('db.Back') }}</a></td>
+            <td><button onclick="window.print();" class="btn btn-primary"><i class="ti ti-printer"></i> {{ __('db.print') }}</button></td>
+            <td><button id="download-btn" onclick="downloadPDF()"><i class="ti ti-download"></i> {{ __('db.download_pdf') }}</button></td>
         </tr></table>
         <br>
     </div>
@@ -49,17 +49,17 @@
             <tr>
                 <td colspan="2" style="padding:9px 0;width:40%">
                     @if (isset($show->show_warehouse_info) && $show->show_warehouse_info == 1)
-                        <h1 style="margin:0">{{ $general_setting->company_name ?? $lims_biller_data->company_name }}</h1>
+                        <h1 style="margin:0">{{ gen_setting()->company_name ?? $lims_biller_data->company_name }}</h1>
                         <div><span>{{ __('db.Address') }}:</span>&nbsp;&nbsp;<span>{{ $lims_warehouse_data->address }}</span></div>
                         <div><span>{{ __('db.Phone') }}:</span>&nbsp;&nbsp;<span>{{ $lims_warehouse_data->phone }}</span></div>
-                        @if ($general_setting->vat_registration_number && isset($show->show_vat_registration_number) && $show->show_vat_registration_number == 1)
-                            <div><span>{{ __('db.VAT Number') }}:</span>&nbsp;&nbsp;<span>{{ $general_setting->vat_registration_number }}</span></div>
+                        @if (gen_setting()->vat_registration_number && isset($show->show_vat_registration_number) && $show->show_vat_registration_number == 1)
+                            <div><span>{{ __('db.VAT Number') }}:</span>&nbsp;&nbsp;<span>{{ gen_setting()->vat_registration_number }}</span></div>
                         @endif
                     @endif
                 </td>
                 <td style="width:30%; text-align: middle; vertical-align: top;">
-                    @if ($general_setting->site_logo || $invoice_settings->company_logo)
-                        <img src="{{ $invoice_settings->company_logo ? url('invoices', $invoice_settings->company_logo) : url('logo', $general_setting->site_logo) }}"
+                    @if (gen_setting()->site_logo || $invoice_settings->company_logo)
+                        <img src="{{ $invoice_settings->company_logo ? url('invoices', $invoice_settings->company_logo) : url('logo', gen_setting()->site_logo) }}"
                             height="{{ $invoice_settings->logo_height ?? auto }}"
                             width="{{ $invoice_settings->logo_width ?? auto }}" style="margin:5px 0;">
                     @endif
@@ -107,7 +107,7 @@
             </tr>
         </table>
 
-        <table dir="@if (Config::get('app.locale') == 'ar' || $general_setting->is_rtl) {{ 'rtl' }} @endif" style="width: 100%;border-collapse: collapse;">
+        <table dir="@if (Config::get('app.locale') == 'ar' || gen_setting()->is_rtl) {{ 'rtl' }} @endif" style="width: 100%;border-collapse: collapse;">
             <tr class="table-header" style="background-color: {{ isset($show->active_primary_color) && $show->active_primary_color == 1 && !empty($invoice_settings->primary_color) ? $invoice_settings->primary_color : '#014b94' }}; color: white;">
                 <td style="border:1px solid #222;padding:1px 3px;width:4%;text-align:center">#</td>
                 <td style="border:1px solid #222;padding:1px 3px;width:49%;text-align:center">{{ __('db.Description') }}</td>
@@ -136,62 +136,62 @@
                         @endif
                     </td>
                     <td style="border:1px solid #222;padding:1px 3px;text-align:center">{{ $pq->qty . ' ' . $unit_code . ' ' . $variant_name }}</td>
-                    <td style="border:1px solid #222;padding:1px 3px;text-align:center">{{ number_format($pq->net_unit_price, $general_setting->decimal) }}</td>
-                    <td style="border:1px solid #222;padding:1px 3px;text-align:center">{{ number_format($total, $general_setting->decimal) }}</td>
-                    <td style="border:1px solid #222;padding:1px 3px;text-align:center">{{ number_format($pq->tax, $general_setting->decimal) }}</td>
-                    <td style="border:1px solid #222;border-right:1px solid #222;padding:1px 3px;text-align:center;font-size: 15px;">{{ number_format($subtotal, $general_setting->decimal) }}</td>
+                    <td style="border:1px solid #222;padding:1px 3px;text-align:center">{{ number_format($pq->net_unit_price, gen_setting()->decimal) }}</td>
+                    <td style="border:1px solid #222;padding:1px 3px;text-align:center">{{ number_format($total, gen_setting()->decimal) }}</td>
+                    <td style="border:1px solid #222;padding:1px 3px;text-align:center">{{ number_format($pq->tax, gen_setting()->decimal) }}</td>
+                    <td style="border:1px solid #222;border-right:1px solid #222;padding:1px 3px;text-align:center;font-size: 15px;">{{ number_format($subtotal, gen_setting()->decimal) }}</td>
                 </tr>
             @endforeach
 
             <tr>
-                <td colspan="3" rowspan="@if ($general_setting->invoice_format == 'gst' && $general_setting->state == 2) 6 @else 5 @endif"
+                <td colspan="3" rowspan="@if (gen_setting()->invoice_format == 'gst' && gen_setting()->state == 2) 6 @else 5 @endif"
                     style="border:1px solid #222;padding:1px 3px;text-align: center; vertical-align: top;">
                     @if ($lims_quotation_data->note)
-                        <p><strong>{{ __('db.Note') }}:</strong> {{ $lims_quotation_data->note }}</p>
+                        <p><strong>{{ __('db.note') }}:</strong> {{ $lims_quotation_data->note }}</p>
                     @endif
                 </td>
                 <td class="td-text" colspan="3" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);">{{ __('db.Total Before Tax') }}</td>
                 <td class="td-text" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">
-                    {{ number_format($lims_quotation_data->total_price - ($lims_quotation_data->total_tax + $lims_quotation_data->order_tax), $general_setting->decimal) }}
+                    {{ number_format($lims_quotation_data->total_price - ($lims_quotation_data->total_tax + $lims_quotation_data->order_tax), gen_setting()->decimal) }}
                 </td>
             </tr>
-            @if ($general_setting->invoice_format == 'gst' && $general_setting->state == 1)
+            @if (gen_setting()->invoice_format == 'gst' && gen_setting()->state == 1)
                 <tr>
                     <td class="td-text" colspan="3" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);">IGST</td>
-                    <td class="td-text" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">{{ number_format($lims_quotation_data->total_tax + $lims_quotation_data->order_tax, $general_setting->decimal) }}</td>
+                    <td class="td-text" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">{{ number_format($lims_quotation_data->total_tax + $lims_quotation_data->order_tax, gen_setting()->decimal) }}</td>
                 </tr>
-            @elseif ($general_setting->invoice_format == 'gst' && $general_setting->state == 2)
+            @elseif (gen_setting()->invoice_format == 'gst' && gen_setting()->state == 2)
                 <tr>
                     <td class="td-text" colspan="3" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);">SGST</td>
                     <td class="td-text" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">
                         @php $total_tax_amount = ($lims_quotation_data->total_tax + $lims_quotation_data->order_tax) / 2; @endphp
-                        {{ number_format($total_tax_amount, $general_setting->decimal) }}
+                        {{ number_format($total_tax_amount, gen_setting()->decimal) }}
                     </td>
                 </tr>
                 <tr>
                     <td class="td-text" colspan="3" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);">CGST</td>
-                    <td class="td-text" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">{{ number_format($total_tax_amount, $general_setting->decimal) }}</td>
+                    <td class="td-text" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">{{ number_format($total_tax_amount, gen_setting()->decimal) }}</td>
                 </tr>
             @else
                 <tr>
                     <td class="td-text" colspan="3" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);">{{ __('db.Tax') }}</td>
-                    <td class="td-text" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">{{ number_format($lims_quotation_data->total_tax + $lims_quotation_data->order_tax, $general_setting->decimal) }}</td>
+                    <td class="td-text" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">{{ number_format($lims_quotation_data->total_tax + $lims_quotation_data->order_tax, gen_setting()->decimal) }}</td>
                 </tr>
             @endif
             <tr>
                 <td class="td-text" colspan="3" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);">{{ __('db.Discount') }}</td>
-                <td class="td-text" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">{{ number_format($lims_quotation_data->total_discount + $lims_quotation_data->order_discount, $general_setting->decimal) }}</td>
+                <td class="td-text" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">{{ number_format($lims_quotation_data->total_discount + $lims_quotation_data->order_discount, gen_setting()->decimal) }}</td>
             </tr>
             <tr>
                 <td class="td-text" colspan="3" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);">{{ __('db.Shipping Cost') }}</td>
-                <td class="td-text" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">{{ number_format($lims_quotation_data->shipping_cost ?? 0, $general_setting->decimal) }}</td>
+                <td class="td-text" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">{{ number_format($lims_quotation_data->shipping_cost ?? 0, gen_setting()->decimal) }}</td>
             </tr>
             <tr>
                 <td class="td-text" colspan="3" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);">{{ __('db.grand total') }}</td>
-                <td class="td-text" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">{{ number_format($lims_quotation_data->grand_total, $general_setting->decimal) }}</td>
+                <td class="td-text" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;">{{ number_format($lims_quotation_data->grand_total, gen_setting()->decimal) }}</td>
             </tr>
             <tr>
-                @if ($general_setting->currency_position == 'prefix')
+                @if (gen_setting()->currency_position == 'prefix')
                     <td class="td-text" colspan="3" rowspan="2" style="border:1px solid #222;padding:1px 3px;background-color:rgb(205, 218, 235);text-align: center;font-size: 15px;vertical-align: top;">
                         @if (isset($show->show_in_words) && $show->show_in_words == 1)
                             {{ __('db.In Words') }}<br>{{ $currency_code }} <span style="text-transform:capitalize;font-size: 15px;">{{ str_replace('-', ' ', $numberInWords) }}</span> only
@@ -271,7 +271,7 @@
                     console.error(err);
                     btn.disabled = false;
                     btn.innerHTML = '⬇ Download PDF';
-                    alert('PDF generation failed!');
+                    SaleProToast.show('PDF generation failed!');
                 });
         }
     </script>

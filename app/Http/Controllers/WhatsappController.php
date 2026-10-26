@@ -132,7 +132,6 @@ class WhatsappController extends Controller
 
     public function sendMessage(Request $request)
     {
-        // 1️⃣ Validation
         $data = $request->validate([
             'receiver_phone' => 'required|array',
             'receiver_phone.*' => 'required|regex:/^[0-9]+$/',
@@ -140,12 +139,34 @@ class WhatsappController extends Controller
             'message' => 'nullable|string',
             'attachment' => 'nullable|file|max:10240',
             'attachment_type' => 'nullable|in:image,document',
-            'html_content' => 'nullable|string'
+            'html_content' => 'nullable|string',
+            'is_optional' => 'nullable|boolean',
         ]);
 
         $phoneNumbers = $data['receiver_phone'];
+        $isOptional = $request->boolean('is_optional');
+        $settings = WhatsappSetting::first();
+        if (!$settings || empty($settings->phone_number_id) || empty($settings->permanent_access_token)) {
+            if ($isOptional) {
+                return response()->json([
+                    'status' => 'skipped',
+                    'message' => __('db.whatsapp_credentials_missing'),
+                ], 200);
+            }
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'message' => __('db.whatsapp_credentials_missing'),
+                    'error' => __('db.whatsapp_credentials_missing'),
+                ], 422);
+            }
+
+            return back()->with('not_permitted', __('db.whatsapp_credentials_missing'));
+        }
+
         $type = 'text';
         $messageContent = null;
+        $tempPath = null;
 
         // -----------------------------------------------------
         // 🔥 CASE 1: Html content → Auto-generate PDF → Send
@@ -194,21 +215,49 @@ class WhatsappController extends Controller
             $messageContent = $data['message'] ?? null;
         }
 
-        $settings = WhatsappSetting::first();
-        if (!$settings || empty($settings->phone_number_id) || empty($settings->permanent_access_token)) {
-            return back()->with('not_permitted', __('db.whatsapp_credentials_missing'));
+        try {
+            $result = $settings->sendMessage($phoneNumbers, $type, $messageContent);
+        } finally {
+            if ($tempPath && is_file($tempPath)) {
+                @unlink($tempPath);
+            }
+        }
+        $isSuccess = (bool) ($result['success'] ?? false);
+
+        if ($isOptional) {
+            if ($isSuccess) {
+                return response()->json([
+                    'status' => 'success',
+                    'message' => $result['message'] ?? 'WhatsApp message sent successfully',
+                ], 200);
+            }
+
+            return response()->json([
+                'status' => 'warning',
+                'message' => $result['message'] ?? __('db.fail_sent_message'),
+            ], 200);
         }
 
-        $result = $settings->sendMessage($phoneNumbers, $type, $messageContent);
-
-        if ($request->has('_from_form')) {
-            // 6️⃣ Response
-            if ($result['success'] ?? false) {
+        if ($request->has('_from_form') || (!$request->ajax() && !$request->wantsJson())) {
+            // 6️⃣ Response for standard browser form
+            if ($isSuccess) {
                 return back()->with('message', $result['message']);
             } else {
                 return back()->with('not_permitted', $result['message'] ?? __('db.fail_sent_message'));
             }
         }
-        return $result;
+
+        // AJAX / API caller: return distinct status codes
+        if ($isSuccess) {
+            return response()->json([
+                'status' => 'success',
+                'message' => $result['message'] ?? 'WhatsApp message sent successfully',
+            ], 200);
+        }
+
+        return response()->json([
+            'message' => $result['message'] ?? __('db.fail_sent_message'),
+            'error' => $result['message'] ?? __('db.fail_sent_message'),
+        ], 502);
     }
 }

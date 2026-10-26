@@ -1,4 +1,8 @@
 @extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+
 @section('content')
     <x-error-message key="name" />
     <x-success-message key="message" />
@@ -7,7 +11,7 @@
     <section>
         <div class="container-fluid mb-3">
             <button type="button" class="btn btn-info" data-toggle="modal" data-target="#createModal">
-                <i class="dripicons-plus"></i> {{ __('db.Add Leave') }}
+                <i class="ti ti-plus"></i> {{ __('db.Add Leave') }}
             </button>
         </div>
 
@@ -65,7 +69,7 @@
                                                 data-start_date="{{ $leave->start_date }}"
                                                 data-end_date="{{ $leave->end_date }}" class="edit-btn btn btn-link"
                                                 data-toggle="modal" data-target="#editModal">
-                                                <i class="dripicons-document-edit"></i> {{ __('db.Edit') }}
+                                                <i class="ti ti-edit"></i> {{ __('db.Edit') }}
                                             </button>
                                         </li>
                                         <li class="divider"></li>
@@ -74,8 +78,8 @@
                                             @method('DELETE')
                                             <li>
                                                 <button type="submit" class="btn btn-link text-danger"
-                                                    onclick="return confirmDelete()">
-                                                    <i class="dripicons-trash"></i> {{ __('db.Delete') }}
+                                                    data-confirm-message="{{ __('db.Are you sure want to delete?') }}">
+                                                    <i class="ti ti-trash"></i> {{ __('db.Delete') }}
                                                 </button>
                                             </li>
                                         </li>
@@ -129,7 +133,7 @@
                             <span class="input-group-prepend">
                                 <button type="button" class="btn btn-primary" data-toggle="modal"
                                     data-target="#createLeaveTypeModal">
-                                    <i class="dripicons-plus"></i>
+                                    <i class="ti ti-plus"></i>
                                 </button>
                             </span>
                         </div>
@@ -140,15 +144,15 @@
                     <div class="form-group">
                         <label>{{ __('db.Start Date') }}</label>
                         <input type="text" name="start_date" class="form-control date"
-                            value="{{ date($general_setting->date_format) }}" required>
+                            value="{{ date(gen_setting()->date_format) }}" required>
                     </div>
                     <div class="form-group">
                         <label>{{ __('db.End Date') }}</label>
                         <input type="text" name="end_date" class="form-control date"
-                            value="{{ date($general_setting->date_format) }}" required>
+                            value="{{ date(gen_setting()->date_format) }}" required>
                     </div>
                     <div class="form-group">
-                        <input type="submit" value="{{ __('db.Submit') }}" class="btn btn-primary">
+                        <input type="submit" value="{{ __('db.submit') }}" class="btn btn-primary">
                     </div>
                 </div>
                 </form>
@@ -164,7 +168,7 @@
                     @csrf
                     @method('PUT')
                     <div class="modal-header">
-                        <h5>{{ __('db.Update Leave') }}</h5>
+                        <h5>{{ __('db.update_leave') }}</h5>
                         <button type="button" class="close" data-dismiss="modal">&times;</button>
                     </div>
                     <div class="modal-body">
@@ -194,7 +198,7 @@
                     </div>
                     <input type="hidden" name="leave_id" id="edit_id">
                     <div class="form-group">
-                        <input type="submit" value="{{ __('db.Update') }}" class="btn btn-primary">
+                        <input type="submit" value="{{ __('db.update') }}" class="btn btn-primary">
                     </div>
                 </div>
                 </form>
@@ -247,11 +251,10 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
     <script>
 
-        function confirmDelete() {
-            return confirm("Are you sure want to delete?");
-        }
+        function confirmDelete() { return true; }
 
         $(document).ready(function() {
 
@@ -303,7 +306,7 @@
                 dom: '<"row"lfB>rtip',
                 buttons: [{
                         extend: 'pdf',
-                        text: '<i class="fa fa-file-pdf-o"></i>',
+                        text: '<i class="ti ti-file-type-pdf"></i>',
                         exportOptions: {
                             columns: ':visible:Not(.not-exported)',
                             rows: ':visible'
@@ -312,7 +315,7 @@
                     },
                     {
                         extend: 'excel',
-                        text: '<i class="dripicons-document-new"></i>',
+                        text: '<i class="ti ti-file-type-xls"></i>',
                         exportOptions: {
                             columns: ':visible:Not(.not-exported)',
                             rows: ':visible'
@@ -321,7 +324,7 @@
                     },
                     {
                         extend: 'csv',
-                        text: '<i class="fa fa-file-text-o"></i>',
+                        text: '<i class="ti ti-file-type-csv"></i>',
                         exportOptions: {
                             columns: ':visible:Not(.not-exported)',
                             rows: ':visible'
@@ -330,7 +333,7 @@
                     },
                     {
                         extend: 'print',
-                        text: '<i class="fa fa-print"></i>',
+                        text: '<i class="ti ti-printer"></i>',
                         exportOptions: {
                             columns: ':visible:Not(.not-exported)',
                             rows: ':visible'
@@ -339,7 +342,7 @@
                     },
                     {
                         extend: 'colvis',
-                        text: '<i class="fa fa-eye"></i>',
+                        text: '<i class="ti ti-eye"></i>',
                         columns: ':gt(0)'
                     }
                 ]
@@ -386,10 +389,10 @@
                         // Hide Type Modal
                         $("#createLeaveTypeModal").modal('hide');
 
-                        toastr.success("Leave Type Added Successfully");
+                        SaleProToast.success("Leave Type Added Successfully");
                     },
                     error: function(err) {
-                        toastr.error("Something went wrong!");
+                        SaleProToast.error("Something went wrong!");
                     }
                 });
             });

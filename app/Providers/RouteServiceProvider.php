@@ -3,81 +3,99 @@
 namespace App\Providers;
 
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 
 class RouteServiceProvider extends ServiceProvider
 {
-    /**
-     * This namespace is applied to your controller routes.
-     *
-     * In addition, it is set as the URL generator's root namespace.
-     *
-     * @var string
-     */
-    // protected $namespace = 'App\Http\Controllers';
+    public const HOME = '/dashboard';
 
     /**
-     * Define your route model bindings, pattern filters, etc.
-     *
-     * @return void
+     * Required by legacy routes such as:
+     * 'HomeController@method'
      */
-    public function boot()
+    protected $namespace = 'App\Http\Controllers';
+
+    public function boot(): void
     {
         $this->configureRateLimiting();
 
         parent::boot();
     }
 
-    protected function configureRateLimiting()
+    protected function configureRateLimiting(): void
     {
         RateLimiter::for('api', function (Request $request) {
-            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+            $identity = $request->user()?->getAuthIdentifier()
+                ?: $request->ip();
+
+            $tenantId = function_exists('tenant')
+                ? tenant('id')
+                : null;
+
+            return Limit::perMinute(60)->by(
+                $tenantId
+                    ? $tenantId . '_' . $identity
+                    : $identity
+            );
         });
     }
 
-    /**
-     * Define the routes for the application.
-     *
-     * @return void
-     */
-    public function map()
+    public function map(): void
     {
         $this->mapApiRoutes();
-
         $this->mapWebRoutes();
+    }
 
-        //
+    protected function mapWebRoutes(): void
+    {
+        foreach ($this->centralRouteDomains() as $domain) {
+            $routes = Route::middleware('web')
+                ->namespace($this->namespace);
+
+            if ($domain !== null) {
+                $routes->domain($domain);
+            }
+
+            $routes->group(base_path('routes/web.php'));
+        }
+    }
+
+    protected function mapApiRoutes(): void
+    {
+        foreach ($this->centralRouteDomains() as $domain) {
+            $routes = Route::prefix('api')
+                ->middleware('api')
+                ->namespace($this->namespace);
+
+            if ($domain !== null) {
+                $routes->domain($domain);
+            }
+
+            $routes->group(base_path('routes/api.php'));
+        }
     }
 
     /**
-     * Define the "web" routes for the application.
-     *
-     * These routes all receive session state, CSRF protection, etc.
-     *
-     * @return void
+     * SaaS: return configured central domains.
+     * Single SalePro: return null for routes without domain restriction.
      */
-    protected function mapWebRoutes()
+    protected function centralRouteDomains(): array
     {
-        Route::middleware('web')
-            ->namespace($this->namespace)
-            ->group(base_path('routes/web.php'));
-    }
+        if (! config()->has('tenancy.central_domains')) {
+            return [null];
+        }
 
-    /**
-     * Define the "api" routes for the application.
-     *
-     * These routes are typically stateless.
-     *
-     * @return void
-     */
-    protected function mapApiRoutes()
-    {
-        Route::prefix('api')
-            ->middleware('api')
-            ->namespace($this->namespace)
-            ->group(base_path('routes/api.php'));
+        $domains = array_values(array_filter(
+            (array) config('tenancy.central_domains'),
+            fn ($domain) => is_string($domain) && $domain !== ''
+        ));
+
+        // During the initial SaaS installation CENTRAL_DOMAIN is blank.
+        // Load the central routes without a domain restriction so that the
+        // installer route remains reachable and can save the current domain.
+        return $domains !== [] ? $domains : [null];
     }
 }

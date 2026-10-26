@@ -31,6 +31,7 @@ class CustomerResource extends JsonResource
             'points' => $this->points,
             'deposit' => $this->deposit,
             'expense' => $this->expense,
+            'credit_limit' => $this->credit_limit !== null ? (float) $this->credit_limit : null,
             'is_active' => (bool) $this->is_active,
             'customer_group' => new CustomerGroupResource($this->customerGroup),
             'discount_plan' => 'N/A',

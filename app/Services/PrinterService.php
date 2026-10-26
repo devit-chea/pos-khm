@@ -63,7 +63,7 @@ class PrinterService
             $text .= $leftRight(__('db.customer').': ', $data['customer']);
         }
         if (isset($data['table'])) {
-            $text .= $leftRight(__('db.Table').': ', $data['table']);
+            $text .= $leftRight(__('db.table').': ', $data['table']);
         }
         if (isset($data['queue'])) {
             $text .= $leftRight(__('db.Queue').': ', $data['queue']);
@@ -115,9 +115,36 @@ class PrinterService
         if (isset($data['shipping_cost'])) {
             $text .= $leftRight(__('db.Shipping Cost').': ', $data['shipping_cost']);
         }
-        $text .= $leftRight(__('db.grand total').': ', $data['grand_total']);
-        if (isset($data['due'])) {
-            $text .= $leftRight(__('db.Due').': ', $data['due']);
+        if (!empty($data['has_returns'])) {
+            $text .= $leftRight(__('db.Original Total').': ', $data['original_grand_total']);
+            if (!empty($data['returns'])) {
+                foreach ($data['returns'] as $ret) {
+                    $text .= $leftRight(__('db.Return').': ' . $ret['reference'], '- ' . $ret['amount']);
+                    if (!empty($ret['items'])) {
+                        foreach ($ret['items'] as $item) {
+                            $itemLine = '  ' . $item['product_name'] . ($item['variant_name'] ? ' (' . $item['variant_name'] . ')' : '');
+                            $qtyLine = $item['qty'] . ' ' . $item['unit_code'];
+                            $text .= $leftRight($itemLine, $qtyLine);
+                        }
+                    }
+                }
+            }
+            $text .= $leftRight(__('db.Net Total').': ', $data['net_grand_total']);
+            if (isset($data['gross_paid_amount'])) {
+                $text .= $leftRight(__('db.Gross Paid').': ', $data['gross_paid_amount']);
+            }
+            if (!empty($data['total_refunded_amount']) && (float)str_replace(',', '', $data['total_refunded_amount']) > 0) {
+                $text .= $leftRight(__('db.Less: Refunded').': ', '- ' . $data['total_refunded_amount']);
+                $text .= $leftRight(__('db.Net Paid').': ', $data['net_paid_amount']);
+            }
+            if (isset($data['remaining_due'])) {
+                $text .= $leftRight(__('db.Remaining Due').': ', $data['remaining_due']);
+            }
+        } else {
+            $text .= $leftRight(__('db.grand total').': ', $data['grand_total']);
+            if (isset($data['due'])) {
+                $text .= $leftRight(__('db.Due').': ', $data['due']);
+            }
         }
         if (isset($data['total_due'])) {
             $text .= $leftRight(__('db.Total Due').': ', $data['total_due']);

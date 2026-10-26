@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 <style type="text/css">
     .btn-icon i{margin-right:5px}
     .top-fields{margin-top:10px;position: relative;}
@@ -12,12 +16,13 @@
     <div class="container-fluid">
         
         @if (in_array('expenses-add', $all_permission))
-            <button class="btn btn-info" data-toggle="modal" data-target="#expense-modal"><i class="dripicons-plus"></i>
+            <button class="btn btn-info" data-toggle="modal" data-target="#expense-modal"><i class="ti ti-plus"></i>
                 {{ __('db.Add Expense') }}</button>
         @endif
         <button type="button" class="btn btn-warning btn-icon" id="toggle-filter">
-            <i class="dripicons-experiment"></i> {{ __('db.Filter') }}
+            <i class="ti ti-filter"></i> {{ __('db.Filter') }}
         </button>
+        
         <div class="card">
             <div class="card-body" id="filter-card" style="display: none;">
                 <form action="{{ route('expenses.index') }}" method="get">
@@ -51,7 +56,7 @@
                             <div class="form-group  top-fields">
                                 <label>{{__('db.Expense Category')}}</label>
                                 <select id="expense_category_id" name="expense_category_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" >
-                                    <option value="0">{{__('db.All Categories')}}</option>
+                                    <option value="0">{{__('db.all_categories')}}</option>
                                     @foreach($expense_category_list as $expense_category)
                                         @if($expense_category->id == $expense_category_id)
                                             <option selected value="{{$expense_category->id}}">{{$expense_category->name}}</option>
@@ -71,6 +76,26 @@
             </div>
         </div>
     </div>
+    
+    <div class="row mb-3 px-3">
+        <div class="col-md-6">
+            <div class="card bg-light border-0 shadow-sm text-center">
+                <div class="card-body">
+                    <h6 class="text-uppercase text-muted mb-1">{{ __('db.Total Expenses') }}</h6>
+                    <h4 id="summary_expense_count" class="font-weight-bold mb-0">0</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card bg-light border-0 shadow-sm text-center">
+                <div class="card-body">
+                    <h6 class="text-uppercase text-muted mb-1">{{ __('db.Total Amount') }}</h6>
+                    <h4 id="summary_expense_total" class="font-weight-bold text-primary mb-0">0.00</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="table-responsive">
         <table id="expense-table" class="table expense-list" style="width: 100%">
             <thead>
@@ -80,14 +105,18 @@
                     <th>{{ __('db.reference') }} No</th>
                     <th>{{ __('db.Warehouse') }}</th>
                     <th>{{ __('db.category') }}</th>
+                    <th>{{ __('db.Account') }}</th>
+                    <th>{{ __('db.User') }}</th>
                     <th>{{ __('db.Amount') }}</th>
-                    <th>{{ __('db.Note') }}</th>
+                    <th>{{ __('db.note') }}</th>
                     <th class="not-exported">{{ __('db.action') }}</th>
                 </tr>
             </thead>
             <tfoot class="tfoot active">
                 <th></th>
                 <th>{{ __('db.Total') }}</th>
+                <th></th>
+                <th></th>
                 <th></th>
                 <th></th>
                 <th></th>
@@ -106,7 +135,7 @@
             <div class="modal-header">
                 <h5 id="exampleModalLabel" class="modal-title">{{ __('db.Update Expense') }}</h5>
                 <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span
-                        aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                        aria-hidden="true"><i class="ti ti-x"></i></span></button>
             </div>
             <div class="modal-body">
                 <p class="italic">
@@ -157,11 +186,20 @@
                         <label>{{ __('db.Amount') }} *</label>
                         <input type="number" name="amount" step="any" required class="form-control">
                     </div>
+                    <div class="col-md-6 form-group">
+                        <label>{{ __('Tax') }} ({{ __('db.Inclusive') }})</label>
+                        <select name="tax_id" class="selectpicker form-control" data-live-search="true" title="Select Tax...">
+                            <option value="">{{ __('No Tax') }}</option>
+                            @foreach ($lims_tax_list as $tax)
+                                <option value="{{ $tax->id }}">{{ $tax->name }} ({{ $tax->rate }}%)</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <!-- Employee + Type (Hidden by default) -->
                     <div id="edit_employee_fields" style="display:none; width:100%;" class="col-md-12">
                         <div class="row">
                             <div class="col-md-6 form-group">
-                                <label>Employee *</label>
+                                <label>{{ __('db.Employee') }} *</label>
                                 <select name="employee_id" id="edit_employee_id" class="selectpicker form-control"
                                     data-live-search="true">
                                     @foreach (\App\Models\Employee::where('is_active', 1)->get() as $emp)
@@ -171,16 +209,16 @@
                             </div>
 
                             <div class="col-md-6 form-group">
-                                <label>Type *</label>
+                                <label>{{ __('db.Type') }} *</label>
                                 <select name="type" id="edit_type" class="form-control">
-                                    <option value="expense">Expense</option>
-                                    <option value="advance">Advance</option>
+                                    <option value="expense">{{ __('db.Expense') }}</option>
+                                    <option value="advance">{{ __('db.advance') }}</option>
                                 </select>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-6 form-group">
-                        <label> {{ __('db.Account') }}</label>
+                        <label>{{ __('db.employee_advance_payment_account') }}</label>
                         <select class="form-control selectpicker" name="account_id">
                             @foreach ($lims_account_list as $account)
                                 @if ($account->is_default)
@@ -200,7 +238,7 @@
                     <div class="col-md-6">
                         <div class="form-group">
                             <label>{{ __('db.Attach Document') }}</label>
-                            <i class="dripicons-question" data-toggle="tooltip"
+                            <i class="ti ti-info-circle" data-toggle="tooltip"
                                 title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
                             <input type="file" name="document" class="form-control" />
                             @if ($errors->has('extension'))
@@ -213,7 +251,7 @@
 
                 </div>
                 <div class="form-group">
-                    <label>{{ __('db.Note') }}</label>
+                    <label>{{ __('db.note') }}</label>
                     <textarea name="note" rows="3" class="form-control"></textarea>
                 </div>
                 <div class="form-group">
@@ -224,9 +262,120 @@
         </div>
     </div>
 </div>
+
+<div id="daily-expense-modal" tabindex="-1" role="dialog" aria-labelledby="dailyExpenseModalLabel" aria-hidden="true" class="modal fade text-left">
+    <div role="document" class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 id="dailyExpenseModalLabel" class="modal-title">{{ __('db.Daily Expense Summary') }}</h5>
+                <button type="button" data-dismiss="modal" aria-label="Close" class="close">
+                    <span aria-hidden="true"><i class="ti ti-x"></i></span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Filters Row -->
+                <div class="row mb-3 align-items-end">
+                    <div class="col-md-5">
+                        <div class="form-group mb-0">
+                            <label class="form-label" style="font-size:12px; font-weight:600;">{{ __('db.date') }}</label>
+                            <input type="date" id="daily_expense_date" class="form-control" value="{{ date('Y-m-d') }}">
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="form-group mb-0">
+                            <label class="form-label" style="font-size:12px; font-weight:600;">{{ __('db.Choose Warehouse') }}</label>
+                            <select id="daily_expense_warehouse_id" class="form-control selectpicker" data-live-search="true">
+                                <option value="0">{{ __('db.All Warehouse') }}</option>
+                                @foreach ($lims_warehouse_list as $warehouse)
+                                    <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" id="daily_expense_filter_btn" class="btn btn-info btn-block" style="height: 38px;">
+                            <i class="ti ti-search"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="daily-expense-loading" class="text-center py-4" style="display:none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="sr-only">Loading...</span>
+                    </div>
+                </div>
+
+                <!-- Content Area -->
+                <div id="daily-expense-content">
+                    <!-- Summary Cards -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="card bg-light border p-2 text-center mb-0">
+                                <small class="text-muted text-uppercase" style="font-size: 11px;">{{ __('db.Total') }} {{ __('db.Expenses') ?? 'Expenses' }}</small>
+                                <h4 class="mb-0 font-weight-bold" id="daily_expense_count">0</h4>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light border p-2 text-center mb-0">
+                                <small class="text-muted text-uppercase" style="font-size: 11px;">{{ __('db.Daily Total') }}</small>
+                                <h4 class="mb-0 font-weight-bold text-primary" id="daily_expense_total">0.00</h4>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Expenses Table -->
+                    <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                        <table class="table table-sm table-bordered table-hover mb-0">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>{{ __('db.reference') }}</th>
+                                    <th>{{ __('db.Warehouse') }}</th>
+                                    <th>{{ __('db.category') }}</th>
+                                    <th>{{ __('db.Account') }}</th>
+                                    <th>{{ __('db.Note') }}</th>
+                                    <th>{{ __('db.User') }}</th>
+                                    <th class="text-right">{{ __('db.Amount') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody id="daily_expense_table_body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                            <tfoot class="bg-light font-weight-bold" id="daily_expense_table_foot">
+                                <tr>
+                                    <th colspan="7" class="text-right">{{ __('db.Daily Total') }}:</th>
+                                    <th class="text-right" id="daily_expense_foot_total">0.00</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- Zero State Container -->
+                    <div id="daily-expense-empty" class="text-center py-4" style="display:none;">
+                        <div class="text-muted mb-2"><i class="ti ti-file-off" style="font-size: 36px;"></i></div>
+                        <p class="text-muted mb-0 font-weight-bold">{{ __('db.No expenses found') }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <div>
+                    <button type="button" id="daily_expense_print_btn" class="btn btn-outline-secondary">
+                        <i class="ti ti-printer"></i> {{ __('db.Print') }}
+                    </button>
+                    <button type="button" id="daily_expense_export_btn" class="btn btn-outline-secondary">
+                        <i class="ti ti-file-type-csv"></i> {{ __('db.Export') }}
+                    </button>
+                </div>
+                <button type="button" data-dismiss="modal" class="btn btn-secondary">{{ __('db.Close') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 <script type="text/javascript">
 
     $('#toggle-filter').on('click', function() {
@@ -234,7 +383,7 @@
     });
 
     var expense_id = [];
-    var user_verified = <?php echo json_encode(env('USER_VERIFIED')); ?>;
+    var user_verified = <?php echo json_encode(config('app.user_verified')); ?>;
     var all_permission = <?php echo json_encode($all_permission); ?>;
 
     $.ajaxSetup({
@@ -258,6 +407,7 @@
             $("#editModal select[name='expense_category_id']").val(data['expense_category_id']);
             $("#editModal select[name='account_id']").val(data['account_id']);
             $("#editModal input[name='amount']").val(data['amount']);
+            $("#editModal select[name='tax_id']").val(data['tax_id'] || '');
             $("#editModal input[name='expense_id']").val(data['id']);
             $("#editModal textarea[name='note']").val(data['note']);
 
@@ -283,12 +433,7 @@
         }
     });
 
-    function confirmDelete() {
-        if (confirm("Are you sure want to delete?")) {
-            return true;
-        }
-        return false;
-    }
+    function confirmDelete() { return true; }
 
     var expenseTable = $('#expense-table').DataTable({
         processing: true,
@@ -301,6 +446,7 @@
                 d.starting_date  = $("input[name=starting_date]").val();
                 d.ending_date    = $("input[name=ending_date]").val();
                 d.warehouse_id   = $("#warehouse_id").val();
+                d.expense_category_id = $("#expense_category_id").val();
             },
             dataType: "json"
         },
@@ -313,6 +459,8 @@
             {"data": "reference_no"},
             {"data": "warehouse"},
             {"data": "expenseCategory"},
+            {"data": "account"},
+            {"data": "user"},
             {"data": "amount"},
             {"data": "note"},
             {"data": "options"}
@@ -323,8 +471,8 @@
             "info": '<small>{{ __('db.Showing') }} _START_ - _END_ (_TOTAL_)</small>',
             "search": '{{ __('db.Search') }}',
             'paginate': {
-                'previous': '<i class="dripicons-chevron-left"></i>',
-                'next': '<i class="dripicons-chevron-right"></i>'
+                'previous': '<i class="ti ti-chevron-left"></i>',
+                'next': '<i class="ti ti-chevron-right"></i>'
             }
         },
         order: [
@@ -332,7 +480,7 @@
         ],
         'columnDefs': [{
                 "orderable": false,
-                'targets': [0, 3, 4, 6, 7]
+                'targets': [0, 3, 4, 5, 6, 8, 9]
             },
             {
                 'render': function(data, type, row, meta) {
@@ -362,7 +510,7 @@
         rowId: 'ObjectID',
         buttons: [{
                 extend: 'pdf',
-                text: '<i title="export to pdf" class="fa fa-file-pdf-o"></i>',
+                text: '<i title="export to pdf" class="ti ti-file-type-pdf"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -376,7 +524,7 @@
             },
             {
                 extend: 'excel',
-                text: '<i title="export to excel" class="dripicons-document-new"></i>',
+                text: '<i title="export to excel" class="ti ti-file-type-xls"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -390,7 +538,7 @@
             },
             {
                 extend: 'csv',
-                text: '<i title="export to csv" class="fa fa-file-text-o"></i>',
+                text: '<i title="export to csv" class="ti ti-file-type-csv"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -404,7 +552,7 @@
             },
             {
                 extend: 'print',
-                text: '<i title="print" class="fa fa-print"></i>',
+                text: '<i title="print" class="ti ti-printer"></i>',
                 exportOptions: {
                     columns: ':visible:Not(.not-exported)',
                     rows: ':visible'
@@ -417,7 +565,7 @@
                 footer: true
             },
             {
-                text: '<i title="delete" class="dripicons-cross"></i>',
+                text: '<i title="delete" class="ti ti-x"></i>',
                 className: 'buttons-delete',
                 action: function(e, dt, node, config) {
                     if (user_verified == '1') {
@@ -427,7 +575,7 @@
                                 expense_id[i - 1] = $(this).closest('tr').data('expense_id');
                             }
                         });
-                        if (expense_id.length && confirm("Are you sure want to delete?")) {
+                        if (expense_id.length) { SaleProConfirm.open({ message: "Are you sure want to delete?" }).then(function(confirmed) { if (confirmed) {
                             $.ajax({
                                 type: 'POST',
                                 url: 'expenses/deletebyselection',
@@ -435,7 +583,7 @@
                                     expenseIdArray: expense_id
                                 },
                                 success: function(data) {
-                                    alert(data);
+                                    SaleProToast.show(data);
                                     //dt.rows({ page: 'current', selected: true }).deselect();
                                     dt.rows({
                                         page: 'current',
@@ -443,15 +591,17 @@
                                     }).remove().draw(false);
                                 }
                             });
+                        }
+                        });
                         } else if (!expense_id.length)
-                            alert('Nothing is selected!');
+                            SaleProToast.show('Nothing is selected!');
                     } else
-                        alert('This feature is disable for demo!');
+                        SaleProToast.show('This feature is disable for demo!');
                 }
             },
             {
                 extend: 'colvis',
-                text: '<i title="column visibility" class="fa fa-eye"></i>',
+                text: '<i title="column visibility" class="ti ti-eye"></i>',
                 columns: ':gt(0)'
             },
         ],
@@ -464,20 +614,20 @@
     function datatable_sum(dt_selector, is_calling_first) {
         if (dt_selector.rows('.selected').any() && is_calling_first) {
             var rows = dt_selector.rows('.selected').indexes();
-            $(dt_selector.column(5).footer()).html(dt_selector.cells(rows, 5, {
+            $(dt_selector.column(7).footer()).html(dt_selector.cells(rows, 7, {
                 page: 'current'
-            }).data().sum().toFixed({{ $general_setting->decimal }}));
+            }).data().sum().toFixed({{ gen_setting()->decimal }}));
         } else {
-            $(dt_selector.column(5).footer()).html(dt_selector.cells(rows, 5, {
+            $(dt_selector.column(7).footer()).html(dt_selector.cells(rows, 7, {
                 page: 'current'
-            }).data().sum().toFixed({{ $general_setting->decimal }}));
+            }).data().sum().toFixed({{ gen_setting()->decimal }}));
         }
     }
 
     $('.daterangepicker-field').on('apply.daterangepicker', function(ev, picker) {
         $('input[name=starting_date]').val(picker.startDate.format('YYYY-MM-DD'));
         $('input[name=ending_date]').val(picker.endDate.format('YYYY-MM-DD'));
-        saleTable.ajax.reload();
+        expenseTable.ajax.reload();
     });
 
     $('#warehouse_id, #expense_category_id').on('change', function () {
@@ -490,11 +640,17 @@
     });
 
     // Hide loader after draw
-    expenseTable.on('xhr.dt', function () {
+    expenseTable.on('xhr.dt', function (e, settings, json, xhr) {
         $('#filter-loading').hide();
+        if (json) {
+            $('#summary_expense_count').text(json.recordsFiltered);
+            var currency = ''; 
+            $('#summary_expense_total').text(json.totalAmount);
+        }
     });
 
     if (all_permission.indexOf("expenses-delete") == -1)
         $('.buttons-delete').addClass('d-none');
+
 </script>
 @endpush

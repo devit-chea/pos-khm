@@ -13,6 +13,7 @@ use App\Models\Unit;
 use App\Models\ProductVariant;
 use Auth;
 use Spatie\Permission\Models\Role;
+use App\Services\AccountingService;
 
 class DamageStockController extends Controller
 {
@@ -49,6 +50,8 @@ class DamageStockController extends Controller
         $products = DB::table('products')
             ->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
             ->whereNull('products.is_variant')
+            ->where('products.is_batch', false)
+            ->where('products.is_imei', false)
             ->where('products.is_active', 1)
             ->where('product_warehouse.warehouse_id', $warehouseId)
             ->groupBy('products.id', 'products.code', 'products.name', 'products.cost')
@@ -66,6 +69,8 @@ class DamageStockController extends Controller
             ->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
             ->join('product_variants', 'product_warehouse.variant_id', '=', 'product_variants.id')
             ->whereNotNull('products.is_variant')
+            ->where('products.is_batch', false)
+            ->where('products.is_imei', false)
             ->where('products.is_active', 1)
             ->where('product_warehouse.warehouse_id', $warehouseId)
             ->groupBy('products.id', 'products.name', 'products.cost', 'product_variants.item_code', 'product_variants.id')
@@ -173,6 +178,7 @@ class DamageStockController extends Controller
     public function productWithoutVariant()
     {
         return Product::ActiveStandard()->select('id', 'name', 'code')
+            ->where('is_batch', false)->where('is_imei', false)
             ->whereNull('is_variant')->get();
     }
 
@@ -180,6 +186,7 @@ class DamageStockController extends Controller
     {
         return Product::join('product_variants', 'products.id', 'product_variants.product_id')
             ->ActiveStandard()
+            ->where('products.is_batch', false)->where('products.is_imei', false)
             ->whereNotNull('is_variant')
             ->select('products.id', 'products.name', 'product_variants.item_code')
             ->orderBy('position')
@@ -192,6 +199,8 @@ class DamageStockController extends Controller
             DB::beginTransaction();
 
             $data = $request->except('document');
+
+            $this->assertDamageStockIdentities($data['product_id'], $data['product_code'], (int) $data['warehouse_id']);
 
             $data['reference_no'] = 'dmg-' . date("Ymd") . '-' . date("his");
             $data['user_id']      = Auth::id();
@@ -256,12 +265,17 @@ class DamageStockController extends Controller
                 ProductDamageStock::create($product_damage);
             }
 
+            $accounting = app(AccountingService::class)->recordDamageStock($lims_damage_data);
+            if (!$accounting->isSuccess()) {
+                throw new \RuntimeException($accounting->getMessage() ?: 'Damage stock accounting failed.');
+            }
+
             DB::commit();
             return redirect('damage-stock')->with('message', __('db.Data inserted successfully'));
 
         } catch (\Throwable $e) {
             DB::rollBack();
-            return redirect('damage-stock')->with('not_permitted', __('db.Someting Error Please try again'));
+            return redirect('damage-stock')->with('not_permitted', __('db.generic_error_please_try_again'));
         }
     }
 
@@ -284,7 +298,15 @@ class DamageStockController extends Controller
             DB::beginTransaction();
 
             $data             = $request->except('document');
-            $lims_damage_data = DamageStock::find($id);
+            $lims_damage_data = DamageStock::findOrFail($id);
+
+            $accountingReversal = app(AccountingService::class)->reverseTransaction(DamageStock::class, (int) $lims_damage_data->id, '_updated_reversed');
+            if (!$accountingReversal->isSuccess()) {
+                throw new \RuntimeException($accountingReversal->getMessage() ?: 'Damage stock accounting reversal failed.');
+            }
+
+            $this->assertPersistedDamageStockIdentities($lims_damage_data);
+            $this->assertDamageStockIdentities($data['product_id'], $data['product_code'], (int) $data['warehouse_id']);
 
             $document = $request->document;
             if ($document) {
@@ -417,6 +439,10 @@ class DamageStockController extends Controller
             }
 
             $lims_damage_data->update($data);
+            $accounting = app(AccountingService::class)->recordDamageStock($lims_damage_data->fresh(), 'damage_stock_updated');
+            if (!$accounting->isSuccess()) {
+                throw new \RuntimeException($accounting->getMessage() ?: 'Damage stock accounting repost failed.');
+            }
 
             DB::commit();
             return redirect('damage-stock')->with('message', __('db.Data updated successfully'));
@@ -429,94 +455,101 @@ class DamageStockController extends Controller
 
     public function deleteBySelection(Request $request)
     {
-        $damage_id = $request['damageIdArray'];
-
-        foreach ($damage_id as $id) {
-            $lims_damage_data = DamageStock::find($id);
-            $this->fileDelete(public_path('documents/damage_stock/'), $lims_damage_data->document);
-
-            $lims_product_damage_data = ProductDamageStock::where('damage_stock_id', $id)->get();
-
-            foreach ($lims_product_damage_data as $key => $product_damage_data) {
-                $lims_product_data = Product::find($product_damage_data->product_id);
-
-                if ($product_damage_data->variant_id) {
-                    $lims_product_variant_data = ProductVariant::select('id', 'qty')
-                        ->FindExactProduct($product_damage_data->product_id, $product_damage_data->variant_id)
-                        ->first();
-
-                    $lims_product_warehouse_data = Product_Warehouse::where([
-                        ['product_id', $product_damage_data->product_id],
-                        ['variant_id', $product_damage_data->variant_id],
-                        ['warehouse_id', $lims_damage_data->warehouse_id]
-                    ])->first();
-
-                    // Restore (was minus, so restore with plus)
-                    $lims_product_variant_data->qty += $product_damage_data->qty;
-                    $lims_product_variant_data->save();
-                } else {
-                    $lims_product_warehouse_data = Product_Warehouse::where([
-                        ['product_id', $product_damage_data->product_id],
-                        ['warehouse_id', $lims_damage_data->warehouse_id]
-                    ])->first();
+        $damageIds = (array) $request->input('damageIdArray', []);
+        $documents = [];
+        DB::transaction(function () use ($damageIds, &$documents) {
+            foreach ($damageIds as $id) {
+                $lims_damage_data = DamageStock::whereKey($id)->lockForUpdate()->firstOrFail();
+                $this->assertPersistedDamageStockIdentities($lims_damage_data);
+                $reversal = app(AccountingService::class)->reverseTransaction(DamageStock::class, (int) $lims_damage_data->id, '_deleted');
+                if (!$reversal->isSuccess()) {
+                    throw new \RuntimeException($reversal->getMessage() ?: 'Damage stock accounting reversal failed.');
                 }
-
-                // Restore product & warehouse qty
-                $lims_product_data->qty           += $product_damage_data->qty;
-                $lims_product_warehouse_data->qty += $product_damage_data->qty;
-
-                $lims_product_data->save();
-                $lims_product_warehouse_data->save();
-                $product_damage_data->delete();
+                $documents[] = $lims_damage_data->document;
+                $this->restoreAndDeleteDamageLines($lims_damage_data);
+                $lims_damage_data->delete();
             }
-
-            $lims_damage_data->delete();
+        }, 3);
+        foreach ($documents as $document) {
+            $this->fileDelete(public_path('documents/damage_stock/'), $document);
         }
-
         return 'Data deleted successfully';
     }
 
     public function destroy($id)
     {
-        $lims_damage_data         = DamageStock::find($id);
-        $lims_product_damage_data = ProductDamageStock::where('damage_stock_id', $id)->get();
+        $document = null;
+        DB::transaction(function () use ($id, &$document) {
+            $lims_damage_data = DamageStock::whereKey($id)->lockForUpdate()->firstOrFail();
+            $this->assertPersistedDamageStockIdentities($lims_damage_data);
+            $reversal = app(AccountingService::class)->reverseTransaction(DamageStock::class, (int) $lims_damage_data->id, '_deleted');
+            if (!$reversal->isSuccess()) {
+                throw new \RuntimeException($reversal->getMessage() ?: 'Damage stock accounting reversal failed.');
+            }
+            $document = $lims_damage_data->document;
+            $this->restoreAndDeleteDamageLines($lims_damage_data);
+            $lims_damage_data->delete();
+        }, 3);
+        $this->fileDelete(public_path('documents/damage_stock/'), $document);
+        return redirect('damage-stock')->with('not_permitted', __('db.Data deleted successfully'));
+    }
 
-        foreach ($lims_product_damage_data as $key => $product_damage_data) {
-            $lims_product_data = Product::find($product_damage_data->product_id);
+    private function restoreAndDeleteDamageLines(DamageStock $damage): void
+    {
+        $lines = ProductDamageStock::where('damage_stock_id', $damage->id)->lockForUpdate()->get();
+        foreach ($lines as $line) {
+            $product = Product::whereKey($line->product_id)->lockForUpdate()->firstOrFail();
+            $stockQuery = Product_Warehouse::where('product_id', $line->product_id)
+                ->where('warehouse_id', $damage->warehouse_id);
+            $line->variant_id ? $stockQuery->where('variant_id', $line->variant_id) : $stockQuery->whereNull('variant_id');
+            $warehouse = $stockQuery->lockForUpdate()->firstOrFail();
+            if ($line->variant_id) {
+                $variant = ProductVariant::where('product_id', $line->product_id)
+                    ->where('variant_id', $line->variant_id)->lockForUpdate()->firstOrFail();
+                $variant->increment('qty', $line->qty);
+            }
+            $product->increment('qty', $line->qty);
+            $warehouse->increment('qty', $line->qty);
+            $line->delete();
+        }
+    }
 
-            if ($product_damage_data->variant_id) {
-                $lims_product_variant_data = ProductVariant::select('id', 'qty')
-                    ->FindExactProduct($product_damage_data->product_id, $product_damage_data->variant_id)
-                    ->first();
-
-                $lims_product_warehouse_data = Product_Warehouse::where([
-                    ['product_id', $product_damage_data->product_id],
-                    ['variant_id', $product_damage_data->variant_id],
-                    ['warehouse_id', $lims_damage_data->warehouse_id]
-                ])->first();
-
-                // Restore
-                $lims_product_variant_data->qty += $product_damage_data->qty;
-                $lims_product_variant_data->save();
-            } else {
-                $lims_product_warehouse_data = Product_Warehouse::where([
-                    ['product_id', $product_damage_data->product_id],
-                    ['warehouse_id', $lims_damage_data->warehouse_id]
-                ])->first();
+    private function assertDamageStockIdentities(array $productIds, array $productCodes, int $warehouseId): void
+    {
+        foreach ($productIds as $key => $productId) {
+            $product = Product::findOrFail($productId);
+            if ($product->is_batch || $product->is_imei) {
+                throw new \RuntimeException('Damage Stock does not persist batch or IMEI identity.');
             }
 
-            // Restore product & warehouse qty
-            $lims_product_data->qty           += $product_damage_data->qty;
-            $lims_product_warehouse_data->qty += $product_damage_data->qty;
-
-            $lims_product_data->save();
-            $lims_product_warehouse_data->save();
-            $product_damage_data->delete();
+            $variantId = null;
+            if ($product->is_variant) {
+                $variantId = ProductVariant::FindExactProductWithCode($product->id, $productCodes[$key])->value('variant_id');
+            }
+            $this->assertSoleWarehouseRow($product->id, $warehouseId, $variantId);
         }
+    }
 
-        $lims_damage_data->delete();
-        $this->fileDelete(public_path('documents/damage_stock/'), $lims_damage_data->document);
+    private function assertPersistedDamageStockIdentities(DamageStock $damage): void
+    {
+        foreach (ProductDamageStock::where('damage_stock_id', $damage->id)->get() as $line) {
+            $product = Product::findOrFail($line->product_id);
+            if ($product->is_batch || $product->is_imei) {
+                throw new \RuntimeException('Damage Stock does not persist batch or IMEI identity.');
+            }
+            $this->assertSoleWarehouseRow($line->product_id, (int) $damage->warehouse_id, $line->variant_id);
+        }
+    }
 
-        return redirect('damage-stock')->with('not_permitted', __('db.Data deleted successfully'));
+    private function assertSoleWarehouseRow(int $productId, int $warehouseId, ?int $variantId): void
+    {
+        $query = Product_Warehouse::where('product_id', $productId)->where('warehouse_id', $warehouseId);
+        $variantId ? $query->where('variant_id', $variantId) : $query->whereNull('variant_id');
+        $count = $query->count();
+        if ($count !== 1) {
+            throw new \RuntimeException($count === 0
+                ? 'Damage Stock warehouse stock tuple is missing.'
+                : 'Damage Stock warehouse stock identity is ambiguous.');
+        }
     }
 }

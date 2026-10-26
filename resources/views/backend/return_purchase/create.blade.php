@@ -37,33 +37,59 @@
                                                 </thead>
                                                 <tbody>
                                                     @foreach($lims_product_purchase_data as $product_purchase)
-                                                    <tr>
                                                     <?php
                                                         $product_data = DB::table('products')->find($product_purchase->product_id);
+                                                        if (!$product_data) {
+                                                            continue;
+                                                        }
+                                                        $product_variant_id = null;
                                                         if($product_purchase->variant_id) {
                                                             $product_variant_data = \App\Models\ProductVariant::select('id', 'item_code')->FindExactProduct($product_data->id, $product_purchase->variant_id)->first();
-                                                            $product_variant_id = $product_variant_data->id;
-                                                            $product_data->code = $product_variant_data->item_code;
+                                                            if (!$product_variant_data) {
+                                                                $product_variant_data = \App\Models\ProductVariant::select('id', 'item_code')
+                                                                    ->where('product_id', $product_data->id)
+                                                                    ->where('id', $product_purchase->variant_id)
+                                                                    ->first();
+                                                            }
+                                                            if ($product_variant_data) {
+                                                                $product_variant_id = $product_variant_data->id;
+                                                                $product_data->code = $product_variant_data->item_code;
+                                                            } else {
+                                                                $product_variant_id = null;
+                                                                $product_data->code = $product_data->code ?? 'N/A';
+                                                            }
                                                         }
-                                                        else
+                                                        else {
                                                             $product_variant_id = null;
+                                                        }
+
+                                                        $lineQty = (float) $product_purchase->qty;
+                                                        $returnableQty = max(0, $lineQty - (float) $product_purchase->return_qty);
+                                                        if ($returnableQty <= 0.000001) {
+                                                            continue;
+                                                        }
+                                                        $hasValidQty = $lineQty > 0;
                                                         if($product_data->tax_method == 1){
-                                                            $product_cost = $product_purchase->net_unit_cost + ($product_purchase->discount / $product_purchase->qty);
+                                                            $product_cost = $product_purchase->net_unit_cost + ($hasValidQty ? ($product_purchase->discount / $lineQty) : 0);
                                                         }
                                                         elseif ($product_data->tax_method == 2) {
-                                                            $product_cost =($product_purchase->total / $product_purchase->qty) + ($product_purchase->discount / $product_purchase->qty);
+                                                            $product_cost = ($hasValidQty ? ($product_purchase->total / $lineQty) : $product_purchase->net_unit_cost) + ($hasValidQty ? ($product_purchase->discount / $lineQty) : 0);
+                                                        }
+                                                        else {
+                                                            $product_cost = $product_purchase->net_unit_cost;
                                                         }
 
                                                         $tax = DB::table('taxes')->where('rate',$product_purchase->tax_rate)->first();
                                                         if($product_data->type == 'standard'){
-                                                            $unit = DB::table('units')->select('unit_name')->find($product_data->unit_id);
-                                                           $unit_name = $unit->unit_name;
+                                                            $unit = $product_data->unit_id ? DB::table('units')->select('unit_name')->find($product_data->unit_id) : null;
+                                                            $unit_name = $unit ? $unit->unit_name : 'n/a';
                                                         }
                                                         else {
                                                             $unit_name = 'n/a';
                                                         }
-                                                        $product_batch_data = \App\Models\ProductBatch::select('batch_no')->find($product_purchase->product_batch_id);
+                                                        $product_batch_data = $product_purchase->product_batch_id ? \App\Models\ProductBatch::select('batch_no')->find($product_purchase->product_batch_id) : null;
                                                     ?>
+                                                    <tr>
                                                         <td>{{$product_data->name}}</td>
                                                         <td>{{$product_data->code}}</td>
                                                         @if($product_batch_data)
@@ -78,18 +104,18 @@
                                                         </td>
                                                         @endif
                                                         <td>
-                                                            <input type="hidden" name="actual_qty[]" class="actual-qty" value="{{$product_purchase->qty}}">
-                                                            <input type="number" class="form-control qty" name="qty[]" value="{{$product_purchase->qty}}" required step="any" max="{{$product_purchase->qty}}" />
+                                                            <input type="hidden" name="actual_qty[]" class="actual-qty" value="{{$returnableQty}}">
+                                                            <input type="number" class="form-control qty" name="qty[]" value="{{$returnableQty}}" required step="any" min="0.000001" max="{{$returnableQty}}" />
                                                         </td>
-                                                        <td class="net_unit_cost">{{ number_format((float)$product_purchase->net_unit_cost, $general_setting->decimal, '.', '')}} </td>
-                                                        <td class="discount">{{ number_format((float)$product_purchase->discount, $general_setting->decimal, '.', '')}}</td>
-                                                        <td class="tax">{{ number_format((float)$product_purchase->tax, $general_setting->decimal, '.', '')}}</td>
-                                                        <td class="sub-total">{{ number_format((float)$product_purchase->total, $general_setting->decimal, '.', '')}}</td>
+                                                        <td class="net_unit_cost">{{ number_format((float)$product_purchase->net_unit_cost, gen_setting()->decimal, '.', '')}} </td>
+                                                        <td class="discount">{{ number_format((float)$product_purchase->discount, gen_setting()->decimal, '.', '')}}</td>
+                                                        <td class="tax">{{ number_format((float)$product_purchase->tax, gen_setting()->decimal, '.', '')}}</td>
+                                                        <td class="sub-total">{{ number_format((float)$product_purchase->total, gen_setting()->decimal, '.', '')}}</td>
                                                         <td><input type="checkbox" class="is-return" name="is_return[]" value="{{$product_purchase->id}}"></td>
                                                         <input type="hidden" class="product-code" name="product_code[]" value="{{$product_data->code}}"/>
                                                         <input type="hidden" name="product_purchase_id[]" value="{{$product_purchase->id}}"/>
                                                         <input type="hidden" name="product_id[]" class="product-id" value="{{$product_data->id}}"/>
-                                                        <input type="hidden" class="unit-cost" value="{{$product_purchase->total/$product_purchase->qty}}">
+                                                        <input type="hidden" class="unit-cost" value="{{ $hasValidQty ? ($product_purchase->total / $lineQty) : 0 }}">
                                                         <input type="hidden" name="product_variant_id[]" value="{{$product_variant_id}}"/>
                                                         <input type="hidden" class="product-cost" name="product_cost[]" value="{{$product_cost}}"/>
                                                         <input type="hidden" class="purchase-unit" name="purchase_unit[]" value="{{$unit_name}}"/>
@@ -102,7 +128,7 @@
                                                         <input type="hidden" class="tax-name" value="No Tax" />
                                                         @endif
                                                         <input type="hidden" class="tax-method" value="{{$product_data->tax_method}}"/>
-                                                        <input type="hidden" class="unit-tax-value" value="{{$product_purchase->tax / $product_purchase->qty}}" />
+                                                        <input type="hidden" class="unit-tax-value" value="{{ $hasValidQty ? ($product_purchase->tax / $lineQty) : 0 }}" />
                                                         <input type="hidden" class="tax-value" name="tax[]" value="{{$product_purchase->tax}}" />
                                                         <input type="hidden" class="subtotal-value" name="subtotal[]" value="{{$product_purchase->total}}" />
                                                         <input type="hidden" class="imei-number" value="{{$product_purchase->imei_number}}" />
@@ -148,6 +174,7 @@
                                     </div>
                                 </div>
                                 <div class="row mt-3">
+                                    @if($lims_purchase_data->paid_amount > 0)
                                     <div class="col-md-4">
                                         <div class="form-group">
                                             <label>{{__('db.Account')}}</label>
@@ -164,6 +191,18 @@
                                     </div>
                                     <div class="col-md-4">
                                         <div class="form-group">
+                                            <label>{{ __('db.refund_amount') }}</label>
+                                            <input type="number" name="refund_amount" id="refund_amount" class="form-control" value="{{ $lims_purchase_data->paid_amount ?? 0 }}" max="{{ $lims_purchase_data->paid_amount ?? 0 }}" step="0.001"/>
+                                            @if ($errors->has('extension'))
+                                                <span>
+                                                    <strong>{{ $errors->first('extension') }}</strong>
+                                                </span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    @endif
+                                    <div class="col-md-4">
+                                        <div class="form-group">
                                             <label>{{__('db.Order Tax')}}</label>
                                             <select class="form-control" name="order_tax_rate">
                                                 <option value="0">No Tax</option>
@@ -176,7 +215,7 @@
                                 	<div class="col-md-4">
                                         <div class="form-group">
                                             <label>{{__('db.Attach Document')}}</label>
-                                            <i class="dripicons-question" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
+                                            <i class="ti ti-info-circle" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
                                             <input type="file" name="document" class="form-control" />
                                             @if($errors->has('extension'))
                                                 <span>
@@ -214,16 +253,16 @@
     <div class="container-fluid">
         <table class="table table-bordered table-condensed totals">
             <td><strong>{{__('db.Items')}}</strong>
-                <span class="pull-right" id="item">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="item">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
             <td><strong>{{__('db.Total')}}</strong>
-                <span class="pull-right" id="subtotal">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="subtotal">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
             <td><strong>{{__('db.Order Tax')}}</strong>
-                <span class="pull-right" id="order_tax">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="order_tax">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
             <td><strong>{{__('db.grand total')}}</strong>
-                <span class="pull-right" id="grand_total">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                <span class="pull-right" id="grand_total">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
             </td>
         </table>
     </div>
@@ -232,7 +271,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="modal_header" class="modal-title"></h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                     <form>
@@ -266,7 +305,7 @@
 
         // If no checkboxes are checked, show an alert and prevent form submission
         if (!anyCheckboxChecked) {
-            alert("Please select at least one product.");
+            SaleProToast.show("Please select at least one product.");
             e.preventDefault(); // Prevent form submission
         }
     });
@@ -359,7 +398,7 @@ $('button[name="update_btn"]').on("click", function() {
         $("#editModal").modal('hide');
     }
     else
-        alert('Please choose imei or serial number!');
+        SaleProToast.show('Please choose imei or serial number!');
 
 });
 
@@ -368,7 +407,7 @@ $("#myTable").on('input', '.qty', function() {
     rowindex = $(this).closest('tr').index();
     if($(this).val() < 1 && $(this).val() != '') {
       $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val(1);
-      alert("Quantity can't be less than 1");
+      SaleProToast.show("Quantity can't be less than 1");
     }
     calculateTotal();
 });
@@ -388,7 +427,7 @@ function calculateTotal() {
             var actual_qty = $('table.order-list tbody tr:nth-child(' + (i + 1) + ') .actual-qty').val();
             var qty = $('table.order-list tbody tr:nth-child(' + (i + 1) + ') .qty').val();
             if(qty > actual_qty) {
-                alert('Quantity can not be bigger than the actual quantity!');
+                SaleProToast.show('Quantity can not be bigger than the actual quantity!');
                 qty = actual_qty;
                 $('table.order-list tbody tr:nth-child(' + (i + 1) + ') .qty').val(actual_qty);
             }
@@ -401,19 +440,19 @@ function calculateTotal() {
             total_tax += parseFloat(tax);
             total += parseFloat(unit_cost * qty);
             $('table.order-list tbody tr:nth-child(' + (i + 1) + ') .subtotal-value').val(unit_cost * qty);
-            $('table.order-list tbody tr:nth-child(' + (i + 1) + ') .sub-total').text(parseFloat(unit_cost * qty).toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (i + 1) + ') .tax-value').val(parseFloat(tax).toFixed({{$general_setting->decimal}}));
-            $('table.order-list tbody tr:nth-child(' + (i + 1) + ') .tax').text(parseFloat(tax).toFixed({{$general_setting->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (i + 1) + ') .sub-total').text(parseFloat(unit_cost * qty).toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (i + 1) + ') .tax-value').val(parseFloat(tax).toFixed({{gen_setting()->decimal}}));
+            $('table.order-list tbody tr:nth-child(' + (i + 1) + ') .tax').text(parseFloat(tax).toFixed({{gen_setting()->decimal}}));
             item++;
         }
     });
     $('input[name="total_qty"]').val(total_qty);
 
-    $('input[name="total_discount"]').val(total_discount.toFixed({{$general_setting->decimal}}));
+    $('input[name="total_discount"]').val(total_discount.toFixed({{gen_setting()->decimal}}));
 
-    $('input[name="total_tax"]').val(total_tax.toFixed({{$general_setting->decimal}}));
+    $('input[name="total_tax"]').val(total_tax.toFixed({{gen_setting()->decimal}}));
 
-    $('input[name="total_cost"]').val(total.toFixed({{$general_setting->decimal}}));
+    $('input[name="total_cost"]').val(total.toFixed({{gen_setting()->decimal}}));
     $('input[name="item"]').val(item);
     item += '(' + total_qty + ')';
     $('#item').text(item);
@@ -429,11 +468,13 @@ function calculateGrandTotal() {
     var grand_total = subtotal + order_tax;
 
 
-    $('#subtotal').text(subtotal.toFixed({{$general_setting->decimal}}));
-    $('#order_tax').text(order_tax.toFixed({{$general_setting->decimal}}));
-    $('input[name="order_tax"]').val(order_tax.toFixed({{$general_setting->decimal}}));
-    $('#grand_total').text(grand_total.toFixed({{$general_setting->decimal}}));
-    $('input[name="grand_total"]').val(grand_total.toFixed({{$general_setting->decimal}}));
+    $('#subtotal').text(subtotal.toFixed({{gen_setting()->decimal}}));
+    $('#order_tax').text(order_tax.toFixed({{gen_setting()->decimal}}));
+    $('input[name="order_tax"]').val(order_tax.toFixed({{gen_setting()->decimal}}));
+    $('#grand_total').text(grand_total.toFixed({{gen_setting()->decimal}}));
+    $('input[name="grand_total"]').val(grand_total.toFixed({{gen_setting()->decimal}}));
+    $('#refund_amount').val(grand_total.toFixed({{gen_setting()->decimal}}));
+    $('#refund_amount').attr('max', grand_total.toFixed({{gen_setting()->decimal}}));
 }
 
 $(window).keydown(function(e){
@@ -458,8 +499,47 @@ $(window).keydown(function(e){
 $('.payment-form').on('submit',function(e){
     var rownumber = $('table.order-list tbody tr:last').index();
     if (rownumber < 0) {
-        alert("Please insert product to order table!")
+        SaleProToast.show("Please insert product to order table!");
         e.preventDefault();
+        return false;
+    }
+
+    var checkedReturns = $('table.order-list tbody tr').filter(function() {
+        return $(this).find('input.is-return').is(':checked');
+    });
+
+    if (checkedReturns.length === 0) {
+        SaleProToast.show("Please select at least one product to return!");
+        e.preventDefault();
+        return false;
+    }
+
+    var invalidInput = null;
+    checkedReturns.each(function() {
+        var $qtyInput = $(this).find('input.qty');
+        var rawVal = String($qtyInput.val() === null ? '' : $qtyInput.val()).trim();
+        var numVal = Number(rawVal);
+        $qtyInput.removeClass('is-invalid');
+
+        if (rawVal === '' || !Number.isFinite(numVal) || numVal <= 0) {
+            invalidInput = $qtyInput;
+            return false;
+        }
+    });
+
+    if (invalidInput) {
+        invalidInput.addClass('is-invalid').focus();
+        SaleProToast.show("Quantity for selected returned products must be greater than zero.");
+        e.preventDefault();
+        return false;
+    }
+});
+
+$(document).on('input change', '.payment-form input.qty', function() {
+    var rawVal = String($(this).val() === null ? '' : $(this).val()).trim();
+    var numVal = Number(rawVal);
+    if (rawVal !== '' && Number.isFinite(numVal) && numVal > 0) {
+        $(this).removeClass('is-invalid');
     }
 });
 

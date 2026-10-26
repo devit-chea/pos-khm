@@ -78,7 +78,7 @@ var Uploader = (function (window, document, Uploader) {
                 var myDropzone = this;
                 // Update selector to match your button
                 $btn.on("click", function (e) {
-                    alert('imageUpload');
+                    SaleProToast.show('imageUpload');
                     e.preventDefault();
                     if ( $form.valid() ) {
                         myDropzone.processQueue();

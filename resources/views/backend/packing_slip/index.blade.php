@@ -1,4 +1,8 @@
-@extends('backend.layout.main') @section('content')
+@extends('backend.layout.main')
+@push('css')
+    @include('backend.layout.partials.datatable_css')
+@endpush
+ @section('content')
 
 <x-success-message key="message" />
 <x-error-message key="not_permitted" />
@@ -10,7 +14,7 @@
         <form action="{{route('challan.create')}}" method="POST" id="challan-form">
             @csrf
             <input type="hidden" name="packing_slip_id">
-            <button id="create-challan-btn" type="submit" class="btn btn-info"><i class="fa fa-plus"></i> Create Challan</button>
+            <button id="create-challan-btn" type="submit" class="btn btn-info"><i class="ti ti-plus"></i> Create Challan</button>
         </form>
     </div>
     <div class="table-responsive">
@@ -34,6 +38,7 @@
 @endsection
 
 @push('scripts')
+    @include('backend.layout.partials.datatable_js')
 
     <script type="text/javascript">
 
@@ -42,12 +47,7 @@
         $("ul#sale #packing-list-menu").addClass("active");
 
         var packing_slip_id = [];
-        function confirmDelete() {
-            if (confirm("Are you sure want to delete?")) {
-                return true;
-            }
-            return false;
-        }
+        function confirmDelete() { return true; }
 
         function toggleCreateChallanButton() {
             // console.log('hello ', $(':checkbox:checked').length);

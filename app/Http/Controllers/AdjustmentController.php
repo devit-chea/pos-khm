@@ -17,10 +17,21 @@ use App\Models\ProductPurchase;
 use Auth;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Illuminate\Validation\ValidationException;
+use App\Services\AccountingService;
 
 class AdjustmentController extends Controller
 {
+    protected $adjustmentDomainService;
+
+    public function __construct(?\App\Services\Domain\AdjustmentDomainService $adjustmentDomainService = null)
+    {
+        $this->adjustmentDomainService = $adjustmentDomainService ?? app(\App\Services\Domain\AdjustmentDomainService::class);
+    }
+
+
     public function index()
+
     {
         $role = Role::find(Auth::user()->role_id);
         if( $role->hasPermissionTo('adjustment') ) {
@@ -64,7 +75,9 @@ class AdjustmentController extends Controller
         */
         $products = DB::table('products')
                     ->join('product_warehouse', 'products.id', '=', 'product_warehouse.product_id')
-                    ->whereNull('products.is_variant')
+                    ->where(function($query) {
+                        $query->whereNull('products.is_variant')->orWhere('products.is_variant', 0);
+                    })
                     ->where('products.is_active', 1)
                     ->where('product_warehouse.warehouse_id', $warehouseId)
                     ->groupBy('products.id', 'products.code', 'products.name', 'products.cost')
@@ -162,40 +175,91 @@ class AdjustmentController extends Controller
 
     public function limsProductSearch(Request $request)
     {
-        $product_code = explode("(", $request['data']);
-        $product_info = explode("|", $request['data']);
+        // dd($request->all());
+        $product_code = explode("|", $request['data']);
         $product_code[0] = rtrim($product_code[0], " ");
-
-        //return $product_info;
-        $lims_product_data = Product::where([
-            ['code', $product_code[0]],
-            ['is_active', true]
-        ])->first();
+        $lims_product_data = Product::where('code', $product_code[0])
+                            ->whereIn('is_active', [1, 3])
+                            ->where(function($query) {
+                                $query->whereNull('is_variant')->orWhere('is_variant', 0);
+                            })
+                            ->first();
         if(!$lims_product_data) {
+            $lims_product_data = Product::where('name', $product_code[1])
+                            ->whereIn('is_active', [1, 3])
+                            ->whereNotNull(['is_variant'])
+                            ->first();
             $lims_product_data = Product::join('product_variants', 'products.id', 'product_variants.product_id')
-                ->select('products.id', 'products.name', 'products.is_variant', 'product_variants.id as product_variant_id', 'product_variants.item_code')
-                ->where([
-                    ['product_variants.item_code', $product_code[0]],
-                    ['products.is_active', true]
-                ])->first();
+                ->where('product_variants.item_code', $product_code[0])
+                ->whereIn('products.is_active', [1, 3])
+                ->whereNotNull('is_variant')
+                ->select('products.*', 'product_variants.item_code', 'product_variants.additional_cost')
+                ->first();
+            if ($lims_product_data) {
+                $lims_product_data->cost += $lims_product_data->additional_cost;
+            }
         }
-
-        $product[] = $lims_product_data->name;
-        $product_variant_id = null;
-        if($lims_product_data->is_variant) {
-            $product[] = $lims_product_data->item_code;
-            $product_variant_id = $lims_product_data->product_variant_id;
-        }
+        $product[] = $lims_product_data->name; //0
+        if($lims_product_data->is_variant)
+            $product[] = $lims_product_data->item_code; //1
         else
-            $product[] = $lims_product_data->code;
+            $product[] = $lims_product_data->code;//1
 
-        $product[] = $lims_product_data->id;
-        $product[] = $product_variant_id;
-        $product[] = $product_info[1];
-        $quantity = explode("|", $request['data']);
-        if (count($quantity) >= 3) {
-            $product[] =  $quantity[2];
+        $product[] = $lims_product_data->cost;//2
+        $product['profit_margin'] = $lims_product_data->profit_margin;
+        $product['profit_margin_type'] = $lims_product_data->profit_margin_type;
+        $product['product_price'] = $lims_product_data->price;
+
+        $cost = (float)$lims_product_data->cost;
+        $price = (float)$lims_product_data->price;
+
+        if ($cost > 0 && $lims_product_data->profit_margin_type === 'percentage') {
+            $calculatedMargin = (($price - $cost) / $cost) * 100;
+        } else if ($cost > 0 && $lims_product_data->profit_margin_type === 'flat') {
+            $calculatedMargin = $price - $cost;
+        } else {
+            $calculatedMargin = 0; // or null, or skip updating
         }
+
+        if (round($calculatedMargin, 2) != round((float)$lims_product_data->profit_margin, 2)) {
+            $product['profit_margin'] = $calculatedMargin;
+        }
+
+        if ($lims_product_data->tax_id) {
+            $lims_tax_data = Tax::find($lims_product_data->tax_id);
+            $product[] = $lims_tax_data->rate;//3
+            $product[] = $lims_tax_data->name;//4
+        } else {
+            $product[] = 0;//3
+            $product[] = 'No Tax';//4
+        }
+        $product[] = $lims_product_data->tax_method;//5
+
+        $units = Unit::where("base_unit", $lims_product_data->unit_id)
+                    ->orWhere('id', $lims_product_data->unit_id)
+                    ->get();
+        $unit_name = array();
+        $unit_operator = array();
+        $unit_operation_value = array();
+        foreach ($units as $unit) {
+            if ($lims_product_data->purchase_unit_id == $unit->id) {
+                array_unshift($unit_name, $unit->unit_name);
+                array_unshift($unit_operator, $unit->operator);
+                array_unshift($unit_operation_value, $unit->operation_value);
+            } else {
+                $unit_name[]  = $unit->unit_name;
+                $unit_operator[] = $unit->operator;
+                $unit_operation_value[] = $unit->operation_value;
+            }
+        }
+
+        $product[] = implode(",", $unit_name) . ','; //6
+        $product[] = implode(",", $unit_operator) . ','; //7
+        $product[] = implode(",", $unit_operation_value) . ','; //8
+        $product[] = $lims_product_data->id; //9
+        $product[] = $lims_product_data->is_batch; //10
+        $product[] = $lims_product_data->is_imei; //11
+        // return dd($product);
         return $product;
     }
 
@@ -282,8 +346,13 @@ class AdjustmentController extends Controller
 
     public function productWithoutVariant()
     {
-        return Product::ActiveStandard()->select('id', 'name', 'code')
-                ->whereNull('is_variant')->get();
+        return Product::whereIn('type', ['standard', 'combo'])
+                ->where('is_active', 1)
+                ->where(function($query) {
+                    $query->whereNull('is_variant')->orWhere('is_variant', 0);
+                })
+                ->select('id', 'name', 'code')
+                ->get();
     }
 
     public function productWithVariant()
@@ -298,92 +367,45 @@ class AdjustmentController extends Controller
 
     public function store(Request $request)
     {
-        try{
-            DB::beginTransaction();
+        try {
             $data = $request->except('document');
-            //return $data;
-            if( isset($data['stock_count_id']) ){
-                $lims_stock_count_data = StockCount::find($data['stock_count_id']);
-                $lims_stock_count_data->is_adjusted = true;
-                $lims_stock_count_data->save();
-            }
-            $data['reference_no'] = 'adr-' . date("Ymd") . '-'. date("his");
             $document = $request->document;
             if ($document) {
                 $documentName = $document->getClientOriginalName();
                 $document->move(public_path('documents/adjustment'), $documentName);
                 $data['document'] = $documentName;
             }
-            $lims_adjustment_data = Adjustment::create($data);
 
-            $product_id = $data['product_id'];
-            $product_code = $data['product_code'];
-            $qty = $data['qty'];
-            if(isset($data['unit_cost']))
-                $unit_cost = $data['unit_cost'];
-            $action = $data['action'];
+            $this->adjustmentDomainService->createAdjustment($data, Auth::user());
 
-            foreach ($product_id as $key => $pro_id) {
-                $lims_product_data = Product::find($pro_id);
-                if($lims_product_data->is_variant) {
-                    $lims_product_variant_data = ProductVariant::select('id', 'variant_id', 'qty')->FindExactProductWithCode($pro_id, $product_code[$key])->first();
-                    $lims_product_warehouse_data = Product_Warehouse::where([
-                        ['product_id', $pro_id],
-                        ['variant_id', $lims_product_variant_data->variant_id ],
-                        ['warehouse_id', $data['warehouse_id'] ],
-                    ])->first();
-
-                    if($action[$key] == '-'){
-                        $lims_product_variant_data->qty -= $qty[$key];
-                    }
-                    elseif($action[$key] == '+'){
-                        $lims_product_variant_data->qty += $qty[$key];
-                    }
-                    $lims_product_variant_data->save();
-                    $variant_id = $lims_product_variant_data->variant_id;
-                }
-                else {
-                    $lims_product_warehouse_data = Product_Warehouse::where([
-                        ['product_id', $pro_id],
-                        ['warehouse_id', $data['warehouse_id'] ],
-                        ])->first();
-                    $variant_id = null;
-                }
-
-                if($action[$key] == '-') {
-                    $lims_product_data->qty -= $qty[$key];
-                    $lims_product_warehouse_data->qty -= $qty[$key];
-                }
-                elseif($action[$key] == '+') {
-                    $lims_product_data->qty += $qty[$key];
-                    $lims_product_warehouse_data->qty += $qty[$key];
-                }
-                $lims_product_data->save();
-                $lims_product_warehouse_data->save();
-
-                $product_adjustment['product_id'] = $pro_id;
-                $product_adjustment['variant_id'] = $variant_id;
-                $product_adjustment['adjustment_id'] = $lims_adjustment_data->id;
-                $product_adjustment['qty'] = $qty[$key];
-                if(isset($data['unit_cost']))
-                    $product_adjustment['unit_cost'] = $unit_cost[$key];
-                $product_adjustment['action'] = $action[$key];
-                ProductAdjustment::create($product_adjustment);
-            }
-            DB::commit();
             return redirect('qty_adjustment')->with('message', __('db.Data inserted successfully'));
-        }catch(\Throwable $e){
-            DB::rollBack();
-             return redirect('qty_adjustment')->with('not_permitted', __('db.Someting Error Please try again'));
+        } catch (ValidationException $e) {
+            return redirect('qty_adjustment/create')
+                ->withInput()
+                ->with('not_permitted', $e->validator->errors()->first());
+        } catch (\Throwable $e) {
+            \Log::error('Adjustment creation failed', ['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
+            return redirect('qty_adjustment')
+                ->with('not_permitted', __('db.We could not complete this action. Please try again.'));
         }
     }
 
+
     public function edit($id)
     {
-        $lims_adjustment_data = Adjustment::find($id);
+        $lims_adjustment_data = Adjustment::findOrFail($id);
+        if ($this->hasComboSource($lims_adjustment_data)) {
+            return redirect('qty_adjustment')->with(
+                'not_permitted',
+                'Combo adjustments cannot be edited safely. Delete and recreate the adjustment instead.'
+            );
+        }
         $lims_product_adjustment_data = ProductAdjustment::where('adjustment_id', $id)->get();
         $lims_warehouse_list = Warehouse::where('is_active', true)->get();
-        return view('backend.adjustment.edit', compact('lims_adjustment_data', 'lims_warehouse_list', 'lims_product_adjustment_data'));
+        
+        $lims_product_list_without_variant = $this->productWithoutVariant();
+        $lims_product_list_with_variant = $this->productWithVariant();
+        return view('backend.adjustment.edit',  compact('lims_adjustment_data', 'lims_warehouse_list', 'lims_product_adjustment_data','lims_product_list_without_variant', 'lims_product_list_with_variant'));
     }
 
     public function update(Request $request, $id)
@@ -391,7 +413,16 @@ class AdjustmentController extends Controller
         try{
             DB::beginTransaction();
             $data = $request->except('document');
-                $lims_adjustment_data = Adjustment::find($id);
+                $lims_adjustment_data = Adjustment::findOrFail($id);
+                $accountingReversal = app(AccountingService::class)->reverseTransaction(Adjustment::class, (int) $lims_adjustment_data->id, '_updated_reversed');
+                if (!$accountingReversal->isSuccess()) {
+                    throw new \RuntimeException($accountingReversal->getMessage() ?: 'Adjustment accounting reversal failed.');
+                }
+                if ($this->hasComboSource($lims_adjustment_data)) {
+                    throw ValidationException::withMessages([
+                        'adjustment' => 'Combo adjustments cannot be edited safely. Delete and recreate the adjustment instead.',
+                    ]);
+                }
 
                 $document = $request->document;
                 if ($document) {
@@ -424,10 +455,10 @@ class AdjustmentController extends Controller
                         ])->first();
                         $old_product_variant_id[$key] = $lims_product_variant_data->id;
                         if($product_adjustment_data->action == '-') {
-                            $lims_product_variant_data->qty -= $product_adjustment_data->qty;
+                            $lims_product_variant_data->qty += $product_adjustment_data->qty;
                         }
                         elseif($product_adjustment_data->action == '+') {
-                            $lims_product_variant_data->qty += $product_adjustment_data->qty;
+                            $lims_product_variant_data->qty -= $product_adjustment_data->qty;
                         }
                         $lims_product_variant_data->save();
                         $lims_product_warehouse_data = Product_Warehouse::where([
@@ -442,17 +473,18 @@ class AdjustmentController extends Controller
                                 ['warehouse_id', $lims_adjustment_data->warehouse_id]
                             ])->first();
                     }
-                    // if($product_adjustment_data->action == '-'){
-                    //     $lims_product_data->qty -= $qty[$key];
-                    //     $lims_product_warehouse_data->qty -= $qty[$key];
-                    // }
-                    // elseif($product_adjustment_data->action == '+'){
-                    //     $lims_product_data->qty += $qty[$key];
-                    //     $lims_product_warehouse_data->qty += $qty[$key];
-                    // }
+                    
+                    if($product_adjustment_data->action == '-'){
+                        $lims_product_data->qty += $product_adjustment_data->qty;
+                        if ($lims_product_warehouse_data) $lims_product_warehouse_data->qty += $product_adjustment_data->qty;
+                    }
+                    elseif($product_adjustment_data->action == '+'){
+                        $lims_product_data->qty -= $product_adjustment_data->qty;
+                        if ($lims_product_warehouse_data) $lims_product_warehouse_data->qty -= $product_adjustment_data->qty;
+                    }
 
-                    // $lims_product_data->save();
-                    // $lims_product_warehouse_data->save();
+                    $lims_product_data->save();
+                    if ($lims_product_warehouse_data) $lims_product_warehouse_data->save();
 
                     if($product_adjustment_data->variant_id && !(in_array($old_product_variant_id[$key], $product_variant_id)) ){
                         $product_adjustment_data->delete();
@@ -491,12 +523,15 @@ class AdjustmentController extends Controller
 
 
                     if($action[$key] == '-'){
-                        $lims_product_warehouse_data->qty -= $qty[$key];
+                        if ($lims_product_warehouse_data) $lims_product_warehouse_data->qty -= $qty[$key];
+                        $lims_product_data->qty -= $qty[$key];
                     }
                     elseif($action[$key] == '+'){
-                        $lims_product_warehouse_data->qty += $qty[$key];
+                        if ($lims_product_warehouse_data) $lims_product_warehouse_data->qty += $qty[$key];
+                        $lims_product_data->qty += $qty[$key];
                     }
-                    $lims_product_warehouse_data->save();
+                    if ($lims_product_warehouse_data) $lims_product_warehouse_data->save();
+                    $lims_product_data->save();
 
                     $product_adjustment['product_id'] = $pro_id;
                     $product_adjustment['variant_id'] = $variant_id;
@@ -538,106 +573,62 @@ class AdjustmentController extends Controller
                     }
                 }
                 $lims_adjustment_data->update($data);
+                $accountingPost = app(AccountingService::class)->recordInventoryAdjustment($lims_adjustment_data->fresh(), 'inventory_adjustment_updated');
+                if (!$accountingPost->isSuccess()) {
+                    throw new \RuntimeException($accountingPost->getMessage() ?: 'Adjustment accounting repost failed.');
+                }
              DB::commit();
              return redirect('qty_adjustment')->with('message', __('db.Data updated successfully'));
-        }catch(\Throwable $e){
+        } catch (ValidationException $e) {
             DB::rollBack();
-            dd($e);
-            return redirect('qty_adjustment')->with('not_permitted', __('db.Someting Error
-            Please try again'));
+            return redirect('qty_adjustment')->with('not_permitted', $e->validator->errors()->first());
+        } catch(\Throwable $e){
+            DB::rollBack();
+            \Log::error('Adjustment update failed', ['error' => $e->getMessage()]);
+            return redirect('qty_adjustment')->with('not_permitted', __('db.someting_error
+_please_try'));
         }
     }
 
     public function deleteBySelection(Request $request)
     {
-        $adjustment_id = $request['adjustmentIdArray'];
-        foreach ($adjustment_id as $id) {
-            $lims_adjustment_data = Adjustment::find($id);
-            $this->fileDelete(public_path('documents/adjustment/'), $lims_adjustment_data->document);
-
-            $lims_product_adjustment_data = ProductAdjustment::where('adjustment_id', $id)->get();
-            foreach ($lims_product_adjustment_data as $key => $product_adjustment_data) {
-                $lims_product_data = Product::find($product_adjustment_data->product_id);
-                if($product_adjustment_data->variant_id) {
-                    $lims_product_variant_data = ProductVariant::select('id', 'qty')->FindExactProduct($product_adjustment_data->product_id, $product_adjustment_data->variant_id)->first();
-                    $lims_product_warehouse_data = Product_Warehouse::where([
-                            ['product_id', $product_adjustment_data->product_id],
-                            ['variant_id', $product_adjustment_data->variant_id],
-                            ['warehouse_id', $lims_adjustment_data->warehouse_id]
-                        ])->first();
-                    if($product_adjustment_data->action == '-'){
-                        $lims_product_variant_data->qty += $product_adjustment_data->qty;
-                    }
-                    elseif($product_adjustment_data->action == '+'){
-                        $lims_product_variant_data->qty -= $product_adjustment_data->qty;
-                    }
-                    $lims_product_variant_data->save();
+        try {
+            $files_to_delete = [];
+            DB::transaction(function () use ($request, &$files_to_delete) {
+                foreach ((array) $request->input('adjustmentIdArray', []) as $id) {
+                    $files_to_delete[] = $this->adjustmentDomainService->reverseAndDelete((int) $id);
                 }
-                else {
-                    $lims_product_warehouse_data = Product_Warehouse::where([
-                            ['product_id', $product_adjustment_data->product_id],
-                            ['warehouse_id', $lims_adjustment_data->warehouse_id]
-                        ])->first();
-                }
-                if($product_adjustment_data->action == '-'){
-                    $lims_product_data->qty += $product_adjustment_data->qty;
-                    $lims_product_warehouse_data->qty += $product_adjustment_data->qty;
-                }
-                elseif($product_adjustment_data->action == '+'){
-                    $lims_product_data->qty -= $product_adjustment_data->qty;
-                    $lims_product_warehouse_data->qty -= $product_adjustment_data->qty;
-                }
-                $lims_product_data->save();
-                $lims_product_warehouse_data->save();
-                $product_adjustment_data->delete();
+            });
+            
+            foreach ($files_to_delete as $file) {
+                $this->fileDelete(public_path('documents/adjustment/'), $file);
             }
-            $lims_adjustment_data->delete();
+            return 'Data deleted successfully';
+        } catch (\Exception $e) {
+            \Log::error('Adjustment bulk deletion failed: ' . $e->getMessage());
+            return __('db.We could not complete this action. Please try again.');
         }
-        return 'Data deleted successfully';
     }
 
     public function destroy($id)
     {
-        $lims_adjustment_data = Adjustment::find($id);
-        $lims_product_adjustment_data = ProductAdjustment::where('adjustment_id', $id)->get();
-        foreach ($lims_product_adjustment_data as $key => $product_adjustment_data) {
-            $lims_product_data = Product::find($product_adjustment_data->product_id);
-            if($product_adjustment_data->variant_id) {
-                $lims_product_variant_data = ProductVariant::select('id', 'qty')->FindExactProduct($product_adjustment_data->product_id, $product_adjustment_data->variant_id)->first();
-                $lims_product_warehouse_data = Product_Warehouse::where([
-                        ['product_id', $product_adjustment_data->product_id],
-                        ['variant_id', $product_adjustment_data->variant_id],
-                        ['warehouse_id', $lims_adjustment_data->warehouse_id]
-                    ])->first();
-                if($product_adjustment_data->action == '-'){
-                    $lims_product_variant_data->qty += $product_adjustment_data->qty;
-                }
-                elseif($product_adjustment_data->action == '+'){
-                    $lims_product_variant_data->qty -= $product_adjustment_data->qty;
-                }
-                $lims_product_variant_data->save();
-            }
-            else {
-                $lims_product_warehouse_data = Product_Warehouse::where([
-                        ['product_id', $product_adjustment_data->product_id],
-                        ['warehouse_id', $lims_adjustment_data->warehouse_id]
-                    ])->first();
-            }
-            if($product_adjustment_data->action == '-'){
-                $lims_product_data->qty += $product_adjustment_data->qty;
-                $lims_product_warehouse_data->qty += $product_adjustment_data->qty;
-            }
-            elseif($product_adjustment_data->action == '+'){
-                $lims_product_data->qty -= $product_adjustment_data->qty;
-                $lims_product_warehouse_data->qty -= $product_adjustment_data->qty;
-            }
-            $lims_product_data->save();
-            $lims_product_warehouse_data->save();
-            $product_adjustment_data->delete();
-        }
-        $lims_adjustment_data->delete();
-        $this->fileDelete(public_path('documents/adjustment/'), $lims_adjustment_data->document);
+        try {
+            $document = $this->adjustmentDomainService->reverseAndDelete((int) $id);
+            $this->fileDelete(public_path('documents/adjustment/'), $document);
 
-        return redirect('qty_adjustment')->with('not_permitted', __('db.Data deleted successfully'));
+            return redirect('qty_adjustment')->with('not_permitted', __('db.Data deleted successfully'));
+        } catch (ValidationException $e) {
+            return redirect()->back()->with('not_permitted', $e->validator->errors()->first());
+        } catch (\Exception $e) {
+            \Log::error('Adjustment deletion failed: ' . $e->getMessage());
+            return redirect()->back()->with('not_permitted', __('db.We could not complete this action. Please try again.'));
+        }
+    }
+
+    private function hasComboSource(Adjustment $adjustment): bool
+    {
+        return collect($adjustment->composition_snapshot ?? [])->contains(
+            fn ($source) => ($source['type'] ?? null) === 'combo'
+        );
     }
 }

@@ -10,6 +10,15 @@
     #product-results-container .product-img{border-radius: 3px; color: #7c5cc4;font-size:13px;padding-top:7px;padding-bottom:7px;text-align:left}
     #product-results-container .product-img:hover{background-color: #7c5cc4;color: #FFF}
 
+    .sale-section {
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+        padding: 20px 20px 10px 20px;
+        margin-bottom: 20px;
+        background: #fff;
+    }
+
 </style>
 @endpush
 
@@ -17,6 +26,20 @@
 <x-error-message key="error" />
 
 <?php $authUser = Auth::user()->role_id; ?>
+
+@php
+    $restaurantModuleEnabled = (bool) ($restaurantModuleEnabled ?? false);
+    $firstWarehouse = collect($lims_warehouse_list)->first();
+    $selectedWarehouseId = $selectedWarehouseId
+        ?? auth()->user()->warehouse_id
+        ?? ($lims_pos_setting_data->warehouse_id ?? ($firstWarehouse->id ?? null));
+    $selectedWarehouse = collect($lims_warehouse_list)->first(function ($warehouse) use ($selectedWarehouseId) {
+        return (string) $warehouse->id === (string) $selectedWarehouseId;
+    });
+    $isRestaurantWarehouse = (bool) ($isRestaurantWarehouse ?? false);
+    $selectedServiceId = isset($service_id) && $service_id ? (string) $service_id : '1';
+    $isDineIn = $isRestaurantWarehouse && $selectedServiceId === '1';
+@endphp
 
 <section id="pos-layout" class="forms hidden-print">
     <div class="container-fluid">
@@ -26,6 +49,7 @@
                 <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
                 <form action="{{ route('sales.store') }}" method="post" enctype="multipart/form-data" class="payment-form">
                 @csrf
+                @include('backend.sale.partials.zatca_preview')
                     <div class="card">
                         <div class="card-body">                            
                             <div class="row">
@@ -33,9 +57,9 @@
                                     <div class="form-group">
                                         <label>{{__('db.date')}}</label>
                                         @can('change_sale_date')
-                                            <input type="text" name="created_at" class="form-control date" placeholder="{{ __('db.Choose date') }}" value="{{date($general_setting->date_format,strtotime('now'))}}" />
+                                            <input type="text" name="created_at" class="form-control date" placeholder="{{ __('db.Choose date') }}" value="{{date(gen_setting()->date_format,strtotime('now'))}}" />
                                         @else
-                                            <input type="text" name="created_at" class="form-control date" placeholder="{{ __('db.Choose date') }}" value="{{date($general_setting->date_format,strtotime('now'))}}" readonly/>
+                                            <input type="text" name="created_at" class="form-control date" placeholder="{{ __('db.Choose date') }}" value="{{date(gen_setting()->date_format,strtotime('now'))}}" readonly/>
                                         @endcan
                                     </div>
                                 </div>
@@ -72,23 +96,51 @@
                                             <select required name="customer_id" id="customer_id" class="selectpicker form-control" data-live-search="true" title="Select customer..." style="width: 100px">
                                             @foreach($lims_customer_list as $customer)
                                                 @php
-                                                $deposit[$customer->id] = $customer->deposit - $customer->expense;
-
+                                                $deposit[$customer->id] = max(0, (float) $customer->deposit - (float) $customer->expense);
                                                 $points[$customer->id] = $customer->points;
+                                                $creditPolicy = 'unlimited';
+                                                $creditLimitVal = '';
+                                                if ($customer->type === 'walkin') {
+                                                    $creditPolicy = 'disabled';
+                                                    $creditLimitVal = '0';
+                                                } elseif ($customer->credit_limit !== null && $customer->credit_limit !== '') {
+                                                    $limitFloat = (float)$customer->credit_limit;
+                                                    if ($limitFloat == 0) {
+                                                        $creditPolicy = 'disabled';
+                                                        $creditLimitVal = '0';
+                                                    } elseif ($limitFloat > 0) {
+                                                        $creditPolicy = 'limited';
+                                                        $creditLimitVal = $customer->credit_limit;
+                                                    }
+                                                }
                                                 @endphp
-                                                <option value="{{$customer->id}}" data-type="{{$customer->type}}"  data-pay_term_no="{{ $customer->pay_term_no }}" data-pay_term_period="{{ $customer->pay_term_period }}"  @if($customer->id == $customer_id) selected @endif>{{$customer->name}} @if($customer->wa_number)({{$customer->wa_number}})@endif</option>
+                                                <option value="{{$customer->id}}" data-type="{{$customer->type}}" data-credit-policy="{{ $creditPolicy }}" data-credit-limit="{{ $creditLimitVal }}" data-pay_term_no="{{ $customer->pay_term_no }}" data-pay_term_period="{{ $customer->pay_term_period }}"  @if($customer->id == $customer_id) selected @endif>{{$customer->name}} @if($customer->wa_number)({{$customer->wa_number}})@endif</option>
                                             @endforeach
                                             </select>
-                                            <button type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#addCustomer"><i class="dripicons-plus"></i></button>
+                                            <button type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#addCustomer"><i class="ti ti-plus"></i></button>
                                             @else
                                             <select required name="customer_id" id="customer_id" class="selectpicker form-control" data-live-search="true" title="Select customer...">
                                             @foreach($lims_customer_list as $customer)
                                                 @php
-                                                $deposit[$customer->id] = $customer->deposit - $customer->expense;
-
+                                                $deposit[$customer->id] = max(0, (float) $customer->deposit - (float) $customer->expense);
                                                 $points[$customer->id] = $customer->points;
+                                                $creditPolicy = 'unlimited';
+                                                $creditLimitVal = '';
+                                                if ($customer->type === 'walkin') {
+                                                    $creditPolicy = 'disabled';
+                                                    $creditLimitVal = '0';
+                                                } elseif ($customer->credit_limit !== null && $customer->credit_limit !== '') {
+                                                    $limitFloat = (float)$customer->credit_limit;
+                                                    if ($limitFloat == 0) {
+                                                        $creditPolicy = 'disabled';
+                                                        $creditLimitVal = '0';
+                                                    } elseif ($limitFloat > 0) {
+                                                        $creditPolicy = 'limited';
+                                                        $creditLimitVal = $customer->credit_limit;
+                                                    }
+                                                }
                                                 @endphp
-                                                <option value="{{$customer->id}}" data-type="{{$customer->type}}" data-pay_term_no="{{ $customer->pay_term_no }}" data-pay_term_period="{{ $customer->pay_term_period }}"  @if($customer->id == $customer_id) selected @endif>{{$customer->name . ' (' . $customer->phone_number . ')'}}</option>
+                                                <option value="{{$customer->id}}" data-type="{{$customer->type}}" data-credit-policy="{{ $creditPolicy }}" data-credit-limit="{{ $creditLimitVal }}" data-pay_term_no="{{ $customer->pay_term_no }}" data-pay_term_period="{{ $customer->pay_term_period }}"  @if($customer->id == $customer_id) selected @endif>{{$customer->name . ' (' . $customer->phone_number . ')'}}</option>
                                             @endforeach
                                             </select>
                                             @endif
@@ -97,28 +149,38 @@
                                     </div>
                                 </div>
                                 @if(isset(auth()->user()->warehouse_id))
-                                <input type="hidden" name="warehouse_id" id="warehouse_id" value="{{auth()->user()->warehouse_id}}" />
+                                <input type="hidden" name="warehouse_id" id="warehouse_id"
+                                    value="{{auth()->user()->warehouse_id}}"
+                                    data-pos-type="{{ $selectedWarehouse->pos_type ?? 'regular' }}" />
                                 @else
                                 <div class="col-md-4">
                                     <div class="form-group">
                                         <label>{{__('db.Warehouse')}} *</label>
-                                        @php
-                                        if($lims_pos_setting_data) {
-                                            $warehouse_id = $lims_pos_setting_data->warehouse_id;
-                                        }
-                                        else{
-                                            $warehouse_id = $lims_warehouse_list[0]->id;
-                                        }
-                                        @endphp
                                         <select required name="warehouse_id" id="warehouse_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" title="Select warehouse...">
                                             @foreach($lims_warehouse_list as $warehouse)
-                                            <option value="{{$warehouse->id}}" @if($warehouse->id == $warehouse_id) selected @endif>{{$warehouse->name}}</option>
+                                            <option value="{{$warehouse->id}}"
+                                                data-pos-type="{{ $warehouse->pos_type ?? 'regular' }}"
+                                                @if((string) $warehouse->id === (string) $selectedWarehouseId) selected @endif>{{$warehouse->name}}</option>
                                             @endforeach
                                         </select>
                                     </div>
                                 </div>
                                 @endif
                                 <x-validation-error fieldName="warehouse_id" />
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label>{{ __('db.Sales Agent') }}</label>
+                                        <select name="sales_agent_id" id="sales_agent_id" class="selectpicker form-control" data-live-search="true" title="Select staff...">
+                                            <option value="">Unassigned</option>
+                                            @foreach($sales_agent_list as $agent)
+                                                <option value="{{ $agent->id }}" data-warehouse-id="{{ $agent->warehouse_id }}" @selected((string) old('sales_agent_id') === (string) $agent->id)>
+                                                    {{ $agent->name }}@if($agent->staff_id) ({{ $agent->staff_id }})@endif
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        <small class="text-muted">Staff can be assigned without a SalePro login account.</small>
+                                    </div>
+                                </div>
                                 @if(isset(auth()->user()->biller_id))
                                 <input type="hidden" name="biller_id" id="biller_id" value="{{auth()->user()->biller_id}}" />
                                 @else
@@ -162,36 +224,28 @@
                                         </div>
                                     </div>
                                 </div>
-                                @if(in_array('restaurant',explode(',',$general_setting->modules)))
-                                <div class="col-md-3 col-6">
+                                @if($restaurantModuleEnabled)
+                                <div class="col-md-3 col-6 restaurant-sale-field" @if(!$isRestaurantWarehouse) style="display:none;" @endif>
                                     <div class="form-group top-fields">
                                         <label>{{__('db.Service')}}</label>
-                                        @if(!empty($service_id))
                                         <div class="input-group pos">
-                                            <select required id="service_id" name="service_id" class="selectpicker form-control" title="Select service...">
-                                                <option value="1" @if($service_id == 1) selected @endif>{{__('db.Dine In')}}</option>
-                                                <option value="2" @if($service_id == 2) selected @endif>{{__('db.Take Away')}}</option>
-                                                <option value="3" @if($service_id == 3) selected @endif>{{__('db.Delivery')}}</option>
+                                            <select id="service_id" name="service_id" class="selectpicker form-control" title="Select service..."
+                                                @if($isRestaurantWarehouse) required @else disabled @endif>
+                                                @foreach($service_list as $service)
+                                                <option value="{{$service->id}}" @if((string) $service->id === $selectedServiceId) selected @endif>{{$service->name}}</option>
+                                                @endforeach
                                             </select>
                                         </div>
-                                        @else
-                                        <div class="input-group pos">
-                                            <select required id="service_id" name="service_id" class="selectpicker form-control" title="Select service...">
-                                                <option value="1" selected>{{__('db.Dine In')}}</option>
-                                                <option value="2">{{__('db.Take Away')}}</option>
-                                                <option value="3">{{__('db.Delivery')}}</option>
-                                            </select>
-                                        </div>
-                                        @endif
                                     </div>
                                 </div>
-                                <div class="col-md-3 col-6">
+                                <div class="col-md-3 col-6 restaurant-sale-field" @if(!$isRestaurantWarehouse) style="display:none;" @endif>
                                     <div class="form-group top-fields">
                                         <label>{{__('db.table')}}</label>
                                         <div class="input-group pos">
-                                            <select required id="table_id" name="table_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" title="Select table...">
+                                            <select id="table_id" name="table_id" class="selectpicker form-control" data-live-search="true" data-live-search-style="begins" title="Select table..."
+                                                @if($isDineIn) required @else disabled @endif>
                                                 @foreach($lims_table_list as $table)
-                                                <option value="{{$table->id}}" @if(!empty($table_id) && $table->id == $table_id) selected @endif>
+                                                <option value="{{$table->id}}" data-warehouse-id="{{$table->warehouse_id}}" @if(!empty($table_id) && $table->id == $table_id) selected @endif>
                                                     {{$table->name}} at {{$table->floor}} ( ðŸ‘¤ {{$table->number_of_person}})
                                                 </option>
                                                 @endforeach
@@ -200,11 +254,12 @@
                                     </div>
                                 </div>
 
-                                <div class="col-md-3 col-6">
+                                <div class="col-md-3 col-6 restaurant-sale-field" @if(!$isRestaurantWarehouse) style="display:none;" @endif>
                                     <div class="form-group top-fields">
                                         <label>{{__('db.Waiter')}}</label>
                                         <div class="input-group pos">
-                                            <select required id="waiter_id" name="waiter_id" class="selectpicker form-control" title="Select waiter...">
+                                            <select id="waiter_id" name="waiter_id" class="selectpicker form-control" title="Select waiter..."
+                                                @if($isDineIn) required @else disabled @endif>
                                                 @if(auth()->user()->service_staff == 1)
                                                 <option value="{{auth()->user()->id}}" selected >{{auth()->user()->name}}</option>
                                                 @else
@@ -261,9 +316,9 @@
                                                 <th>{{__('db.Total')}}</th>
                                                 <th id="total-qty" class="text-center">0</th>
                                                 <th></th>
-                                                <th id="total-discount">{{number_format(0, $general_setting->decimal, '.', '')}}</th>
-                                                <th id="total-tax">{{number_format(0, $general_setting->decimal, '.', '')}}</th>
-                                                <th id="total">{{number_format(0, $general_setting->decimal, '.', '')}}</th>
+                                                <th id="total-discount">{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
+                                                <th id="total-tax">{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
+                                                <th id="total">{{number_format(0, gen_setting()->decimal, '.', '')}}</th>
                                                 <th></th>
                                             </tfoot>
                                         </table>
@@ -301,7 +356,7 @@
                                 <div class="col-md-2">
                                     <div class="form-group">
                                         <input type="hidden" name="grand_total" />
-                                        <input type="hidden" name="used_points" />
+                                        <input type="hidden" name="redeem_point" />
                                         <input type="hidden" name="coupon_active" value="0" />
                                     </div>
                                 </div>
@@ -326,8 +381,8 @@
                                     <div class="form-group">
                                         <label>{{__('db.Order Discount Type')}}</label>
                                         <select id="order-discount-type" name="order_discount_type" class="form-control">
-                                        <option value="Flat">{{__('db.Flat')}}</option>
-                                        <option value="Percentage">{{__('db.Percentage')}}</option>
+                                            <option value="Flat">{{__('db.Flat')}}</option>
+                                            <option value="Percentage">{{__('db.Percentage')}}</option>
                                         </select>
                                     </div>
                                 </div>
@@ -353,7 +408,7 @@
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label>{{__('db.Attach Document')}}</label> <i class="dripicons-question" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
+                                        <label>{{__('db.Attach Document')}}</label> <i class="ti ti-info-circle" data-toggle="tooltip" title="Only jpg, jpeg, png, gif, pdf, csv, docx, xlsx and txt file is supported"></i>
                                         <input type="file" name="document" class="form-control" />
                                         <x-validation-error fieldName="document" />
                                         <x-validation-error fieldName="extension" />
@@ -375,37 +430,37 @@
                                                     <?php $option_values = explode(",", $field->option_value); ?>
                                                     @foreach($option_values as $value)
                                                         <label>
-                                                            <input type="checkbox" name="{{str_replace(' ', '_', strtolower($field->name))}}[]" value="{{$value}}" @if($value == $field->default_value){{'checked'}}@endif @if($field->is_required){{'required'}}@endif> {{$value}}
-                                                        </label>
-                                                        &nbsp;
+                                                        <input type="checkbox" name="{{str_replace(' ', '_', strtolower($field->name))}}[]" value="{{$value}}" @if($value == $field->default_value){{'checked'}}@endif @if($field->is_required){{'required'}}@endif> {{$value}}
+                                                            </label>
+                                                            &nbsp;
                                                     @endforeach
                                                 @elseif($field->type == 'radio_button')
-                                                    <br>
-                                                    <?php $option_values = explode(",", $field->option_value); ?>
+                                                        <br>
+                                                        <?php $option_values = explode(",", $field->option_value); ?>
                                                     @foreach($option_values as $value)
                                                         <label class="radio-inline">
                                                             <input type="radio" name="{{str_replace(' ', '_', strtolower($field->name))}}" value="{{$value}}" @if($value == $field->default_value){{'checked'}}@endif @if($field->is_required){{'required'}}@endif> {{$value}}
                                                         </label>
                                                         &nbsp;
                                                     @endforeach
-                                                @elseif($field->type == 'select')
-                                                    <?php $option_values = explode(",", $field->option_value); ?>
-                                                    <select class="form-control" name="{{str_replace(' ', '_', strtolower($field->name))}}" @if($field->is_required){{'required'}}@endif>
-                                                        @foreach($option_values as $value)
-                                                            <option value="{{$value}}" @if($value == $field->default_value){{'selected'}}@endif>{{$value}}</option>
-                                                        @endforeach
-                                                    </select>
-                                                @elseif($field->type == 'multi_select')
-                                                    <?php $option_values = explode(",", $field->option_value); ?>
-                                                    <select class="form-control" name="{{str_replace(' ', '_', strtolower($field->name))}}[]" @if($field->is_required){{'required'}}@endif multiple>
-                                                        @foreach($option_values as $value)
-                                                            <option value="{{$value}}" @if($value == $field->default_value){{'selected'}}@endif>{{$value}}</option>
-                                                        @endforeach
-                                                    </select>
-                                                @elseif($field->type == 'date_picker')
-                                                    <input type="text" name="{{str_replace(' ', '_', strtolower($field->name))}}" value="{{$field->default_value}}" class="form-control date" @if($field->is_required){{'required'}}@endif>
-                                                @endif
-                                            </div>
+                                                    @elseif($field->type == 'select')
+                                                        <?php $option_values = explode(",", $field->option_value); ?>
+                                                        <select class="form-control" name="{{str_replace(' ', '_', strtolower($field->name))}}" @if($field->is_required){{'required'}}@endif>
+                                                            @foreach($option_values as $value)
+                                                                <option value="{{$value}}" @if($value == $field->default_value){{'selected'}}@endif>{{$value}}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    @elseif($field->type == 'multi_select')
+                                                        <?php $option_values = explode(",", $field->option_value); ?>
+                                                        <select class="form-control" name="{{str_replace(' ', '_', strtolower($field->name))}}[]" @if($field->is_required){{'required'}}@endif multiple>
+                                                            @foreach($option_values as $value)
+                                                                <option value="{{$value}}" @if($value == $field->default_value){{'selected'}}@endif>{{$value}}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    @elseif($field->type == 'date_picker')
+                                                        <input type="text" name="{{str_replace(' ', '_', strtolower($field->name))}}" value="{{$field->default_value}}" class="form-control date" @if($field->is_required){{'required'}}@endif>
+                                                    @endif
+                                                </div>
                                         </div>
                                     @endif
                                 @endforeach
@@ -413,23 +468,24 @@
                                     <div class="form-group">
                                         <label>{{__('db.Sale Status')}} *</label>
                                         <select name="sale_status" class="form-control">
-                                            <option value="1">{{__('db.Completed')}}</option>
+                                            <option value="1" @if(!$isRestaurantWarehouse) selected @endif>{{__('db.Completed')}}</option>
                                             <option value="2">{{__('db.Pending')}}</option>
-                                            @if(in_array('restaurant',explode(',',$general_setting->modules)))
-                                            <option value="5" selected>{{__('db.Processing')}}</option>
+                                            @if($restaurantModuleEnabled)
+                                            <option value="5" class="restaurant-sale-status-option"
+                                                @if($isRestaurantWarehouse) selected @else disabled hidden @endif>{{__('db.Processing')}}</option>
                                             @endif
                                         </select>
                                         <x-validation-error fieldName="sale_status" />
                                     </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label>{{__('db.Payment Status')}} *</label>
-                                        <select name="payment_status" id="payment_status" class="form-control">
-                                            <option value="1">{{__('db.Pending')}}</option>
-                                            <option value="2">{{__('db.Due')}}</option>
-                                            <option value="3">{{__('db.Partial')}}</option>
-                                            <option value="4">{{__('db.Paid')}}</option>
+                                        <div class="form-group">
+                                            <label>{{__('db.Payment Status')}} *</label>
+                                            <select name="payment_status" id="payment_status" class="form-control">
+                                                <option value="1">{{__('db.Pending')}}</option>
+                                                <option value="2">{{__('db.Due')}}</option>
+                                                <option value="3">{{__('db.Partial')}}</option>
+                                                <option value="4">{{__('db.Paid')}}</option>
                                         </select>
                                         <x-validation-error fieldName="payment_status" />
                                     </div>
@@ -444,6 +500,7 @@
                                             <label>{{__('db.Account')}}</label>
                                             <select required name="account_id" id="account_id" class="selectpicker form-control" data-live-search="true">
                                                 <option value="0" style="color: #A7B49E;">Select an Account</option>
+                                                @if(isset($lims_account_list))
                                                 @foreach($lims_account_list as $account)
                                                     <option value="{{ $account->id }}"
                                                         @if(auth()->user()->account_id == $account->id)
@@ -455,6 +512,7 @@
                                                         {{ $account->name }}
                                                     </option>
                                                 @endforeach
+                                                @endif
                                             </select>
                                         </div>
                                     </div>
@@ -482,7 +540,7 @@
                                             <option value="4">{{ __('db.Cheque') }}</option>
                                             @endif
                                             @if(in_array("paypal",$options) && (strlen($lims_pos_setting_data->paypal_live_api_username)>0) && (strlen($lims_pos_setting_data->paypal_live_api_password)>0) && (strlen($lims_pos_setting_data->paypal_live_api_secret)>0))
-                                            <option value="5">{{ __('db.Paypal') }}</option>
+                                            <option value="5">{{ __('db.paypal') }}</option>
                                             @endif
                                             @if(in_array("deposit",$options))
                                             <option value="6">{{ __('db.Deposit') }}</option>
@@ -494,7 +552,7 @@
                                             <option value="8">{{ __('db.Pesapal') }}</option>
                                             @endif
                                             @foreach($options as $option)
-                                                @if($option !== 'cash' && $option !== 'card' && $option !== 'card' && $option !== 'cheque' && $option !== 'gift_card' && $option !== 'deposit' && $option !== 'paypal' && $option !== 'pesapal')
+                                                @if(!in_array($option, ['cash', 'card', 'cheque', 'gift_card', 'deposit', 'paypal', 'pesapal', 'points', 'credit']))
                                                     <option value="{{$option}}">{{ucfirst($option)}}</option>
                                                 @endif
                                             @endforeach
@@ -526,7 +584,7 @@
                                 <div class="col-md-4">
                                     <div class="form-group">
                                         <label>{{__('db.Change')}}</label>
-                                        <p id="change" class="ml-2">{{number_format(0, $general_setting->decimal, '.', '')}}</p>
+                                        <p id="change" class="ml-2">{{number_format(0, gen_setting()->decimal, '.', '')}}</p>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
@@ -606,7 +664,8 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <input type="hidden" name="draft" value="0" />
-                                        <button id="submit-button" type="button" class="btn btn-primary">{{__('db.submit')}}</button>
+                                        @include('backend.sale.credit_limit_checker')
+                                        <button id="submit-button" type="button" class="btn btn-primary sale-submit-btn">{{__('db.submit')}}</button>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
@@ -628,22 +687,22 @@
             <div class="card-body">
                 <table class="table table-bordered table-condensed totals mt-3">
                     <td><strong>{{__('db.Items')}}</strong>
-                        <span class="pull-right" id="item">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                        <span class="pull-right" id="item">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
                     </td>
                     <td><strong>{{__('db.Total')}}</strong>
-                        <span class="pull-right" id="subtotal">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                        <span class="pull-right" id="subtotal">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
                     </td>
                     <td><strong>{{__('db.Order Tax')}}</strong>
-                        <span class="pull-right" id="order_tax">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                        <span class="pull-right" id="order_tax">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
                     </td>
                     <td><strong>{{__('db.Order Discount')}}</strong>
-                        <span class="pull-right" id="order_discount">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                        <span class="pull-right" id="order_discount">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
                     </td>
                     <td><strong>{{__('db.Shipping Cost')}}</strong>
-                        <span class="pull-right" id="shipping_cost">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                        <span class="pull-right" id="shipping_cost">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
                     </td>
                     <td><strong>{{__('db.grand total')}}</strong>
-                        <span class="pull-right" id="grand_total">{{number_format(0, $general_setting->decimal, '.', '')}}</span>
+                        <span class="pull-right" id="grand_total">{{number_format(0, gen_setting()->decimal, '.', '')}}</span>
                     </td>
                 </table>
             </div>
@@ -655,7 +714,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="modal_header" class="modal-title"></h5>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
+                    <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="ti ti-x"></i></span></button>
                 </div>
                 <div class="modal-body">
                     <form>
@@ -706,10 +765,12 @@
                                 <select name="edit_unit" class="form-control selectpicker">
                                 </select>
                             </div>
+                            @if(\Auth::user()->role_id <= 2)
                             <div class="col-md-4 form-group">
                                 <label>{{__('db.Cost')}}</label>
                                 <p id="product-cost"></p>
                             </div>
+                            @endif
                         </div>
                         <button type="button" name="update_btn" class="btn btn-primary">{{__('db.update')}}</button>
                     </form>
@@ -717,89 +778,10 @@
             </div>
         </div>
     </div>
-    <!-- add customer modal -->
-    <div id="addCustomer" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" class="modal fade text-left">
-        <div role="document" class="modal-dialog">
-          <div class="modal-content">
-            <form action="{{ route('customer.store') }}" method="post" enctype="multipart/form-data" id="customer-form">
-                @csrf
-            <div class="modal-header">
-              <h5 id="exampleModalLabel" class="modal-title">{{__('db.Add Customer')}}</h5>
-              <button type="button" data-dismiss="modal" aria-label="Close" class="close"><span aria-hidden="true"><i class="dripicons-cross"></i></span></button>
-            </div>
-            <div class="modal-body">
-              <p class="italic"><small>{{__('db.The field labels marked with are required input fields')}}.</small></p>
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>{{__('db.Customer Group')}} *</strong> </label>
-                            <select required class="form-control selectpicker" name="customer_group_id">
-                                @foreach($lims_customer_group_all as $customer_group)
-                                <option value="{{$customer_group->id}}">{{$customer_group->name}}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>{{__('db.name')}} *</strong> </label>
-                            <input type="text" name="customer_name" required class="form-control">
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>{{__('db.Email')}}</label>
-                            <input type="text" name="email" placeholder="example@example.com" class="form-control">
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>{{__('db.Phone Number')}} *</label>
-                            <input type="text" name="phone_number" required class="form-control">
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>{{__('db.WhatsApp Number')}}</label>
-                            <input type="text" name="wa_number" class="form-control">
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>{{__('db.Address')}}</label>
-                            <input type="text" name="address" required class="form-control">
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>{{__('db.City')}}</label>
-                            <input type="text" name="city" required class="form-control">
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>{{__('db.Credit Limit')}}</label>
-                            <input type="number" name="credit_limit" class="form-control" value="0" step="any" min="0">
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>{{__('db.Tax Number')}}</label>
-                            <input type="text" name="tax_no" class="form-control">
-                        </div>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <input type="hidden" name="pos" value="1">
-                    <button type="button" class="btn btn-primary customer-submit-btn">{{__('db.submit')}}</button>
-                </div>
-            </div>
-            </form>
-          </div>
-        </div>
-    </div>
 
-    <!-- ✅ Instalment Plan Modal -->
+    @include('backend.customer.add_modal')
+
+<!-- ✅ Instalment Plan Modal -->
     <div class="modal fade" id="installmentPlanModal" tabindex="-1" aria-labelledby="installmentPlanModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -866,7 +848,7 @@
                                             <option value="7">{{ __('db.Points') }}</option>
                                             @endif
                                             @foreach($options as $option)
-                                                @if($option !== 'cash' && $option !== 'card' && $option !== 'cheque' && $option !== 'gift_card' && $option !== 'deposit' && $option !== 'paypal' && $option !== 'pesapal')
+                                                @if(!in_array($option, ['cash', 'card', 'cheque', 'gift_card', 'deposit', 'paypal', 'pesapal', 'points', 'credit']))
                                                     <option value="{{$option}}">{{ucfirst($option)}}</option>
                                                 @endif
                                             @endforeach
@@ -875,9 +857,11 @@
                                     <div class="mb-3">
                                         <label class="form-label">Account</label>
                                         <select name="installment_plan[account_id]" class="form-control selectpicker">
+                                            @if(isset($lims_account_list))
                                             @foreach($lims_account_list as $account)
                                             <option value="{{$account->id}}">{{$account->name}} [{{$account->account_no}}]</option>
                                             @endforeach
+                                            @endif
                                         </select>
                                     </div>
                                     <div class="mb-3">
@@ -948,7 +932,7 @@
 
         function searchProducts(search) {
             $results.css('padding', '0 10px 15px');
-            $results.html('<div class="loader " title="4" style="border:none;min-height:300px"><svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="24px" height="30px" viewBox="0 0 24 30" style="enable-background:new 0 0 50 50;" xml:space="preserve"><rect x="0" y="0" width="4" height="10" fill="#333"><animateTransform attributeType="xml" attributeName="transform" type="translate" values="0 0; 0 20; 0 0" begin="0" dur="0.6s" repeatCount="indefinite"></animateTransform></rect><rect x="10" y="0" width="4" height="10" fill="#333"><animateTransform attributeType="xml" attributeName="transform" type="translate" values="0 0; 0 20; 0 0" begin="0.2s" dur="0.6s" repeatCount="indefinite"></animateTransform></rect><rect x="20" y="0" width="4" height="10" fill="#333"><animateTransform attributeType="xml" attributeName="transform" type="translate" values="0 0; 0 20; 0 0" begin="0.4s" dur="0.6s" repeatCount="indefinite"></animateTransform></rect></svg></div>');
+            $results.html('<div class="loader " title="4" style="border:none;min-height:300px"><svg fill="#97979859" width="30" height="30" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,19a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z" opacity=".25"/><path d="M12,4a8,8,0,0,1,7.89,6.7A1.53,1.53,0,0,0,21.38,12h0a1.5,1.5,0,0,0,1.48-1.75,11,11,0,0,0-21.72,0A1.5,1.5,0,0,0,2.62,12h0a1.53,1.53,0,0,0,1.49-1.3A8,8,0,0,1,12,4Z"><animateTransform attributeName="transform" type="rotate" dur="0.75s" values="0 12 12;360 12 12" repeatCount="indefinite"/></path></svg></div>');
             $noResults.hide();
 
             $.ajax({
@@ -1055,7 +1039,7 @@
                         // Auto-click if only one result
                         if (data.length === 1) {
 
-                            //let product = data[0]; // ✅ define it properly
+                            //let product = data.name; // ✅ define it properly
 
                             if (click === 0) {
                                 $('#product-results-container .product-img').first().trigger('click');
@@ -1081,9 +1065,9 @@
         // Trigger on input
         $input.on('input', function () {
             const value = $(this).val().trim();
+            clearTimeout(typingTimer);
             if (value.length >= 3) {
                 click = 0;
-                clearTimeout(typingTimer);
                 typingTimer = setTimeout(() => searchProducts(value), doneTypingInterval);
             } else {
                 clearResults();
@@ -1092,10 +1076,17 @@
 
         // Trigger on paste
         $input.on('paste', function (e) {
-            const pastedData = (e.originalEvent || e).clipboardData.getData('text');
-            if (pastedData.length >= 3) {
+            e.preventDefault();
+            clearTimeout(typingTimer);
+            const clipboard = (e.originalEvent || e).clipboardData || window.clipboardData;
+            const pastedData = clipboard ? clipboard.getData('text') : '';
+            const cleanPasted = String(pastedData || '').trim();
+            $(this).val(cleanPasted);
+            if (cleanPasted.length >= 3) {
                 click = 0;
-                searchProducts(pastedData.trim());
+                searchProducts(cleanPasted);
+            } else {
+                clearResults();
             }
         });
 
@@ -1109,7 +1100,7 @@
         $('#installmentPlanBtn').on('click', function() {
             var customer_type = $('#customer_id option:selected').data('type');
             if(customer_type == 'walkin') {
-                alert('Instalment Plan is not available for walk-in customer');
+                SaleProToast.show('Instalment Plan is not available for walk-in customer');
                 return;
             }
             let baseTotal = parseFloat($('#total').text().replace(/,/g, '')) || 0;
@@ -1163,14 +1154,13 @@
         $('#done-installment-modal').on('click', function() {
             let months = parseInt($('#installment_months').val()) || 0;
             if (months < 1) {
-                alert('Please enter valid number of months.');
+                SaleProToast.show('Please enter valid number of months.');
                 return;
             }
 
             // Sync totals to main form
             let total = $('#installment_total').val();
             $('input[name="grand_total"]').val(total);
-            $('input[name="total_price"]').val(total);
             $('#grand_total').text(parseFloat(total).toFixed(2));
 
             let downPayment = parseFloat($('#down_payment_id').val()) || 0;
@@ -1267,7 +1257,7 @@
         $.ajax({
             type: 'GET',
             async: false,
-            url: '{{route("package.fetchData", $general_setting->package_id)}}',
+            url: '{{route("package.fetchData", gen_setting()->package_id)}}',
             success: function(data) {
                 if(data['number_of_invoice'] > 0 && data['number_of_invoice'] <= numberOfInvoice) {
                     localStorage.setItem("message", "You don't have permission to create another invoice as you already exceed the limit! Subscribe to another package if you wants more!");
@@ -1282,9 +1272,99 @@
     @endif
     var currency = <?php echo json_encode($currency) ?>;
     var currencyChange = false;
-    var without_stock = <?php echo json_encode($general_setting->without_stock) ?>;
+    var without_stock = <?php echo json_encode(gen_setting()->without_stock) ?>;
     var authUser = <?php echo json_encode($authUser) ?>;
     var all_permission = '<?php echo json_encode($all_permission) ?>';
+    var restaurantModuleEnabled = @json($restaurantModuleEnabled);
+
+    function isSelectedRestaurantWarehouse() {
+        if (!restaurantModuleEnabled) {
+            return false;
+        }
+
+        var $warehouse = $('#warehouse_id');
+        var posType = $warehouse.is('select')
+            ? $warehouse.find(':selected').data('pos-type')
+            : $warehouse.data('pos-type');
+
+        return String(posType || '').toLowerCase() === 'restaurant';
+    }
+
+    function filterRestaurantTablesByWarehouse() {
+        if (!$('#table_id').length) {
+            return;
+        }
+
+        var warehouseId = String($('#warehouse_id').val() || '');
+        var currentTableId = String($('#table_id').val() || '');
+        var currentTableIsAvailable = false;
+
+        $('#table_id option').each(function () {
+            var belongsToWarehouse = String($(this).data('warehouse-id') || '') === warehouseId;
+            $(this).prop('disabled', !belongsToWarehouse).prop('hidden', !belongsToWarehouse);
+            if (belongsToWarehouse && String($(this).val()) === currentTableId) {
+                currentTableIsAvailable = true;
+            }
+        });
+
+        if (!currentTableIsAvailable) {
+            $('#table_id').val('');
+        }
+    }
+
+    function syncRestaurantServiceRequirements() {
+        if (!isSelectedRestaurantWarehouse() || !$('#service_id').length) {
+            return;
+        }
+
+        var isDineIn = String($('#service_id').val() || '') === '1';
+        $('#table_id, #waiter_id')
+            .prop('disabled', !isDineIn)
+            .prop('required', isDineIn);
+
+        if (!isDineIn) {
+            $('#table_id, #waiter_id').val('');
+        }
+
+        $('.selectpicker').selectpicker('refresh');
+    }
+
+    function syncRestaurantSaleUi() {
+        var isRestaurant = isSelectedRestaurantWarehouse();
+
+        $('.restaurant-sale-field').toggle(isRestaurant);
+        $('#service_id')
+            .prop('disabled', !isRestaurant)
+            .prop('required', isRestaurant);
+
+        if (isRestaurant) {
+            filterRestaurantTablesByWarehouse();
+            syncRestaurantServiceRequirements();
+        } else {
+            $('#service_id, #table_id, #waiter_id')
+                .prop('disabled', true)
+                .prop('required', false);
+        }
+
+        var $processingOption = $('select[name="sale_status"] option[value="5"]');
+        $processingOption
+            .prop('disabled', !isRestaurant)
+            .prop('hidden', !isRestaurant);
+
+        if (!isRestaurant && String($('select[name="sale_status"]').val() || '') === '5') {
+            $('select[name="sale_status"]').val('1');
+        }
+
+        $('.selectpicker').selectpicker('refresh');
+    }
+
+    $(function () {
+        syncRestaurantSaleUi();
+    });
+
+    $(document).on('change', '#service_id', function () {
+        syncRestaurantServiceRequirements();
+    });
 
     $('#currency').val(currency['id']);
 
@@ -1298,31 +1378,28 @@
         $("table.order-list tbody .product-id").each(function(index) {
             rowindex = index;
             currencyChange = true;
+            if (document.querySelector('[data-zatca-sale-preview]')) {
+                // Fiscal hidden prices are already pre-discount prices. Do not
+                // add line VAT to them (or apply the customer markup twice).
+                // Convert the stored base-unit price and manual discount once.
+                product_price[index] = parseFloat(product_price[index]) * rate / prev_rate;
+                product_discount[index] = parseFloat(product_discount[index] || 0) * rate / prev_rate;
+                var fiscalQty = $(this).closest('tr').find('.qty').val();
+                calculateRowProductData(fiscalQty);
+                return;
+            }
             cur_product_id = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .product-id').val();
             var qty = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val();
             var price = (parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_price').val()) + parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val()));
 
             price = (price / prev_rate);
             checkDiscount(qty, true, price);
-            couponDiscount();
+            // checkDiscount recalculates row and grand totals in its callback.
+            // Add Sale has no couponDiscount function (that is a POS helper).
         });
     });
 
-    $('.customer-submit-btn').on("click", function() {
-        $.ajax({
-            type:'POST',
-            url:'{{route('customer.store')}}',
-            data: $("#customer-form").serialize(),
-            success:function(response) {
-                key = response['id'];
-                value = response['name']+' ['+response['phone_number']+']';
-                $('select[name="customer_id"]').append('<option value="'+ key +'" data-type="'+response['type']+'">'+ value +'</option>');
-                $('select[name="customer_id"]').val(key).trigger('change');
-                $('.selectpicker').selectpicker('refresh');
-                $("#addCustomer").modal('hide');
-            }
-        });
-    });
+
 
     function setCustomerGroupRate(id) {
         $.get('{{ url("sales/getcustomergroup") }}/' + id, function(data) {
@@ -1375,9 +1452,8 @@ var temp_unit_operation_value = [];
 var deposit = <?php echo json_encode($deposit) ?>;
 var points = <?php echo json_encode($points) ?>;
 
-@if($lims_reward_point_setting_data)
-var reward_point_setting = <?php echo json_encode($lims_reward_point_setting_data) ?>;
-@endif
+var reward_point_setting = <?php echo json_encode($lims_reward_point_setting_data ?? []) ?>;
+if (reward_point_setting === null) reward_point_setting = {};
 
 var rowindex;
 var customer_group_rate;
@@ -1414,7 +1490,7 @@ $("#myTable").on('focusout', '.qty', function () {
         // --- 1) Empty or non-numeric check
         if (value === "" || isNaN(value)) {
             $input.val(1);
-            alert("Quantity must be a number.");
+            SaleProToast.show("Quantity must be a number.");
             return;
         }
 
@@ -1423,14 +1499,14 @@ $("#myTable").on('focusout', '.qty', function () {
         // --- 2) Must be greater than 0
         if (value <= 0) {
             $input.val(1);
-            alert("Quantity must be greater than 0.");
+            SaleProToast.show("Quantity must be greater than 0.");
             return;
         }
 
         // --- 3) Max attribute validation
         if (!isNaN(max) && value > max && without_stock == 'no') {
             $input.val(max);
-            alert("Quantity cannot exceed available stock (" + max + ").");
+            SaleProToast.show("Quantity cannot exceed available stock (" + max + ");.");
             return;
         }
 
@@ -1486,16 +1562,21 @@ $('button[name="update_btn"]').on("click", function() {
     var edit_discount = $('input[name="edit_discount"]').val();
     var edit_qty = $('input[name="edit_qty"]').val();
     var edit_unit_price = $('input[name="edit_unit_price"]').val();
+    // A fiscal checkout must not let the async promotion lookup replace a
+    // discount the cashier explicitly changed in the line editor.
+    var fiscalManualDiscount = document.querySelector('[data-zatca-sale-preview]')
+        && parseFloat(edit_discount) !== parseFloat(product_discount[rowindex] || 0)
+        ? parseFloat(edit_discount) : null;
 
     if (parseFloat(edit_discount) > parseFloat(edit_unit_price)) {
-        alert('Invalid Discount Input!');
+        SaleProToast.show('Invalid Discount Input!');
         return;
     }
 
     if(edit_qty < 0) {
         $('input[name="edit_qty"]').val(1);
         edit_qty = 1;
-        alert("Quantity can't be less than 0");
+        SaleProToast.show("Quantity can't be less than 0");
     }
 
     var tax_rate_all = <?php echo json_encode($tax_rate_all) ?>;
@@ -1535,7 +1616,7 @@ $('button[name="update_btn"]').on("click", function() {
         product_price[rowindex] = $('input[name="edit_unit_price"]').val();
     }
     product_discount[rowindex] = $('input[name="edit_discount"]').val();
-    checkDiscount(edit_qty, false);
+    checkDiscount(edit_qty, false, 0, fiscalManualDiscount);
     //checkQuantity(edit_qty, false);
     $('#editModal').modal('hide');
 });
@@ -1550,7 +1631,7 @@ $("#myTable").on('click', '.plus', function() {
     if(!qty)
         qty = 1;
     else if(!isNaN(max_qty) && qty >= max_qty && without_stock == 'no') {
-        alert("Quantity cannot exceed available stock (" + max_qty + ").");
+        SaleProToast.show("Quantity cannot exceed available stock (" + max_qty + ");.");
         return;
     }
     else
@@ -1581,8 +1662,8 @@ $("#myTable").on('click', '.minus', function() {
 
 $('#warehouse_id').on('change', function() {
         warehouse_id = $(this).val();
+        syncRestaurantSaleUi();
         // getProduct(warehouse_id);
-        isCashRegisterAvailable(warehouse_id);
         $('#featured-filter').trigger('click');
     });
 
@@ -1607,7 +1688,7 @@ $("#myTable").on("change", ".batch-no", function () {
     var warehouse_id = $('#warehouse_id').val();
     $.get('../check-batch-availability/' + product_id + '/' + $(this).val() + '/' + warehouse_id, function(data) {
         if(data['message'] != 'ok') {
-            alert(data['message']);
+            SaleProToast.show(data['message']);
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.batch-no').val('');
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product-batch-id').val('');
             $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.expired-date').text('');
@@ -1630,35 +1711,35 @@ $(document).on('click', '.product-img', function() {
     var warehouse_id = $('#warehouse_id').val();
     var biller_id = $('#biller_id').val();
 
-    @if(in_array('restaurant',explode(',',$general_setting->modules)))
-    var table_id = $('#table_id').val();
-    var waiter_id = $('#waiter_id').val();
-    var service_id = $('#service_id').val();
-    @endif
+    var isRestaurantWarehouse = isSelectedRestaurantWarehouse();
+    var table_id = isRestaurantWarehouse ? $('#table_id').val() : null;
+    var waiter_id = isRestaurantWarehouse ? $('#waiter_id').val() : null;
+    var service_id = isRestaurantWarehouse ? $('#service_id').val() : null;
 
     if(!customer_id)
-        alert('Please select Customer!');
+        SaleProToast.show('Please select Customer!');
     else if(!warehouse_id)
-        alert('Please select Warehouse!');
+        SaleProToast.show('Please select Warehouse!');
     else if(!biller_id)
-        alert('Please select Biller!');
-    @if(in_array('restaurant',explode(',',$general_setting->modules)))
-    else if(!table_id && service_id == 1){
-        alert('Please select Table!');
+        SaleProToast.show('Please select Biller!');
+    else if(isRestaurantWarehouse && !service_id){
+        SaleProToast.show('Please select Service!');
     }
-    else if(!waiter_id && service_id == 1){
-        alert('Please select Waiter!');
+    else if(isRestaurantWarehouse && service_id == 1 && !table_id){
+        SaleProToast.show('Please select Table!');
     }
-    @endif
+    else if(isRestaurantWarehouse && service_id == 1 && !waiter_id){
+        SaleProToast.show('Please select Waiter!');
+    }
     else{
         var data = $(this).data();
         productSearch(data);
     }
 });
 
-function productSearch(data) {
+async function productSearch(data) {
     // if(data.embedded == 1) {
-    //     alert('{{ __("db.This product has been added using the weight scale machine.")}}');
+    //     SaleProToast.show('{{ __("db.product_added_using_scale_weight");}}');
     //     return;
     // }
     var item_code = data.code;
@@ -1672,7 +1753,7 @@ function productSearch(data) {
                 imeiNumbersArray = imeiNumbers.split(",");
 
                 if(imeiNumbersArray.includes(data.imei)) {
-                    alert('Same imei or serial number is not allowed!');
+                    SaleProToast.show('Same imei or serial number is not allowed!');
                     flag = false;
                     $('#product-search-input').val('');
                     return;
@@ -1693,48 +1774,59 @@ function productSearch(data) {
             price: data.price,
             customer_id: $('#customer_id').val()
         };
-        $.ajax({
+        await $.ajax({
             type: 'GET',
-            async: false,
             url: '{{url("sales/lims_product_search")}}',
             data: {
                 data: product
             },
             success: function(data) {
-                if(data[23]) {
-                    data[15] = 1;
+                // Capture rowindex immediately — it's a shared global that can
+                // change if the user clicks another product before this callback fires.
+                const capturedRowindex = rowindex;
+
+                if(isSelectedRestaurantWarehouse() && data.modifiers && data.modifiers.length) {
+                    data.qty = 1;
                     pre_qty = 0;
                 }
-                if(pre_qty > 0 && data[21]) {
-                    var old_batch = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.batch-no').val();
-
-                    if(old_batch && old_batch != data[22]) {
+                if(pre_qty > 0 && data.batch_id) {
+                    const $existingRow = $('table.order-list tbody tr:nth-child(' + (capturedRowindex + 1) + ')');
+                    const old_batch = $existingRow.find('.batch-no').val();
+                    if(old_batch && old_batch != data.batch_no) {
                         pre_qty = 0;
-                        data[15] = 1;
+                        data.qty = 1;
                     }
-
                 }
+
                 var flag = 1;
                 if (pre_qty > 0) {
-                    var qty = data[15];
-                    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val(qty);
+                    const qty = data.qty;
+                    rowindex = capturedRowindex;
+                    const $existingRow = $('table.order-list tbody tr:nth-child(' + (capturedRowindex + 1) + ')');
+                    $existingRow.find('.qty').val(qty);
 
-                    product_price[rowindex] = parseFloat(data[2] * currency['exchange_rate']) + parseFloat(data[2] * currency['exchange_rate'] * groupRate(data));
+                    product_price[capturedRowindex] = parseFloat(data.price * currency['exchange_rate']) + parseFloat(data.price * currency['exchange_rate'] * groupRate(data));
 
+                    // Update discount from fresh server response (qty may affect discount tier)
+                    if (data.discount !== undefined) {
+                        product_discount[capturedRowindex] = parseFloat(data.discount) * currency['exchange_rate'];
+                    }
+
+                    rowindex = capturedRowindex;
+                    checkQuantity(String(qty), true);
                     flag = 0;
                 }
                 $("input[name='product_code_name']").val('');
 
                 if(flag){
+                    rowindex = capturedRowindex;
                     addNewProduct(data);
                 }
-                else if(data[18] != 'null' && data[18] != '') {
-                    var imeiNumbers = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.imei-number').val();
-                    if(imeiNumbers)
-                        imeiNumbers += ','+data[18];
-                    else
-                        imeiNumbers = data[18];
-                    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.imei-number').val(imeiNumbers);
+                else if(data.imei_number != 'null' && data.imei_number != '') {
+                    const $existingRow = $('table.order-list tbody tr:nth-child(' + (capturedRowindex + 1) + ')');
+                    let imeiNumbers = $existingRow.find('.imei-number').val();
+                    imeiNumbers = imeiNumbers ? imeiNumbers + ',' + data.imei_number : data.imei_number;
+                    $existingRow.find('.imei-number').val(imeiNumbers);
                 }
             }
         });
@@ -1742,35 +1834,39 @@ function productSearch(data) {
 
 }
 
-// Markup for a product search result: none when the server already applied a fixed customer group price (data[24])
+// Markup for a product search result: none when the server already applied a fixed customer group price
 function groupRate(d) {
-    return (d && d[24]) ? 0 : (customer_group_rate || 0);
+    return (d && d.group_price) ? 0 : (customer_group_rate || 0);
 }
 
 function addNewProduct(data){
     $('.payment-btn').removeAttr('disabled');
     $('#installmentPlanBtn').removeAttr('disabled');
-    var newRow = $('<tr id='+ data[1] +'>');
-    newRow.attr('data-group-price', data[24] ? 1 : 0);
+    var newRow = $('<tr id='+ data.code +'>');
+    newRow.attr('data-group-price', data.group_price ? 1 : 0);
     var cols = '';
-    temp_unit_name = (data[6]).split(',');
-    pos = product_code.indexOf(data[1]);
+    temp_unit_name = (data.unit_name).split(',');
+    pos = product_code.indexOf(data.code);
 
     let stockDisplay = '';
-
-    if (all_permission.includes("cart-product-update")) {
-        if(data[20].trim() == 'standard' || data[20].trim() == 'combo'){
-            if (!data[18] || data[18] == 'null') {
-                stockDisplay = ` | {{ __('db.In Stock') }} : <span class="in-stock">` + data[19] + `</span>`;
-            }
-        }
-        cols += '<td class="product-title"><strong class="edit-product btn btn-link pl-0 pr-0" data-toggle="modal" data-target="#editModal">' + data[0] + ' <i class="dripicons-document-edit"></i></strong><br><span>' + data[1] + '</span>' + stockDisplay + ' <strong class="product-price d-md-none"></strong>';
-    } else {
-        cols += '<td class="product-title"><strong>' + data[0] + '<br><span>' + data[1] + '</span>' + stockDisplay + ' <strong class="product-price d-md-none"></strong>';
+    var variantDisplay = '';
+    if (data.variant_name && data.variant_name.length > 0) {
+        variantDisplay = '<br><span class="product-variant font-weight-bold" style="font-size: 0.85em; color: #555;">' + "{{trans('file.Variant') == 'file.Variant' ? 'Variant' : trans('file.Variant')}}" + ': ' + data.variant_name + '</span>';
     }
 
-    if(data[12]) {
-        cols += '<br><input style="font-size:13px;padding:3px 25px 3px 10px;height:30px !important" type="text" class="form-control batch-no" value="'+data[22]+'" required/> <input type="hidden" class="product-batch-id" name="product_batch_id[]" value="'+data[21]+'"/>';
+    if (all_permission.includes("cart-product-update")) {
+        if(data.type.trim() == 'standard' || data.type.trim() == 'combo'){
+            if (!data.imei_number || data.imei_number == 'null') {
+                stockDisplay = ` | {{ __('db.In Stock') }} : <span class="in-stock">` + data.warehouse_qty + `</span>`;
+            }
+        }
+        cols += '<td class="product-title"><strong class="edit-product btn btn-link pl-0 pr-0" data-toggle="modal" data-target="#editModal">' + data.name + ' <i class="ti ti-edit"></i></strong>' + variantDisplay + '<br><span>' + data.code + '</span>' + stockDisplay + ' <strong class="product-price d-md-none"></strong>';
+    } else {
+        cols += '<td class="product-title"><strong>' + data.name + '</strong>' + variantDisplay + '<br><span>' + data.code + '</span>' + stockDisplay + ' <strong class="product-price d-md-none"></strong>';
+    }
+
+    if(data.is_batch) {
+        cols += '<br><input style="font-size:13px;padding:3px 25px 3px 10px;height:30px !important" type="text" class="form-control batch-no" value="'+data.batch_no+'" required/> <input type="hidden" class="product-batch-id" name="product_batch_id[]" value="'+data.batch_id+'"/>';
     }
     else {
         cols += '<input type="text" class="form-control batch-no d-none" disabled/> <input type="hidden" class="product-batch-id" name="product_batch_id[]"/>';
@@ -1780,16 +1876,16 @@ function addNewProduct(data){
     cols += '<td><div class="input-group"><span class="input-group-btn">';
 
     // If no IMEI, show minus button
-    if (!data[18] || data[18] == 'null') {
-        cols += '<button type="button" class="btn btn-default minus mr-1" style="padding:5px 8px"><i class="dripicons-minus"></i></button></span>';
+    if (!data.imei_number || data.imei_number == 'null') {
+        cols += '<button type="button" class="btn btn-default minus mr-1" style="padding:5px 8px"><i class="ti ti-minus"></i></button></span>';
     }
 
     // Input field
-    cols += '<input type="text" name="qty[]" class="form-control qty numkey input-number" style="font-size:13px;max-width:50px;padding: 0 0;text-align:center" step="any" value="'+data[15]+'" max="'+data[19]+'" required><span class="input-group-btn">';
+    cols += '<input type="text" name="qty[]" class="form-control qty numkey input-number" style="font-size:13px;max-width:50px;padding: 0 0;text-align:center" step="any" value="'+data.qty+'" max="'+data.warehouse_qty+'" required><span class="input-group-btn">';
 
     // If no IMEI, show plus button
-    if (!data[18] || data[18] == 'null') {
-        cols += '<button type="button" class="btn btn-default plus ml-1" style="padding:5px 8px"><i class="dripicons-plus"></i></button>';
+    if (!data.imei_number || data.imei_number == 'null') {
+        cols += '<button type="button" class="btn btn-default plus ml-1" style="padding:5px 8px"><i class="ti ti-plus"></i></button>';
     }
 
     cols += '</span></div></td>';
@@ -1800,27 +1896,27 @@ function addNewProduct(data){
 
     cols += '<td class="sub-total"></td>';
     // Always show delete button
-    cols += '<td><button type="button" class="ibtnDel btn btn-danger btn-sm mr-2"><i class="dripicons-trash"></i></button></td>';
+    cols += '<td><button type="button" class="ibtnDel btn btn-danger btn-sm mr-2"><i class="ti ti-trash"></i></button></td>';
 
-    cols += '<input type="hidden" class="product-code" name="product_code[]" value="' + data[1] + '"/>';
-    cols += '<input type="hidden" class="product-id" name="product_id[]" value="' + data[9] + '"/>';
-    cols += '<input type="hidden" class="product_type" name="product_type[]" value="' + data[20] + '"/>';
+    cols += '<input type="hidden" class="product-code" name="product_code[]" value="' + data.code + '"/>';
+    cols += '<input type="hidden" class="product-id" name="product_id[]" value="' + data.id + '"/>';
+    cols += '<input type="hidden" class="product_type" name="product_type[]" value="' + data.type + '"/>';
     cols += '<input type="hidden" class="product_price" />';
     cols += '<input type="hidden" class="sale-unit" name="sale_unit[]" value="' + temp_unit_name[0] + '"/>';
     cols += '<input type="hidden" class="net_unit_price" name="net_unit_price[]" />';
     cols += '<input type="hidden" class="discount-value" name="discount[]" />';
-    cols += '<input type="hidden" class="tax-rate" name="tax_rate[]" value="' + data[3] + '"/>';
+    cols += '<input type="hidden" class="tax-rate" name="tax_rate[]" value="' + data.tax_rate + '"/>';
     cols += '<input type="hidden" class="tax-value" name="tax[]" />';
-    cols += '<input type="hidden" class="tax-name" value="'+data[4]+'" />';
-    cols += '<input type="hidden" class="tax-method" value="'+data[5]+'" />';
-    cols += '<input type="hidden" class="sale-unit-operator" value="'+data[7]+'" />';
-    cols += '<input type="hidden" class="sale-unit-operation-value" value="'+data[8]+'" />';
+    cols += '<input type="hidden" class="tax-name" value="'+data.tax_name+'" />';
+    cols += '<input type="hidden" class="tax-method" value="'+data.tax_method+'" />';
+    cols += '<input type="hidden" class="sale-unit-operator" value="'+data.unit_operator+'" />';
+    cols += '<input type="hidden" class="sale-unit-operation-value" value="'+data.unit_operation_value+'" />';
     cols += '<input type="hidden" class="subtotal-value" name="subtotal[]" />';
-    if(data[18] != 'null' && data[18] != '')
-        cols += '<input type="hidden" class="imei-number" name="imei_number[]" value="'+data[18]+'" />';
+    if(data.imei_number != 'null' && data.imei_number != '')
+        cols += '<input type="hidden" class="imei-number" name="imei_number[]" value="'+data.imei_number+'" />';
     else
         cols += '<input type="hidden" class="imei-number" name="imei_number[]" value="" />';
-    if(data[23]){
+    if(isSelectedRestaurantWarehouse() && data.modifiers && data.modifiers.length){
         cols += '<input type="hidden" class="topping_product" name="topping_product[]" value="" />';
         cols += '<input type="hidden" class="topping-price" name="topping-price" value="" />';
     }
@@ -1831,34 +1927,44 @@ function addNewProduct(data){
 
     rowindex = newRow.index();
 
-    product_price.splice(rowindex, 0, parseFloat(data[2] * currency['exchange_rate']) + parseFloat(data[2] * currency['exchange_rate'] * groupRate(data)));
+    // ── Price Arrays ──────────────────────────────────────────────────────────
+    const _exRate    = currency['exchange_rate'];
+    const _cgRate    = groupRate(data);
+    const _retail    = parseFloat(data.price * _exRate) + parseFloat(data.price * _exRate * _cgRate);
+    const _wholesale = data.wholesale_price
+        ? parseFloat(data.wholesale_price * _exRate) + parseFloat(data.wholesale_price * _exRate * _cgRate)
+        : 0;
 
-    if(data[16])
-        wholesale_price.splice(rowindex, 0, parseFloat(data[16] * currency['exchange_rate']) + parseFloat(data[16] * currency['exchange_rate'] * groupRate(data)));
-    else
-        wholesale_price.splice(rowindex, 0, '{{number_format(0, $general_setting->decimal, '.', '')}}');
-    cost.splice(rowindex, 0, parseFloat(data[17] * currency['exchange_rate']));
-    product_discount.splice(rowindex, 0, '{{number_format(0, $general_setting->decimal, '.', '')}}');
-    tax_rate.splice(rowindex, 0, parseFloat(data[3]));
-    tax_name.splice(rowindex, 0, data[4]);
-    tax_method.splice(rowindex, 0, data[5]);
-    unit_name.splice(rowindex, 0, data[6]);
-    unit_operator.splice(rowindex, 0, data[7]);
-    unit_operation_value.splice(rowindex, 0, data[8]);
-    is_imei.splice(rowindex, 0, data[13]);
-    is_variant.splice(rowindex, 0, data[14]);
+    product_price.splice(rowindex, 0, _retail);
+    wholesale_price.splice(rowindex, 0, _wholesale || '{{number_format(0, gen_setting()->decimal, '.', '')}}');
+    cost.splice(rowindex, 0, parseFloat(data.cost * _exRate));
 
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product_price').val(product_price[rowindex]);
+    // ── Discount from server response (no second AJAX needed) ─────────────────
+    const _discountPerUnit = parseFloat(data.discount || 0) * _exRate;
+    product_discount.splice(rowindex, 0, _discountPerUnit);
 
-    checkQuantity(data[15], true);
-    checkDiscount(data[15], true);
+    tax_rate.splice(rowindex, 0, parseFloat(data.tax_rate));
+    tax_name.splice(rowindex, 0, data.tax_name);
+    tax_method.splice(rowindex, 0, data.tax_method);
+    unit_name.splice(rowindex, 0, data.unit_name);
+    unit_operator.splice(rowindex, 0, data.unit_operator);
+    unit_operation_value.splice(rowindex, 0, data.unit_operation_value);
+    is_imei.splice(rowindex, 0, data.is_imei);
+    is_variant.splice(rowindex, 0, data.is_variant);
 
-    if(data[16]) {
+    // Cache row reference once — reused below (avoids repeated nth-child scans)
+    const $newRow = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')');
+    $newRow.find('.product_price').val(product_price[rowindex]);
+
+    // ── Single synchronous calculation — no AJAX, no redundant DOM scans ──
+    checkQuantity(data.qty, true);
+
+    if(data.wholesale_price) {
         populatePriceOption();
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.edit-product').click();
+        $newRow.find('.edit-product').click();
     }
 
-    if (data[23] && Array.isArray(data[23]) && data[23].length > 0) {
+    if (isSelectedRestaurantWarehouse() && data.modifiers && Array.isArray(data.modifiers) && data.modifiers.length > 0) {
         if(productSale && productSale.length > 0) {
 
             if (product_discount[rowindex] < 1) {
@@ -1871,8 +1977,8 @@ function addNewProduct(data){
                 @endif
             }
 
-            // Find a match for current data[9] (product_id)
-            let matchedIndex = productSale.findIndex(p => parseInt(p.product_id) === parseInt(data[9]));
+            // Find a match for current data.id (product_id)
+            let matchedIndex = productSale.findIndex(p => parseInt(p.product_id) === parseInt(data.id));
 
             if (matchedIndex !== -1) {
                 let matchedProduct = productSale[matchedIndex];
@@ -1880,23 +1986,24 @@ function addNewProduct(data){
                 // Parse toppings
                 let toppings = JSON.parse(matchedProduct.topping_id || '[]');
 
-                let toppingNames = toppings.map(t => t.name).join(", ");
-                let totalToppingPrice = toppings.reduce((sum, t) => sum + parseFloat(t.price), 0);
+                let toppingNames = toppings.map(t => `${t.group_name || ''}: ${t.name}`).join(" | ");
+                let totalToppingPrice = toppings.reduce((sum, t) => sum + parseFloat(t.price_adjustment || t.price || 0), 0);
 
                 newRow.find('.product-title').append(`<br><small>Includes: ${toppingNames}</small>`);
-                newRow.find('.topping_product').val(matchedProduct.topping_id);
-                newRow.find('.topping-price').val(totalToppingPrice.toFixed({{$general_setting->decimal}}));
+                newRow.find('.topping_product').val(matchedProduct.topping_id || JSON.stringify(toppings));
+                newRow.find('.topping-price').val(totalToppingPrice.toFixed({{gen_setting()->decimal}}));
 
-                const currentPrice = parseFloat(newRow.find('.product-price').text()) || 0;
-                const newPrice = currentPrice + totalToppingPrice;
-                newPrice -= product_discount[rowindex];
-                newRow.find('.product-price').text(newPrice.toFixed({{$general_setting->decimal}}));
-                newRow.find('.sub-total').text(newPrice.toFixed({{$general_setting->decimal}}));
+                const currentPrice = parseFloat(newRow.find('.net_unit_price').val()) || 0;
+                let newPrice = currentPrice + totalToppingPrice;
+                
+                newRow.find('.net_unit_price').val(newPrice.toFixed({{gen_setting()->decimal}}));
+                product_price[rowindex] = newPrice;
+                
+                var qty = newRow.find('.qty').val();
+                checkDiscount(qty, true, newPrice);
 
                 // Remove used item from array
                 productSale.splice(matchedIndex, 1);
-
-                calculateTotal();
             }
 
         }else{
@@ -1904,35 +2011,53 @@ function addNewProduct(data){
 
             function openToppingsModal(data, selectedToppings = [], rowIndex = null) {
                 let modalContent = '<form id="product-selection-form">';
-                data[23].forEach(product => {
-                    const selected = selectedToppings.find(t => t.id == product.id);
-                    const isChecked = selected ? 'checked' : '';
-                    const qty = selected ? selected.qty : 1;
+                data.modifiers.forEach(group => {
+                    let requiredLabel = group.is_required ? '<span class="text-danger">*</span>' : '';
+                    let reqText = [];
+                    if (group.is_required && group.min_selection > 0) reqText.push(`Min: ${group.min_selection}`);
+                    if (group.max_selection > 0) reqText.push(`Max: ${group.max_selection}`);
+                    let smallText = reqText.length ? `<small class="text-muted ml-2">(${reqText.join(', ')})</small>` : '';
 
                     modalContent += `
-                        <div class="form-check d-flex align-items-center mb-1">
-                            <div>
-                                <input class="form-check-input" type="checkbox" name="productOption" id="product_${product.id}" value="${product.id}" data-name="${product.name}" data-price="${product.price}" ${isChecked}>
-                                <label class="form-check-label" for="product_${product.id}">
-                                    ${product.name} (${product.code}) - ${product.price}
-                                </label>
-                            </div>
-                            <input type="number" name="quantity_${product.id}" id="quantity_${product.id}" class="form-control form-control-sm" style="width: 80px;" min="1" value="${qty}">
-                        </div>`;
+                        <div class="modifier-group mb-3" data-id="${group.id}" data-name="${group.name}" data-min="${group.min_selection}" data-max="${group.max_selection}" data-required="${group.is_required ? 1 : 0}">
+                            <h6 class="border-bottom pb-1 mb-2">${group.name} ${requiredLabel} ${smallText}</h6>
+                            <div class="modifier-options">`;
+                    
+                    group.modifiers.forEach(mod => {
+                        const selected = selectedToppings.find(t => t.id == mod.id && t.group_id == group.id);
+                        const isChecked = selected ? 'checked' : '';
+                        const inputType = group.selection_type === 'single' ? 'radio' : 'checkbox';
+                        const inputName = group.selection_type === 'single' ? `group_${group.id}` : `modifier_${mod.id}`;
+                        const priceLabel = parseFloat(mod.price_adjustment) > 0 ? ` (+${parseFloat(mod.price_adjustment).toFixed(2)})` : '';
+                        
+                        modalContent += `
+                            <div class="form-check d-flex align-items-center mb-1">
+                                <div>
+                                    <input class="form-check-input mod-input" type="${inputType}" name="${inputName}" id="mod_${mod.id}" value="${mod.id}" data-group-id="${group.id}" data-group-name="${group.name}" data-name="${mod.name}" data-price="${mod.price_adjustment}" ${isChecked}>
+                                    <label class="form-check-label" for="mod_${mod.id}">
+                                        ${mod.name}${priceLabel}
+                                    </label>
+                                </div>
+                            </div>`;
+                    });
+                    modalContent += `</div></div>`;
                 });
                 modalContent += '</form>';
 
                 const modalHTML = `
-                    <div class="modal fade" id="productSelectionModal" tabindex="-1" role="dialog" aria-labelledby="productSelectionModalLabel" aria-hidden="true" data-rowindex="${rowIndex}">
+                    <div class="modal fade" id="productSelectionModal" tabindex="-1" role="dialog" aria-labelledby="productSelectionModalLabel" aria-hidden="true" data-rowindex="${rowIndex}" data-backdrop="static">
                         <div class="modal-dialog" role="document">
                             <div class="modal-content">
                                 <div class="modal-header">
-                                    <h5 class="modal-title" id="productSelectionModalLabel">{{__('db.Select Additional Products')}}</h5>
+                                    <h5 class="modal-title" id="productSelectionModalLabel">{{__('db.select_modifiers')}}</h5>
                                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                         <span aria-hidden="true">&times;</span>
                                     </button>
                                 </div>
-                                <div class="modal-body">${modalContent}</div>
+                                <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+                                    <div id="modifier-error" class="alert alert-danger d-none p-2 mb-2"></div>
+                                    ${modalContent}
+                                </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
                                     <button type="button" class="btn btn-primary" id="confirmSelection">Confirm</button>
@@ -1949,9 +2074,10 @@ function addNewProduct(data){
 
 
             // Handle selection confirmation
-            $("#confirmSelection").on('click', function () {
+            $("body").off("click", "#confirmSelection").on("click", "#confirmSelection", function () {
                 let selectedToppings = [];
                 let totalAdditionalPrice = 0;
+                let validationError = null;
 
                 if (product_discount[rowindex] < 1) {
                     cur_product_id = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .product-id').val();
@@ -1963,14 +2089,40 @@ function addNewProduct(data){
                     @endif
                 }
 
-                $("input[name='productOption']:checked").each(function () {
-                    const qty = parseFloat($(`#quantity_${$(this).val()}`).val() || 1); // define qty first
+                // Validate groups
+                $('.modifier-group').each(function() {
+                    let $group = $(this);
+                    let min = parseInt($group.data('min')) || 0;
+                    let max = parseInt($group.data('max')) || 0;
+                    let req = parseInt($group.data('required'));
+                    let name = $group.data('name');
+                    let checkedCount = $group.find('.mod-input:checked').length;
 
+                    if (req === 1 && checkedCount < min) {
+                        validationError = `Please select at least ${min} option(s) for ${name}.`;
+                        return false;
+                    }
+                    if (max > 0 && checkedCount > max) {
+                        validationError = `You can only select up to ${max} option(s) for ${name}.`;
+                        return false;
+                    }
+                });
+
+                if (validationError) {
+                    $('#modifier-error').text(validationError).removeClass('d-none');
+                    return;
+                }
+
+                $('#modifier-error').addClass('d-none');
+
+                $(".mod-input:checked").each(function () {
                     const topping = {
+                        group_id: $(this).data('group-id'),
                         id: $(this).val(),
+                        group_name: $(this).data('group-name'),
                         name: $(this).data('name'),
-                        qty: qty,
-                        price: parseFloat($(this).data('price')) * qty
+                        price: parseFloat($(this).data('price')) || 0,
+                        qty: 1
                     };
 
                     selectedToppings.push(topping);
@@ -1978,29 +2130,26 @@ function addNewProduct(data){
                 });
 
                 if (selectedToppings.length > 0) {
-                    // Convert the selected toppings array to JSON
                     const selectedToppingsJson = JSON.stringify(selectedToppings);
+                    const selectedProductNames = selectedToppings.map(t => `${t.group_name}: ${t.name}`).join(' | ');
 
-                    // Append toppings to the main product row
-                    const selectedProductNames = selectedToppings.map(t => `${t.name} (${t.qty})`).join(', ');
+                    newRow.find('.product-title').append(`<br><small class="text-muted">Incl: ${selectedProductNames}</small>`);
+                    newRow.find('.topping_product').val(selectedToppingsJson); 
+                    newRow.find('.topping-price').val(totalAdditionalPrice.toFixed({{gen_setting()->decimal}}));
 
-                    newRow.find('.product-title').append(`<br><small>Includes: ${selectedProductNames}</small>`);
+                    let baseUnitPrice = parseFloat(newRow.find('.net_unit_price').val()) || 0;
+                    baseUnitPrice += totalAdditionalPrice;
+                    newRow.find('.net_unit_price').val(baseUnitPrice.toFixed({{gen_setting()->decimal}}));
 
-                    newRow.find('.topping_product').val(selectedToppingsJson); // Store JSON in hidden field
-
-                    // Update the total price
-                    const currentPrice = parseFloat(newRow.find('.product-price').text()) || 0;
-                    let newPrice = currentPrice + totalAdditionalPrice;
-                    newPrice -= product_discount[rowindex];
-                    newRow.find('.product-price').text(newPrice.toFixed({{$general_setting->decimal}}));
-                    newRow.find('.sub-total').text(newPrice.toFixed({{$general_setting->decimal}}));
-                    newRow.find('.topping-price').val(totalAdditionalPrice.toFixed({{$general_setting->decimal}}));
+                    product_price[rowindex] = baseUnitPrice;
+                    
+                    var qty = newRow.find('.qty').val();
+                    checkDiscount(qty, true, baseUnitPrice);
                 }
 
                 $("#productSelectionModal").modal('hide');
                 $(".modal-backdrop").remove();
                 $("#productSelectionModal").remove();
-                calculateTotal();
             });
 
             // Stop further processing until the modal is resolved
@@ -2010,8 +2159,8 @@ function addNewProduct(data){
 }
 
 function populatePriceOption() {
-        var product_price = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product_price').val()).toFixed({{$general_setting->decimal}});
-        var ws_price = parseFloat(wholesale_price[rowindex]).toFixed({{$general_setting->decimal}});
+        var product_price = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product_price').val()).toFixed({{gen_setting()->decimal}});
+        var ws_price = parseFloat(wholesale_price[rowindex]).toFixed({{gen_setting()->decimal}});
 
         $('#editModal select[name=price_option]').empty();
         if(ws_price > 0)
@@ -2067,7 +2216,7 @@ function edit(){
         }
     @endif
 
-    $('input[name="edit_discount"]').val(parseFloat(product_discount[rowindex]).toFixed({{$general_setting->decimal}}));
+    $('input[name="edit_discount"]').val(parseFloat(product_discount[rowindex]).toFixed({{gen_setting()->decimal}}));
 
     var tax_name_all = <?php echo json_encode($tax_name_all) ?>;
     pos = tax_name_all.indexOf(tax_name[rowindex]);
@@ -2093,7 +2242,7 @@ function edit(){
         row_product_price = product_price[rowindex];
         $("#edit_unit").hide();
     }
-    $('input[name="edit_unit_price"]').val(row_product_price.toFixed({{$general_setting->decimal}}));
+    $('input[name="edit_unit_price"]').val(row_product_price.toFixed({{gen_setting()->decimal}}));
     $('.selectpicker').selectpicker('refresh');
 }
 
@@ -2134,84 +2283,93 @@ $(document).on("click", "table#imei-table tbody .imei-del", function() {
     calculateTotal();
 });
 
-function checkDiscount(qty, flag, price = 0) {
-    var customer_id = $('#customer_id').val();
-    var warehouse_id = $('#warehouse_id').val();
-    var product_id = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .product-id').val();
+/**
+ * checkDiscount — used only from the EDIT MODAL / qty-change path.
+ * NOT called during initial product add (discount now comes in server response).
+ * Converted from async:false to async:true to prevent UI thread blocking.
+ */
+function checkDiscount(qty, flag, price = 0, fiscalManualDiscount = null) {
+    const capturedRowindex = rowindex; // capture before async gap
+    const customer_id  = $('#customer_id').val();
+    const warehouse_id = $('#warehouse_id').val();
+    const $row         = $('table.order-list tbody tr:nth-child(' + (capturedRowindex + 1) + ')');
+    const product_id   = $row.find('.product-id').val();
 
-        $.ajax({
-            type: 'GET',
-            async: false,
-            url: '{{url("/")}}/sales/check-discount?qty='+qty+'&customer_id='+customer_id+'&product_id='+product_id+'&warehouse_id='+warehouse_id,
-            success: function(data) {
-                if(product_price[rowindex].length == 0){
-                    product_price[rowindex] = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .product_price').val();
-                }
-                if(price > 0){
-                    product_price[rowindex] = price;
-                    product_price[rowindex] = parseFloat(product_price[rowindex] * currency['exchange_rate']) + parseFloat(product_price[rowindex] * currency['exchange_rate'] * ($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').attr('data-group-price') == 1 ? 0 : customer_group_rate));
-                }
+    $.ajax({
+        type: 'GET',
+        async: true, // ✅ Never block the UI thread
+        url: '{{url("/")}}/sales/check-discount?qty=' + qty + '&customer_id=' + customer_id + '&product_id=' + product_id + '&warehouse_id=' + warehouse_id,
+        success: function(data) {
+            rowindex = capturedRowindex;
 
-                var productDiscount = parseFloat($('#discount').text());
-
-                if(flag == true)
-                    $('#discount').text(productDiscount+data[2]);
-                else if(flag == false)
-                    $('#discount').text(productDiscount-data[2]*qty);
-                else if(flag == 'input')
-                    $('#discount').text(productDiscount-data[2]*previousqty+data[2]*qty);
-                else
-                    $('#discount').text(productDiscount-data[2]);
+            if (String(product_price[rowindex]).length === 0) {
+                product_price[rowindex] = $row.find('.product_price').val();
             }
-        });
+            if (price > 0) {
+                product_price[rowindex] = parseFloat(price * currency['exchange_rate'])
+                    + parseFloat(price * currency['exchange_rate'] * ($row.attr('data-group-price') == 1 ? 0 : customer_group_rate));
+            }
 
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .qty').val(qty);
-    flag = true;
-    checkQuantity(String(qty), flag);
+            // Update stored discount then recalculate
+            product_discount[rowindex] = fiscalManualDiscount !== null
+                ? fiscalManualDiscount
+                : parseFloat(data[2] || 0) * currency['exchange_rate'];
+            $row.find('.qty').val(qty);
+            checkQuantity(String(qty), true);
+        }
+    });
 }
 
 function checkQuantity(sale_qty, flag) {
-    var row_product_code = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product-code').val();
-    var qty = parseFloat($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').attr('max'));
-    var product_type = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product_type').val();
-    var imeiNumbers = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.imei-number').val();
-    if(without_stock == 'no') {
-        if(product_type.trim() == 'standard' || product_type.trim() == 'combo') {
-            var operator = unit_operator[rowindex].split(',');
-            var operation_value = unit_operation_value[rowindex].split(',');
-            if(operator[0] == '*')
-                total_qty = sale_qty * operation_value[0];
-            else if(operator[0] == '/')
-                total_qty = sale_qty / operation_value[0];
-            if (total_qty > qty) {
-                if(imeiNumbers.length){
-                    // console.log(sale_qty);
-                    // sale_qty = (sale_qty + 1);
-                }else{
-                    alert('Quantity exceeds stock quantity!');
+    // Cache row reference once — avoid repeated nth-child DOM traversals
+    const $row        = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')');
+    const maxQty      = parseFloat($row.find('.qty').attr('max'));
+    const productType = $row.find('.product_type').val();
+    const imeiNumbers = $row.find('.imei-number').val();
+    sale_qty          = parseFloat(sale_qty);
 
+    if (without_stock == 'no') {
+        if (productType && (productType.trim() == 'standard' || productType.trim() == 'combo')) {
+            const operator        = unit_operator[rowindex].split(',');
+            const operation_value = unit_operation_value[rowindex].split(',');
+
+            let total_stock_qty = sale_qty;
+            if (operator[0] == '*')
+                total_stock_qty = sale_qty * operation_value[0];
+            else if (operator[0] == '/')
+                total_stock_qty = sale_qty / operation_value[0];
+
+            // ✅ Iterative clamp — replaces recursive call that risked stack overflow
+            if (total_stock_qty > maxQty && !isNaN(maxQty)) {
+                if (!imeiNumbers || !imeiNumbers.length) {
+                    SaleProToast.show('Quantity exceeds stock quantity!');
                     if (flag) {
-                        sale_qty = (sale_qty - 1);
-                        checkQuantity(sale_qty, true);
-                    }
-                    else {
+                        if (operator[0] == '*')
+                            sale_qty = Math.floor(maxQty / operation_value[0]);
+                        else if (operator[0] == '/')
+                            sale_qty = Math.floor(maxQty * operation_value[0]);
+                        else
+                            sale_qty = maxQty;
+                        sale_qty = Math.max(0, sale_qty);
+                    } else {
                         edit();
                         return;
                     }
                 }
 
-                if(sale_qty == 0) {
-                    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').remove();
+                if (sale_qty === 0) {
+                    $row.remove();
+                    calculateTotal();
+                    return;
                 }
             }
-            $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val(sale_qty);
         }
     }
-    else
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val(sale_qty);
-    if(!flag) {
+
+    $row.find('.qty').val(sale_qty);
+
+    if (!flag) {
         $('#editModal').modal('hide');
-        $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.qty').val(sale_qty);
     }
     calculateRowProductData(sale_qty);
 }
@@ -2228,46 +2386,53 @@ function unitConversion() {
 }
 
 function calculateRowProductData(quantity) {
+    quantity = parseFloat(quantity);
+
+    // Draft discount resolution (only applies when restoring a draft sale)
     if (product_discount[rowindex] < 1) {
-        cur_product_id = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .product-id').val();
+        const cur_product_id = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ') .product-id').val();
         @if (isset($draft_product_discount))
             if (product_discount[rowindex] < 1) {
-                draft_discounts = @json($draft_product_discount['discount']);
+                const draft_discounts = @json($draft_product_discount['discount']);
                 product_discount[rowindex] = draft_discounts[cur_product_id];
             }
         @endif
     }
 
-    if(product_type[pos] == 'standard')
+    // Cache row reference once — reused for all reads/writes below
+    const $row = $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')');
+    const productTypeVal = $row.find('.product_type').val();
+    if (productTypeVal && productTypeVal.trim() == 'standard')
         unitConversion();
     else
         row_product_price = product_price[rowindex];
+
+    let net_unit_price, tax, sub_total, sub_total_unit;
+
     if (tax_method[rowindex] == 1) {
-        var net_unit_price = row_product_price - product_discount[rowindex];
-        var tax = net_unit_price * quantity * (tax_rate[rowindex] / 100);
-        var sub_total = (net_unit_price * quantity) + tax;
-
-        if(parseFloat(quantity))
-            var sub_total_unit = sub_total / quantity;
-        else
-            var sub_total_unit = sub_total;
-    }
-    else {
-        var sub_total_unit = row_product_price - product_discount[rowindex];
-        var net_unit_price = (100 / (100 + tax_rate[rowindex])) * sub_total_unit;
-        var tax = (sub_total_unit - net_unit_price) * quantity;
-        var sub_total = sub_total_unit * quantity;
+        net_unit_price = row_product_price - product_discount[rowindex];
+        tax            = net_unit_price * quantity * (tax_rate[rowindex] / 100);
+        sub_total      = net_unit_price * quantity + tax;
+        sub_total_unit = quantity ? sub_total / quantity : sub_total;
+    } else {
+        sub_total_unit = row_product_price - product_discount[rowindex];
+        net_unit_price = (100 / (100 + tax_rate[rowindex])) * sub_total_unit;
+        tax            = (sub_total_unit - net_unit_price) * quantity;
+        sub_total      = sub_total_unit * quantity;
     }
 
-    var topping_price = ($('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.topping-price').val() * quantity) || 0;
-
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.discount-value').val((product_discount[rowindex] * quantity).toFixed({{$general_setting->decimal}}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-rate').val(tax_rate[rowindex].toFixed({{$general_setting->decimal}}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.net_unit_price').val(net_unit_price.toFixed({{$general_setting->decimal}}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.tax-value').val(tax.toFixed({{$general_setting->decimal}}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.product-price').text(sub_total_unit.toFixed({{$general_setting->decimal}}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.sub-total').text((sub_total+topping_price).toFixed({{$general_setting->decimal}}));
-    $('table.order-list tbody tr:nth-child(' + (rowindex + 1) + ')').find('.subtotal-value').val((sub_total+topping_price).toFixed({{$general_setting->decimal}}));
+    const dp = {{gen_setting()->decimal}};
+    $row.find('.discount-value').val((product_discount[rowindex] * quantity).toFixed(dp));
+    $row.find('.tax-rate').val(tax_rate[rowindex].toFixed(dp));
+    // SaleDomainService applies discount[] itself during Phase 2 reconciliation.
+    // Submit the pre-discount unit price here; submitting the already-discounted
+    // net value would subtract the same line discount twice on the server.
+    $row.find('.net_unit_price').val((document.querySelector('[data-zatca-sale-preview]')
+        ? parseFloat(row_product_price) : net_unit_price).toFixed(dp));
+    $row.find('.tax-value').val(tax.toFixed(dp));
+    $row.find('.product-price').text(sub_total_unit.toFixed(dp));
+    $row.find('.sub-total').text(sub_total.toFixed(dp));
+    $row.find('.subtotal-value').val(sub_total.toFixed(dp));
 
     calculateTotal();
 }
@@ -2290,24 +2455,24 @@ function calculateTotal() {
     $("table.order-list tbody .discount-value").each(function() {
         total_discount += parseFloat($(this).val());
     });
-    $("#total-discount").text(total_discount.toFixed({{$general_setting->decimal}}));
-    $('input[name="total_discount"]').val(total_discount.toFixed({{$general_setting->decimal}}));
+    $("#total-discount").text(total_discount.toFixed({{gen_setting()->decimal}}));
+    $('input[name="total_discount"]').val(total_discount.toFixed({{gen_setting()->decimal}}));
 
     //Sum of tax
     var total_tax = 0;
     $(".tax-value").each(function() {
         total_tax += parseFloat($(this).val());
     });
-    $("#total-tax").text(total_tax.toFixed({{$general_setting->decimal}}));
-    $('input[name="total_tax"]').val(total_tax.toFixed({{$general_setting->decimal}}));
+    $("#total-tax").text(total_tax.toFixed({{gen_setting()->decimal}}));
+    $('input[name="total_tax"]').val(total_tax.toFixed({{gen_setting()->decimal}}));
 
     //Sum of subtotal
     var total = 0;
     $(".sub-total").each(function() {
         total += parseFloat($(this).text());
     });
-    $("#total").text(total.toFixed({{$general_setting->decimal}}));
-    $('input[name="total_price"]').val(total.toFixed({{$general_setting->decimal}}));
+    $("#total").text(total.toFixed({{gen_setting()->decimal}}));
+    $('input[name="total_price"]').val(total.toFixed({{gen_setting()->decimal}}));
 
     calculateGrandTotal();
     payment_amount();
@@ -2325,7 +2490,7 @@ function calculateGrandTotal() {
     var order_discount_value = parseFloat($('input[name="order_discount_value"]').val());
 
     if (!order_discount_value)
-        order_discount_value = {{number_format(0, $general_setting->decimal, '.', '')}};
+        order_discount_value = {{number_format(0, gen_setting()->decimal, '.', '')}};
 
     if(order_discount_type == 'Flat') {
         if(!currencyChange) {
@@ -2337,7 +2502,7 @@ function calculateGrandTotal() {
     else
         var order_discount = parseFloat(subtotal * (order_discount_value / 100));
 
-    $("#discount").text(order_discount_value.toFixed({{$general_setting->decimal}}));
+    $("#discount").text(order_discount_value.toFixed({{gen_setting()->decimal}}));
     $('input[name="order_discount"]').val(order_discount);
     $('#order-discount-val').val(order_discount_value);
     $('input[name="order_discount_type"]').val(order_discount_type);
@@ -2346,33 +2511,34 @@ function calculateGrandTotal() {
     else
         var shipping_cost = parseFloat($('input[name="shipping_cost"]').val() * currency['exchange_rate']);
     if (shipping_cost.length < 1)
-        shipping_cost = {{number_format(0, $general_setting->decimal, '.', '')}};
+        shipping_cost = {{number_format(0, gen_setting()->decimal, '.', '')}};
 
     item = ++item + '(' + total_qty + ')';
     order_tax = (subtotal - order_discount) * (order_tax / 100);
     var grand_total = (subtotal + order_tax + shipping_cost) - order_discount;
-    $('input[name="grand_total"]').val(grand_total.toFixed({{$general_setting->decimal}}));
+    $('input[name="grand_total"]').val(grand_total.toFixed({{gen_setting()->decimal}}));
 
     if(!currencyChange)
         var coupon_discount = parseFloat($('input[name="coupon_discount"]').val());
     else
         var coupon_discount = parseFloat($('input[name="coupon_discount"]').val() * currency['exchange_rate']);
     if (!coupon_discount)
-        coupon_discount = {{number_format(0, $general_setting->decimal, '.', '')}};
+        coupon_discount = {{number_format(0, gen_setting()->decimal, '.', '')}};
     grand_total -= coupon_discount;
 
     $('#item').text(item);
     $('input[name="item"]').val($('table.order-list tbody tr:last').index() + 1);
-    $('#subtotal').text(subtotal.toFixed({{$general_setting->decimal}}));
-    $('#order_tax').text(order_tax.toFixed({{$general_setting->decimal}}));
-    $('#tax').text(order_tax.toFixed({{$general_setting->decimal}}));
-    $('input[name="order_tax"]').val(order_tax.toFixed({{$general_setting->decimal}}));
-    $('#order_discount').text(order_discount.toFixed({{$general_setting->decimal}}));
-    $('#shipping_cost').text(shipping_cost.toFixed({{$general_setting->decimal}}));
+    $('#subtotal').text(subtotal.toFixed({{gen_setting()->decimal}}));
+    $('#order_tax').text(order_tax.toFixed({{gen_setting()->decimal}}));
+    $('#tax').text(order_tax.toFixed({{gen_setting()->decimal}}));
+    $('input[name="order_tax"]').val(order_tax.toFixed({{gen_setting()->decimal}}));
+    $('#order_discount').text(order_discount.toFixed({{gen_setting()->decimal}}));
+    $('#shipping_cost').text(shipping_cost.toFixed({{gen_setting()->decimal}}));
     $('input[name="shipping_cost"]').val(shipping_cost);
-    $('#grand_total').text(grand_total.toFixed({{$general_setting->decimal}}));
-    $('input[name="grand_total"]').val(grand_total.toFixed({{$general_setting->decimal}}));
+    $('#grand_total').text(grand_total.toFixed({{gen_setting()->decimal}}));
+    $('input[name="grand_total"]').val(grand_total.toFixed({{gen_setting()->decimal}}));
     currencyChange = false;
+    $(document).trigger('credit_limit_check_required');
 }
 
 function cancel(rownumber) {
@@ -2428,6 +2594,7 @@ function payment_amount(){
             $('input[name="paid_amount[]"]').val($('input[name="grand_total"]').val());
         }
         $("#account-list").attr("hidden", false);
+        $(document).trigger('credit_limit_check_required');
     }
     else{
         $("#paying-amount").prop('required',false);
@@ -2436,6 +2603,7 @@ function payment_amount(){
         $('input[name="paid_amount[]"]').val('');
         $("#payment").hide();
         $("#account-list").attr("hidden", true);
+        $(document).trigger('credit_limit_check_required');
     }
 }
 
@@ -2498,30 +2666,79 @@ $('select[name="paid_by_id[]"]').on("change", function() {
         $("#cheque").hide();
         if (id == 6) {
             if($('input[name="paid_amount[]"]').val() > deposit[$('#customer_id').val()]){
-                alert('Amount exceeds customer deposit! Customer deposit : '+ deposit[$('#customer_id').val()]);
+                SaleProToast.error('Amount exceeds customer deposit! Customer deposit : ' + deposit[$('#customer_id').val()]);
             }
         }
         else if (id == 7) {
-            pointCalculation();
+            var pointAlreadyExists = false;
+            var $currentSelect = $(this);
+            $('select[name="paid_by_id[]"]').each(function() {
+                if (!$(this).is($currentSelect) && $(this).val() == '7') {
+                    pointAlreadyExists = true;
+                    return false;
+                }
+            });
+
+            if (pointAlreadyExists) {
+                SaleProToast.show('Points Payment has already been added. Multiple points payment is not allowed.');
+                $(this).val('1').selectpicker('refresh');
+                return;
+            }
+
+            let isValid = pointCalculation();
+            if (!isValid) {
+                $(this).val('1').selectpicker('refresh');
+                return;
+            }
         }
     }
 });
 
 function pointCalculation() {
-    paid_amount = $('input[name="paid_amount[]"]').val();
-    required_point = Math.ceil(paid_amount / reward_point_setting['per_point_amount']);
-    if(required_point > points[$('#customer_id').val()]) {
-        alert('Customer does not have sufficient points. Available points: '+points[$('#customer_id').val()]);
+    let paid_amount = parseFloat($('input[name="paid_amount[]"]').val()) || 0;
+    let customerPoints = points[$('#customer_id').val()] || 0;
+    
+    let perPoint = reward_point_setting['redeem_amount_per_unit_rp'] || 1;
+    let minPoints = reward_point_setting['min_redeem_point'] || 0;
+    let maxPoints = reward_point_setting['max_redeem_point'] || 0;
+    let minOrderTotal = reward_point_setting['min_order_total_for_redeem'] || 0;
+    let total_bill = parseFloat($('input[name="grand_total"]').val()) || 0;
+
+    let required_point = Math.ceil(paid_amount / perPoint);
+
+    if (minPoints > 0 && required_point < minPoints) {
+        required_point = minPoints;
     }
-    else {
-        $("input[name='used_points']").val(required_point);
+
+    if (maxPoints > 0 && required_point > maxPoints) {
+        required_point = maxPoints;
     }
+
+    if (paid_amount <= 0) {
+        SaleProToast.show('⚠️ Paid amount is required.');
+        return false;
+    }
+    
+    if (minOrderTotal > 0 && total_bill < minOrderTotal) {
+        SaleProToast.show('⚠️ Order total must be at least ' + minOrderTotal + ' to redeem points.');
+        return false;
+    }
+
+    if (required_point > customerPoints) {
+        SaleProToast.show('⚠️ Not enough points\n' +
+            'Required: ' + required_point +
+            '\nAvailable: ' + customerPoints);
+        return false;
+    }
+
+    $("input[name='redeem_point']").val(required_point);
+    return true;
 }
 
 $('select[name="gift_card_id"]').on("change", function() {
     var balance = gift_card_amount[$(this).val()] - gift_card_expense[$(this).val()];
     if($('input[name="paid_amount[]"]').val() > balance){
-        alert('Amount exceeds card balance! Gift Card balance: '+ balance);
+        SaleProToast.show('Amount exceeds card balance! Gift Card balance: '+ balance);
     }
 });
 
@@ -2529,13 +2746,13 @@ $('input[name="paid_amount[]"]').on("input", function() {
     if( $(this).val() > parseFloat($('input[name="paying_amount[]"]').val()) ) {
         $('#paying-amount-error').addClass('d-none');
         $("#submit-button").prop('disabled', true).css('cursor', 'default');
-        alert('Paying amount cannot be bigger than recieved amount');
+        SaleProToast.show('Paying amount cannot be bigger than recieved amount');
         // $(this).val('');
     }
     else if( $(this).val() > parseFloat($('#grand_total').text()) ){
         $('#paying-amount-error').addClass('d-none');
         $("#submit-button").prop('disabled', true).css('cursor', 'default');
-        alert('Paying amount cannot be bigger than grand total');
+        SaleProToast.show('Paying amount cannot be bigger than grand total');
         // $(this).val('');
     } else if ($(this).val() <= 0) {
         $("#submit-button").prop('disabled', true).css('cursor', 'default');
@@ -2545,21 +2762,37 @@ $('input[name="paid_amount[]"]').on("input", function() {
         $("#submit-button").prop('disabled', false).css('cursor', 'pointer');
     }
 
-    $("#change").text( parseFloat($("#paying-amount").val() - $(this).val()).toFixed({{$general_setting->decimal}}) );
+    $("#change").text( parseFloat($("#paying-amount").val() - $(this).val()).toFixed({{gen_setting()->decimal}}) );
     var id = $('select[name="paid_by_id[]"]').val();
     if(id == 2){
         var balance = gift_card_amount[$("#gift_card_id").val()] - gift_card_expense[$("#gift_card_id").val()];
         if($(this).val() > balance)
-            alert('Amount exceeds card balance! Gift Card balance: '+ balance);
+            SaleProToast.show('Amount exceeds card balance! Gift Card balance: '+ balance);
     }
     else if(id == 6){
         if( $('input[name="paid_amount[]"]').val() > deposit[$('#customer_id').val()] )
-            alert('Amount exceeds customer deposit! Customer deposit : '+ deposit[$('#customer_id').val()]);
+            SaleProToast.error('Amount exceeds customer deposit! Customer deposit : ' + deposit[$('#customer_id').val()]);
+    }
+    else if (id == 7) {
+        let paid_amount = parseFloat($(this).val()) || 0;
+        let customerPoints = points[$('#customer_id').val()] || 0;
+        let perPoint = reward_point_setting['redeem_amount_per_unit_rp'] || 1;
+        let maxPoints = reward_point_setting['max_redeem_point'] || 0;
+        
+        let required_point = Math.ceil(paid_amount / perPoint);
+        
+        if (required_point > customerPoints) {
+            SaleProToast.show('⚠️ Not enough points. You only have ' + customerPoints + ' points available.');
+            $(this).val(0);
+        } else if (maxPoints > 0 && required_point > maxPoints) {
+            SaleProToast.show('⚠️ You can redeem a maximum of ' + maxPoints + ' points.');
+            $(this).val(0);
+        }
     }
 });
 
 $('input[name="paying_amount[]"]').on("input", function() {
-    $("#change").text( parseFloat( $(this).val() - $("#paid-amount").val()).toFixed({{$general_setting->decimal}}));
+    $("#change").text( parseFloat( $(this).val() - $("#paid-amount").val()).toFixed({{gen_setting()->decimal}}));
 });
 
 $(window).keydown(function(e){
@@ -2631,108 +2864,110 @@ $("#submit-button").on("click", function (e) {
     form.trigger("submit");
 });
 
+let addSaleSubmitting = false;
+
 $(document).on('submit', '.payment-form', function(e) {
+    e.preventDefault();
+
+    if (window.ZatcaSalePreview && !window.ZatcaSalePreview.canSubmit(this)) { return false; }
+
+    if (addSaleSubmitting) {
+        return false;
+    }
+
+    if (window.SaleRequestFeedback) {
+        window.SaleRequestFeedback.clear();
+    }
+
     let hasError = false;
 
     $('table.order-list tbody tr').each(function () {
         let batchInput = $(this).find('.batch-no');
-        let batchId    = $(this).find('.product-batch-id').val();
-        let expiryText = $(this).find('.expired-date').text().trim();
+        let batchId = $(this).find('.product-batch-id').val();
         let productName = $(this).find('.product-name').text() || 'This product';
 
-        // If batch input exists (not hidden)
         if (batchInput.length && !batchInput.hasClass('d-none')) {
-
-            // Batch missing
             if (!batchInput.val()) {
-                alert(productName + ': Batch number is required!');
+                SaleProToast.show(productName + ': Batch number is required!');
                 hasError = true;
                 return false;
             }
 
-            // Batch ID missing (means invalid batch)
             if (!batchId) {
-                alert(productName + ': Invalid batch selected!');
+                SaleProToast.show(productName + ': Invalid batch selected!');
                 hasError = true;
                 return false;
             }
-
-            // // Expiry missing
-            // if (!expiryText) {
-            //     alert(productName + ': Expiry date not found!');
-            //     hasError = true;
-            //     return false;
-            // }
-
-            // // Expired product check
-            // if (expiryText.toLowerCase() === 'expired') {
-            //     alert(productName + ': This batch is expired!');
-            //     hasError = true;
-            //     return false;
-            // }
-
-            // // Date comparison (extra safety)
-            // let today = new Date();
-            // let expiryDate = new Date(expiryText);
-
-            // if (!isNaN(expiryDate) && expiryDate < today) {
-            //     alert(productName + ': Expired batch cannot be sold!');
-            //     hasError = true;
-            //     return false;
-            // }
         }
     });
 
     if (hasError) {
-        e.preventDefault();
         return false;
     }
 
-    let customer_type = $('#customer_id option:selected').data('type');
-    let current_payment_status = parseInt($('select[name="payment_status"]').val());
+    let customerType = $('#customer_id option:selected').data('type');
+    let currentPaymentStatus = parseInt($('select[name="payment_status"]').val());
+    let rownumber = $('table.order-list tbody tr:last').index();
+    let hasEmptyQty = false;
 
-    var rownumber = $('table.order-list tbody tr:last').index();
-    $("table.order-list tbody .qty").each(function(index) {
-        if ($(this).val() == '') {
-            alert('One of products has no quantity!');
-            e.preventDefault();
+    $('table.order-list tbody .qty').each(function () {
+        if ($(this).val() === '') {
+            hasEmptyQty = true;
+            return false;
         }
     });
 
-    if (customer_type === 'walkin' && current_payment_status !== 4) {
-        alert('Payment Status should be Paid for Walk in Customer!');
-        e.preventDefault();
+    if (hasEmptyQty) {
+        SaleProToast.show('One of products has no quantity!');
+        return false;
     }
-    else if ( rownumber < 0 ) {
-        alert("Please insert product to order table!")
-        e.preventDefault();
-    }
-    else if(parseFloat($('input[name="total_qty"]').val()) <= 0) {
-        alert('Product quantity is 0');
-        e.preventDefault();
-    }
-    else if( parseFloat($("#paying-amount").val()) < parseFloat($("#paid-amount").val()) ){
-        alert('Paying amount cannot be bigger than recieved amount');
-        e.preventDefault();
-    }
-    else if( $('select[name="payment_status"]').val() == 3 && parseFloat($("#paid-amount").val()) == parseFloat($('input[name="grand_total"]').val()) ) {
-        alert('Paying amount equals to grand total! Please change payment status.');
-        e.preventDefault();
-    }
-    else if(!$('#biller_id').val()) {
-        alert('Please select a biller');
-        e.preventDefault();
-    }
-    else {
-        $("#submit-button").prop('disabled', true);
-        $("#paid-amount").prop('disabled',false);
-        $(".batch-no").prop('disabled', false);
 
-        e.preventDefault(); // Prevents the default form submission behavior
+    if (customerType === 'walkin' && currentPaymentStatus !== 4) {
+        SaleProToast.show('Payment Status should be Paid for Walk in Customer!');
+        return false;
+    }
+
+    if (rownumber < 0) {
+        SaleProToast.show('Please insert product to order table!');
+        return false;
+    }
+
+    if (parseFloat($('input[name="total_qty"]').val()) <= 0) {
+        SaleProToast.show('Product quantity is 0');
+        return false;
+    }
+
+    if (parseFloat($('#paying-amount').val()) < parseFloat($('#paid-amount').val())) {
+        SaleProToast.show('Paying amount cannot be bigger than recieved amount');
+        return false;
+    }
+
+    if (
+        $('select[name="payment_status"]').val() == 3 &&
+        parseFloat($('#paid-amount').val()) == parseFloat($('input[name="grand_total"]').val())
+    ) {
+        SaleProToast.show('Paying amount equals to grand total! Please change payment status.');
+        return false;
+    }
+
+    if (!$('#biller_id').val()) {
+        SaleProToast.show('Please select a biller');
+        return false;
+    }
+
+    const form = $(this);
+
+    const submitSale = function () {
+        addSaleSubmitting = true;
+        $('#submit-button').html('<svg fill="#f5f5f5" width="30" height="30" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,19a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z" opacity=".25"/><path d="M12,4a8,8,0,0,1,7.89,6.7A1.53,1.53,0,0,0,21.38,12h0a1.5,1.5,0,0,0,1.48-1.75,11,11,0,0,0-21.72,0A1.5,1.5,0,0,0,2.62,12h0a1.53,1.53,0,0,0,1.49-1.3A8,8,0,0,1,12,4Z"><animateTransform attributeName="transform" type="rotate" dur="0.75s" values="0 12 12;360 12 12" repeatCount="indefinite"/></path></svg>');
+        $('#submit-button').prop('disabled', true);
+        $('#paid-amount').prop('disabled', false);
+        $('.batch-no').prop('disabled', false);
+
         $.ajax({
-            url: $('.payment-form').attr('action'),
-            type: $('.payment-form').attr('method'),
-            data: $('.payment-form').serialize(),
+            url: form.attr('action'),
+            type: form.attr('method'),
+            data: form.serialize(),
             success: function(response) {
 
                 if (response.payment_method === 'pesapal' && response.redirect_url) {
@@ -2746,10 +2981,10 @@ $(document).on('submit', '.payment-form', function(e) {
                         type: 'GET',
                         success: function(data) {
                             if (data.trim() === 'receipt_printer') {
-                                alert("{{ __('db.The receipt has been successfully printed') }}");
+                                SaleProToast.show("{{ __('db.The receipt has been successfully printed');}}");
                                 location.href = "{{route('sales.index')}}";
                             } else if (data.trim() === 'invoice_settings_error') {
-                                alert("{{ __('db.Please select either the 58mm or 80mm template as the default in Invoice Settings') }}");
+                                SaleProToast.show("{{ __('db.Please select either the 58mm or 80mm template as the default in Invoice Settings');}}");
                                 location.href = "{{route('sales.index')}}";
                             } else {
                                 location.href = link;
@@ -2770,12 +3005,31 @@ $(document).on('submit', '.payment-form', function(e) {
                 }
             },
             error: function(xhr) {
-                alert(xhr.responseJSON.message);
-                $("#submit-button").prop('disabled', false);
+                addSaleSubmitting = false;
+
+                if (window.SaleRequestFeedback) {
+                    window.SaleRequestFeedback.showXhrError(xhr, true);
+                } else {
+                    const response = xhr.responseJSON || {};
+                    SaleProToast.show(response.message || response.error || @json(__('db.generic_error_please_try_again')));
+                }
+
+                $('#submit-button').prop('disabled', false).html("{{__('db.submit')}}");
             }
         });
+    };
 
+    if (window.SaleCreditLimit) {
+        window.SaleCreditLimit.validate({ focusError: true }).done(function (allowed) {
+            if (allowed) {
+                submitSale();
+            }
+        });
+    } else {
+        submitSale();
     }
+
+    return false;
 });
 </script>
 <script type="text/javascript" src="https://js.stripe.com/v3/"></script>

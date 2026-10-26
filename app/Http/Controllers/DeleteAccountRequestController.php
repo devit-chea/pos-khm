@@ -12,11 +12,11 @@ class DeleteAccountRequestController extends Controller
     public function show()
     {
         if (config('database.connections.saleprosaas_landlord') && !tenant()) {
-            $general_setting = GeneralSetting::latest()->first();
+            $general_setting = cache()->get('general_setting');
             $theme = $general_setting->theme ?? 'light';
             $tenants = Tenant::all();
         } else {
-            $general_setting = GeneralSetting::latest()->first();
+            $general_setting = cache()->get('general_setting');
             $theme = $general_setting->theme ?? 'light';
             $tenants = [];
         }
