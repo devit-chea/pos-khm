@@ -1,0 +1,49 @@
+# Production image (DigitalOcean Droplet, used by docker-compose.prod.yml).
+# Unlike Dockerfile (local dev, source bind-mounted), the code is baked into the image
+# and uploads/storage live on named volumes. See docker/production/README.md.
+FROM php:8.3-apache
+
+# System libraries + PHP extensions required by composer.lock (gd, zip, intl, bcmath, exif, calendar, pdo_mysql)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        unzip libzip-dev libicu-dev libpng-dev libjpeg62-turbo-dev \
+        libfreetype6-dev libwebp-dev default-mysql-client \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+    && docker-php-ext-install -j"$(nproc)" pdo_mysql mysqli gd zip intl bcmath exif calendar opcache \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY docker/production/php.ini /usr/local/etc/php/conf.d/app.ini
+COPY docker/apache/vhost.conf /etc/apache2/sites-available/000-default.conf
+RUN a2enmod rewrite headers \
+    # Apache logs to stdout/stderr -> `docker compose logs app`
+    && sed -ri 's#^(\s*)ErrorLog .*#\1ErrorLog /proc/self/fd/2#; s#^(\s*)CustomLog .*#\1CustomLog /proc/self/fd/1 combined#' \
+        /etc/apache2/sites-available/000-default.conf
+
+WORKDIR /var/www/html
+
+# Install dependencies first for better layer caching
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --no-scripts --no-autoloader --prefer-dist
+
+COPY . .
+# Upload folders are mounted as volumes; they must exist and belong to www-data in the image
+# so a new volume starts with the shipped default images and is writable.
+RUN rm -f .env bootstrap/cache/*.php \
+    && composer dump-autoload --optimize --no-dev \
+    && mkdir -p storage/app/public storage/framework/cache/data storage/framework/sessions \
+        storage/framework/views storage/logs bootstrap/cache \
+        public/images public/documents public/logo public/downloads public/invoices public/stock_count \
+        public/product/files public/frontend/images \
+        public/sale/documents public/purchase/documents public/transfer/documents \
+    && ln -sfn ../storage/app/public public/storage \
+    && chown -R www-data:www-data storage bootstrap/cache \
+        public/images public/documents public/logo public/downloads public/invoices public/stock_count \
+        public/product/files public/frontend/images \
+        public/sale/documents public/purchase/documents public/transfer/documents
+
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+EXPOSE 80
+ENTRYPOINT ["entrypoint.sh"]
+CMD ["apache2-foreground"]

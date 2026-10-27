@@ -8,3 +8,4 @@ storage/framework/views/*
 bootstrap/cache/*.php
 docker/mysql/init
 .env
+.git

@@ -1,0 +1,15 @@
+# HTTPS reverse proxy. Caddy gets and renews a Let's Encrypt certificate for {$DOMAIN}
+# automatically; the domain's DNS A record must point at the Droplet first.
+{$DOMAIN} {
+	encode gzip
+
+	# Vendor routes that run migrations / clear caches without authentication
+	@maintenance path /migrate /migrate/* /clear /clear/*
+	respond @maintenance 404
+
+	request_body {
+		max_size 64MB
+	}
+
+	reverse_proxy app:80
+}

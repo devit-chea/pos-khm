@@ -1,0 +1,95 @@
+# Production stack for a DigitalOcean Droplet (see docker/production/README.md):
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Secrets come from .env on the server (never committed).
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: salepro-app:prod
+    container_name: salepro-prod-app
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    # Real environment variables take precedence over values in .env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      # Only Caddy can reach the app (no published port), so trusting all proxies is safe
+      TRUSTED_PROXIES: "*"
+    volumes:
+      - storage:/var/www/html/storage
+      - images:/var/www/html/public/images
+      - documents:/var/www/html/public/documents
+      - logo:/var/www/html/public/logo
+      - downloads:/var/www/html/public/downloads
+      - invoices:/var/www/html/public/invoices
+      - stock_count:/var/www/html/public/stock_count
+      - product_files:/var/www/html/public/product/files
+      - frontend_images:/var/www/html/public/frontend/images
+      - sale_documents:/var/www/html/public/sale/documents
+      - purchase_documents:/var/www/html/public/purchase/documents
+      - transfer_documents:/var/www/html/public/transfer/documents
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    container_name: salepro-prod-db
+    command: --default-authentication-plugin=mysql_native_password --max_allowed_packet=256M
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    # No published port: MySQL is only reachable from the app container
+    volumes:
+      - db_data:/var/lib/mysql
+      # *.sql / *.sql.gz here is imported on the FIRST start (empty db_data volume) only
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.8
+    container_name: salepro-prod-caddy
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./docker/production/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+# NOTE: no scheduler service on purpose — app/Console/Kernel.php schedules `reset:db`,
+# which drops every table twice a day (vendor demo reset).
+
+volumes:
+  db_data:
+  storage:
+  images:
+  documents:
+  logo:
+  downloads:
+  invoices:
+  stock_count:
+  product_files:
+  frontend_images:
+  sale_documents:
+  purchase_documents:
+  transfer_documents:
+  caddy_data:
+  caddy_config:

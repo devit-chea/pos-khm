@@ -25,4 +25,21 @@ class TrustProxies extends Middleware
         Request::HEADER_X_FORWARDED_PORT |
         Request::HEADER_X_FORWARDED_PROTO |
         Request::HEADER_X_FORWARDED_AWS_ELB;
+
+    /**
+     * Trusted proxies can also come from TRUSTED_PROXIES ("*" or comma-separated IPs),
+     * e.g. behind the Caddy reverse proxy in docker-compose.prod.yml so https:// URLs are generated.
+     *
+     * @return array|string|null
+     */
+    protected function proxies()
+    {
+        $fromEnv = env('TRUSTED_PROXIES');
+
+        if (! empty($fromEnv)) {
+            return $fromEnv === '*' ? '*' : array_map('trim', explode(',', $fromEnv));
+        }
+
+        return parent::proxies();
+    }
 }

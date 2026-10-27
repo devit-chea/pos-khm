@@ -9,18 +9,26 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Same columns as Modules/Repair's migration of the same name; skip whatever already exists
+        // so a fresh database can run both.
         Schema::table('sales', function (Blueprint $table) {
-            $table->unsignedBigInteger('service_id')
-                  ->nullable()
-                  ->after('sale_note')
-                  ->index();
-            $table->unsignedBigInteger('repair_id')
-                  ->nullable()
-                  ->after('service_id')
-                  ->index();
-            $table->decimal('service_charge', 15, 4)
-                  ->default(0)
-                  ->after('shipping_cost');
+            if (!Schema::hasColumn('sales', 'service_id')) {
+                $table->unsignedBigInteger('service_id')
+                      ->nullable()
+                      ->after('sale_note')
+                      ->index();
+            }
+            if (!Schema::hasColumn('sales', 'repair_id')) {
+                $table->unsignedBigInteger('repair_id')
+                      ->nullable()
+                      ->after('service_id')
+                      ->index();
+            }
+            if (!Schema::hasColumn('sales', 'service_charge')) {
+                $table->decimal('service_charge', 15, 4)
+                      ->default(0)
+                      ->after('shipping_cost');
+            }
         });
 
         Schema::table('payments', function (Blueprint $table) { 
