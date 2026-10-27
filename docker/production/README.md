@@ -26,7 +26,7 @@ ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw enable
 ```bash
 git clone https://github.com/<you>/<repo>.git /opt/salepro   # or upload the zip and unzip it there
 cd /opt/salepro
-git checkout upgrade/6.1.5                                   # the branch you deploy
+git checkout deploy/digitalocean                             # the branch you deploy
 ```
 
 ## 3. Create `.env` on the server
@@ -42,7 +42,7 @@ Set at least:
 |---|---|
 | `APP_URL` | `https://pos.example.com` |
 | `DOMAIN` | `pos.example.com` |
-| `APP_KEY` | leave empty for now, generated in step 4 |
+| `APP_KEY` | **copying existing data (4A):** the `APP_KEY` from your local `.env`; some settings (AI provider, WooCommerce credentials, notification deliveries) are encrypted with it. **Starting empty (4B):** leave empty, generated in step 4 |
 | `DB_DATABASE`, `DB_USERNAME` | e.g. `salepro` |
 | `DB_PASSWORD`, `DB_ROOT_PASSWORD` | long random values (`openssl rand -base64 24`) |
 | `VERSION`, mail settings, `PRINTNODE_API_KEY`, payment keys… | copy from your local `.env` as needed |
@@ -54,7 +54,7 @@ Set at least:
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml exec app php artisan key:generate --show
-# put the printed base64:... value into APP_KEY in .env, then:
+# only if APP_KEY is still empty: put the printed base64:... value into APP_KEY in .env, then:
 docker compose -f docker-compose.prod.yml up -d
 ```
 
